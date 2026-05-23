@@ -1,0 +1,63 @@
+name: SIT Deploy
+
+on:
+  push:
+    branches: [sit]
+
+jobs:
+  build-api:
+    name: Build API
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Detect stack
+        id: stack
+        run: |
+          if [ -f "apps/api/*.csproj" ] || [ -f "*.sln" ]; then
+            echo "dotnet=true" >> $GITHUB_OUTPUT
+          fi
+      - name: Set up .NET
+        if: steps.stack.outputs.dotnet == 'true'
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Build .NET
+        if: steps.stack.outputs.dotnet == 'true'
+        run: dotnet build -c Release
+
+  build-web:
+    name: Build Web
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22.x'
+      - name: Install
+        run: npm install --legacy-peer-deps
+      - name: Build
+        run: npm run build:sit
+
+  deploy-api:
+    name: Deploy API
+    runs-on: ubuntu-latest
+    needs: build-api
+    environment: SIT
+    steps:
+      - name: Trigger deploy hook
+        if: ${{ secrets.API_DEPLOY_HOOK_URL != '' }}
+        run: |
+          curl -fsSL -X POST "${{ secrets.API_DEPLOY_HOOK_URL }}" \
+            -o /dev/null -w "HTTP %{http_code}\n"
+
+  deploy-web:
+    name: Deploy Web
+    runs-on: ubuntu-latest
+    needs: build-web
+    environment: SIT
+    steps:
+      - name: Trigger deploy hook
+        if: ${{ secrets.WEB_DEPLOY_HOOK_URL != '' }}
+        run: |
+          curl -fsSL -X POST "${{ secrets.WEB_DEPLOY_HOOK_URL }}" \
+            -o /dev/null -w "HTTP %{http_code}\n"
