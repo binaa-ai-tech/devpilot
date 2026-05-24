@@ -17,36 +17,39 @@ Tick every box before marking the Jira ticket Done.
 
 ## Step 3 — Branch
 
-- [ ] Branch named `feature/<KEY>-<kebab-summary>`
-- [ ] Branched from latest `main`
-- [ ] Baseline `npm test` passes on branch
+- [ ] Branch named `feature/{prefix}-<n>-<slug>`
+- [ ] Branched from latest **`develop`** (not main)
+- [ ] Baseline tests pass on branch
 
 ## Step 4 — Implement
 
 - [ ] All acceptance criteria implemented
-- [ ] Code follows `.aidev/rules.md` (no `any`, takeUntilDestroyed, OnPush, etc.)
+- [ ] Code follows `.aidev/rules.md`
 - [ ] Tests added alongside new code
 - [ ] Commits use Conventional Commits + ticket key
 
 ## Step 5 — Self-review
 
-- [ ] Self-review prompt run on diff
+- [ ] `git diff develop...HEAD` reviewed against `rules.md`
 - [ ] All BLOCKERS resolved
-- [ ] Suggestions addressed or deferred (noted in PR)
+- [ ] Warnings addressed or deferred (noted in PR)
 
-## Step 6 — Test & verify
+## Step 6 — Test & Verify
 
-- [ ] `npm test` green
-- [ ] `npm run lint` clean
-- [ ] `npm run build` clean
-- [ ] Manual smoke test done in dev
-- [ ] DB changes (if any) verified across dev → UAT
+- [ ] Tests green
+- [ ] Lint clean
+- [ ] Build clean
+- [ ] Manual smoke test done
 
-## Step 7 — Deploy & close
+## Step 7 — Deploy pipeline
 
-- [ ] PR opened with full description from template
+- [ ] PR opened targeting **`develop`**
+- [ ] Merged → CI passes → **DEV** auto-deployed ✅
+- [ ] `bash scripts/git-flow.sh release-start X.Y.Z`
+- [ ] **SIT** auto-deployed ✅ — smoke test passed
+- [ ] **UAT** approved in GitHub Actions ✅ — smoke test passed
+- [ ] `bash scripts/git-flow.sh release-finish X.Y.Z`
+- [ ] **PRD** approved in GitHub Actions ✅
+- [ ] Smoke test on production passed
+- [ ] Jira ticket moved to Done with PR link
 - [ ] Changelog entry added
-- [ ] Reviewer approved
-- [ ] Merged
-- [ ] Deployed to UAT, then prod
-- [ ] Ticket moved to Done with PR link

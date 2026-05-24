@@ -16,8 +16,12 @@
 
 ## Step 3 — Branch
 
-- [ ] Branched from the DEPLOYED PRODUCTION TAG, not from `main`
-- [ ] Named `hotfix/<KEY>-<kebab-summary>`
+- [ ] Branched from **`main`** (the live production code)
+- [ ] Named `hotfix/{prefix}-<n>-<slug>`
+
+```bash
+bash scripts/git-flow.sh hotfix-start <ticket-number> <slug>
+```
 
 ## Step 4 — Implement
 
@@ -27,21 +31,26 @@
 
 ## Step 5 — Self-review
 
-- [ ] Diff reviewed by another human if possible
-- [ ] No scope creep
+- [ ] `git diff main...HEAD` reviewed — diff is minimal, no scope creep
+- [ ] Reviewed by another person if possible
+- [ ] No new issues introduced
 
-## Step 6 — Test & verify
+## Step 6 — Test & Verify
 
-- [ ] `npm test` green
-- [ ] Deployed to UAT and verified — yes, even under pressure
-- [ ] If UAT is unavailable, document the risk acceptance in the ticket
+- [ ] Tests green
+- [ ] Manual smoke test done
 
-## Step 7 — Deploy & close
+## Step 7 — Deploy pipeline
 
-- [ ] Deployed to prod
-- [ ] Verified fix in prod
-- [ ] **Merged back into `main`** (or cherry-picked) — do not let the hotfix
-      diverge
-- [ ] Post-incident: schedule a follow-up ticket for proper fix if this was a
-      band-aid
+```bash
+bash scripts/git-flow.sh hotfix-finish <X.Y.Z>
+# merges hotfix → main, tags vX.Y.Z, merges back → develop
+```
+
+- [ ] CI runs on `main` — lint + test + build pass ✅
+- [ ] **PRD** approved in GitHub Actions ✅ (manual gate)
+- [ ] Fix verified on production
+- [ ] `develop` also has the fix (git-flow.sh handles this automatically)
+- [ ] Jira ticket Done
 - [ ] Post-mortem written if customer-impacting
+- [ ] Follow-up ticket created for proper fix if this was a band-aid

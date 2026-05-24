@@ -1,0 +1,160 @@
+name: CI / CD
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Trigger matrix
+#
+#  branch          CI (lint/test/build)   deploy
+#  ─────────────── ─────────────────────  ────────────────────────────────────
+#  feature/**      ✓                      —
+#  hotfix/**       ✓                      —
+#  develop         ✓                      → DEV  (auto)
+#  release/**      ✓                      → SIT  (auto) → UAT (manual gate)
+#  main            ✓                      → PRD  (manual gate)
+# ─────────────────────────────────────────────────────────────────────────────
+on:
+  push:
+    branches:
+      - main
+      - develop
+      - 'release/**'
+      - 'feature/**'
+      - 'hotfix/**'
+  pull_request:
+    branches:
+      - main
+      - develop
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # ── 1. Lint ──────────────────────────────────────────────────────────────────
+  lint:
+    name: Lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+      - run: npm ci
+      - name: Lint
+        run: npm run lint --if-present
+
+  # ── 2. Test ──────────────────────────────────────────────────────────────────
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+      - run: npm ci
+      - name: Test
+        run: npm test --if-present -- --ci --passWithNoTests
+
+  # ── 3. Build ─────────────────────────────────────────────────────────────────
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: lint
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20.x'
+          cache: 'npm'
+      - run: npm ci
+      - name: Build
+        run: npm run build --if-present
+
+  # ── 4. Deploy → DEV ──────────────────────────────────────────────────────────
+  deploy-dev:
+    name: Deploy → DEV
+    runs-on: ubuntu-latest
+    needs: [test, build]
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    environment:
+      name: dev
+      url: ${{ vars.DEV_URL }}
+    steps:
+      - name: Trigger DEV deploy
+        run: |
+          if [ -n "${{ secrets.DEPLOY_HOOK_DEV }}" ]; then
+            curl -s -X POST "${{ secrets.DEPLOY_HOOK_DEV }}" | head -c 200
+            echo ""
+          else
+            echo "⚠ DEPLOY_HOOK_DEV not set — add it in Settings → Secrets → Actions"
+          fi
+
+  # ── 5. Deploy → SIT ──────────────────────────────────────────────────────────
+  deploy-sit:
+    name: Deploy → SIT
+    runs-on: ubuntu-latest
+    needs: [test, build]
+    if: startsWith(github.ref, 'refs/heads/release/') && github.event_name == 'push'
+    environment:
+      name: sit
+      url: ${{ vars.SIT_URL }}
+    steps:
+      - name: Trigger SIT deploy
+        run: |
+          if [ -n "${{ secrets.DEPLOY_HOOK_SIT }}" ]; then
+            curl -s -X POST "${{ secrets.DEPLOY_HOOK_SIT }}" | head -c 200
+            echo ""
+          else
+            echo "⚠ DEPLOY_HOOK_SIT not set — add it in Settings → Secrets → Actions"
+          fi
+
+  # ── 6. Deploy → UAT ──────────────────────────────────────────────────────────
+  # Gate: manual approval in GitHub Actions
+  # Configure: Settings → Environments → uat → Required reviewers
+  deploy-uat:
+    name: Deploy → UAT
+    runs-on: ubuntu-latest
+    needs: deploy-sit
+    if: startsWith(github.ref, 'refs/heads/release/') && github.event_name == 'push'
+    environment:
+      name: uat
+      url: ${{ vars.UAT_URL }}
+    steps:
+      - name: Trigger UAT deploy
+        run: |
+          if [ -n "${{ secrets.DEPLOY_HOOK_UAT }}" ]; then
+            curl -s -X POST "${{ secrets.DEPLOY_HOOK_UAT }}" | head -c 200
+            echo ""
+          else
+            echo "⚠ DEPLOY_HOOK_UAT not set — add it in Settings → Secrets → Actions"
+          fi
+
+  # ── 7. Deploy → PRD ──────────────────────────────────────────────────────────
+  # Gate: manual approval in GitHub Actions
+  # Configure: Settings → Environments → prd → Required reviewers
+  deploy-prd:
+    name: Deploy → PRD
+    runs-on: ubuntu-latest
+    needs: [test, build]
+    if: github.ref == 'refs/heads/main' && github.event_name == 'push'
+    environment:
+      name: prd
+      url: ${{ vars.PRD_URL }}
+    steps:
+      - name: Trigger PRD deploy
+        run: |
+          if [ -n "${{ secrets.DEPLOY_HOOK_PRD }}" ]; then
+            curl -s -X POST "${{ secrets.DEPLOY_HOOK_PRD }}" | head -c 200
+            echo ""
+          else
+            echo "⚠ DEPLOY_HOOK_PRD not set — add it in Settings → Secrets → Actions"
+          fi

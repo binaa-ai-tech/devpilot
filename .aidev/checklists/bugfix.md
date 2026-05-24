@@ -14,7 +14,9 @@
 
 ## Step 3 — Branch
 
-- [ ] Branch named `bug/<KEY>-<kebab-summary>`
+- [ ] Branch named `fix/{prefix}-<n>-<slug>`
+- [ ] Branched from latest **`develop`** (not main)
+- [ ] Reproducer confirmed on branch before fixing
 
 ## Step 4 — Implement
 
@@ -26,20 +28,26 @@
 
 ## Step 5 — Self-review
 
-- [ ] Diff is minimal — no scope creep
+- [ ] `git diff develop...HEAD` reviewed — diff is minimal, no scope creep
 - [ ] Regression test now passes
 - [ ] No new BLOCKERS introduced
 
-## Step 6 — Test & verify
+## Step 6 — Test & Verify
 
 - [ ] Regression test in suite
 - [ ] Full test suite green
 - [ ] Manual verification using original repro steps — bug is gone
-- [ ] For DB bugs: env-diff diagnosis done; fix verified in UAT before prod
+- [ ] For DB bugs: env-diff done; fix verified in SIT before UAT/PRD
 
-## Step 7 — Deploy & close
+## Step 7 — Deploy pipeline
 
-- [ ] PR includes root cause in description
+- [ ] PR opened targeting **`develop`**
+- [ ] Merged → **DEV** auto-deployed ✅ — verify fix on DEV
+- [ ] `bash scripts/git-flow.sh release-start X.Y.Z`
+- [ ] **SIT** auto-deployed ✅ — verify fix on SIT
+- [ ] **UAT** approved in GitHub Actions ✅ — verify fix on UAT
+- [ ] `bash scripts/git-flow.sh release-finish X.Y.Z`
+- [ ] **PRD** approved in GitHub Actions ✅
+- [ ] Verify fix on production
+- [ ] Jira ticket Done with PR link + verification note
 - [ ] Changelog entry under "Fixed"
-- [ ] Deployed and verified in each environment
-- [ ] Ticket Done with PR link + verification note
