@@ -9,7 +9,7 @@ name: CI / CD
 #  hotfix/**       ✓                      —
 #  develop         ✓                      → DEV  (auto)
 #  release/**      ✓                      → SIT  (auto) → UAT (manual gate)
-#  main            ✓                      → PRD  (manual gate)
+#  main            ✓                      → PRD  (manual workflow_dispatch)
 # ─────────────────────────────────────────────────────────────────────────────
 on:
   push:
@@ -138,23 +138,18 @@ jobs:
             echo "⚠ DEPLOY_HOOK_UAT not set — add it in Settings → Secrets → Actions"
           fi
 
-  # ── 7. Deploy → PRD ──────────────────────────────────────────────────────────
-  # Gate: manual approval in GitHub Actions
-  # Configure: Settings → Environments → prd → Required reviewers
-  deploy-prd:
-    name: Deploy → PRD
+  # ── 7. PRD readiness check ────────────────────────────────────────────────────
+  # Push to main NEVER auto-deploys to production.
+  # PRD deploy is a separate manual workflow: .github/workflows/deploy-prd.yml
+  # This job just marks the commit as "ready for PRD" after CI passes.
+  prd-ready:
+    name: ✅ Ready for PRD
     runs-on: ubuntu-latest
     needs: [test, build]
     if: github.ref == 'refs/heads/main' && github.event_name == 'push'
-    environment:
-      name: prd
-      url: ${{ vars.PRD_URL }}
     steps:
-      - name: Trigger PRD deploy
+      - name: Mark as PRD-ready
         run: |
-          if [ -n "${{ secrets.DEPLOY_HOOK_PRD }}" ]; then
-            curl -s -X POST "${{ secrets.DEPLOY_HOOK_PRD }}" | head -c 200
-            echo ""
-          else
-            echo "⚠ DEPLOY_HOOK_PRD not set — add it in Settings → Secrets → Actions"
-          fi
+          echo "✅ CI passed on main."
+          echo "   This commit is ready for production."
+          echo "   To deploy: Actions → Deploy to PRD → Run workflow"
