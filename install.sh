@@ -1,32 +1,44 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # =============================================================================
 # binaa-ai Dev Process — Installer
+#
 # Run from the root of any project:
-#   curl -s https://raw.githubusercontent.com/binaa-ai/dev-process/main/install.sh | bash
+#   curl -s https://raw.githubusercontent.com/binaa-ai-tech/dev-process/main/install.sh | bash
 # =============================================================================
-set -e
+set -euo pipefail
 
-REPO="https://raw.githubusercontent.com/binaa-ai/dev-process/main"
+REPO="https://raw.githubusercontent.com/binaa-ai-tech/dev-process/main"
 PROJECT_ROOT=$(pwd)
 
+GREEN="\033[0;32m"
+YELLOW="\033[1;33m"
+RESET="\033[0m"
+
+info()  { echo -e "${GREEN}[install]${RESET} $*"; }
+warn()  { echo -e "${YELLOW}[install]${RESET} $*"; }
+
+echo ""
 echo "Installing binaa-ai dev process into: $PROJECT_ROOT"
 echo ""
 
-# Create directories
+# ── Create directories ────────────────────────────────────────────────────────
 mkdir -p .aidev/{prompts,templates,checklists,impact-maps}
 mkdir -p scripts
 mkdir -p .github/workflows
-mkdir -p docs
+mkdir -p .github
+mkdir -p .claude/commands
 
-# Download .aidev files
-echo "Downloading .aidev files..."
-for f in rules.md config.sh; do
+# ── .aidev core files ─────────────────────────────────────────────────────────
+info "Downloading .aidev files..."
+for f in README.md rules.md config.sh; do
   curl -fsSL "$REPO/.aidev/$f" -o ".aidev/$f"
 done
 
-for f in 0-start-work.md 4-copilot-implement.md 4-implement-feature.md \
-          4-implement-bugfix.md 4-implement-refactor.md 5-self-review.md \
-          6-env-diff.md 6-generate-tests.md 7-pr-description.md; do
+for f in 0-start-work.md 1-triage.md 2-investigate.md \
+          4-copilot-implement.md 4-implement-feature.md \
+          4-implement-bugfix.md 4-implement-refactor.md \
+          5-self-review.md 6-env-diff.md 6-generate-tests.md \
+          7-pr-description.md; do
   curl -fsSL "$REPO/.aidev/prompts/$f" -o ".aidev/prompts/$f"
 done
 
@@ -40,35 +52,97 @@ done
 
 touch .aidev/impact-maps/.gitkeep
 
-# Download scripts
-echo "Downloading scripts..."
-for f in new-feature.sh deploy-sit.sh create-jira-ticket.sh; do
-  curl -fsSL "$REPO/scripts/$f" -o "scripts/$f"
-  chmod +x "scripts/$f"
+# ── Scripts ───────────────────────────────────────────────────────────────────
+info "Downloading scripts..."
+for f in git-flow.sh new-feature.sh \
+          deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh \
+          create-jira-ticket.sh update-jira-status.sh; do
+  curl -fsSL "$REPO/scripts/$f" -o "scripts/$f" 2>/dev/null || \
+    warn "scripts/$f not found in repo — skipping"
+  chmod +x "scripts/$f" 2>/dev/null || true
 done
 
-# Download workflow
-echo "Downloading GitHub Actions workflow..."
-curl -fsSL "$REPO/.github/workflows/sit-deploy.yml" \
-  -o ".github/workflows/sit-deploy.yml"
+# ── GitHub Actions CI/CD workflow ─────────────────────────────────────────────
+info "Downloading CI/CD workflow..."
+curl -fsSL "$REPO/.github/workflows/ci.yml" -o ".github/workflows/ci.yml"
 
-# Download docs
-curl -fsSL "$REPO/docs/dev-flow.md" -o "docs/dev-flow.md"
+# ── GitHub docs ───────────────────────────────────────────────────────────────
+info "Downloading GitHub docs..."
+for f in BRANCH_NAMING.md COMMIT_CONVENTION.md pull_request_template.md; do
+  curl -fsSL "$REPO/.github/$f" -o ".github/$f" 2>/dev/null || \
+    warn ".github/$f not found — skipping"
+done
 
-# Add .aidev/config.sh to .gitignore if not already there
-if [ -f ".gitignore" ]; then
-  if ! grep -q ".aidev/config.sh" .gitignore; then
-    echo ".aidev/config.sh" >> .gitignore
-    echo "Added .aidev/config.sh to .gitignore"
-  fi
+# ── Commitlint config ─────────────────────────────────────────────────────────
+if [ ! -f ".commitlintrc.json" ]; then
+  curl -fsSL "$REPO/.commitlintrc.json" -o ".commitlintrc.json"
+  info "Downloaded .commitlintrc.json"
+else
+  warn ".commitlintrc.json already exists — skipping (keep your project scopes)"
 fi
 
+# ── Claude Code commands ──────────────────────────────────────────────────────
+info "Downloading Claude Code commands..."
+for f in binaa.md binaa-dev.md binaa-sit.md binaa-uat.md binaa-prd.md binaa-hotfix.md; do
+  curl -fsSL "$REPO/.claude/commands/$f" -o ".claude/commands/$f"
+done
+
+# ── .gitignore additions ──────────────────────────────────────────────────────
+GITIGNORE_ENTRIES=(
+  ".aidev/config.sh"
+  ".env.local"
+  ".env.*.local"
+)
+if [ -f ".gitignore" ]; then
+  for entry in "${GITIGNORE_ENTRIES[@]}"; do
+    if ! grep -qF "$entry" .gitignore; then
+      echo "$entry" >> .gitignore
+      info "Added $entry to .gitignore"
+    fi
+  done
+fi
+
+# ── Git: create develop branch ───────────────────────────────────────────────
+if git rev-parse --git-dir > /dev/null 2>&1; then
+  CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "main")
+
+  if ! git show-ref --verify --quiet refs/heads/develop; then
+    info "Creating develop branch from ${CURRENT_BRANCH}..."
+    git checkout -b develop
+    git push -u origin develop 2>/dev/null || \
+      warn "Could not push develop to origin — push manually: git push -u origin develop"
+    git checkout "${CURRENT_BRANCH}"
+  else
+    info "develop branch already exists ✅"
+  fi
+else
+  warn "Not a git repo — skipping branch setup"
+fi
+
+# ── Done ──────────────────────────────────────────────────────────────────────
 echo ""
-echo "Done! Next steps:"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+echo " ✅  binaa-ai dev process installed"
+echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-echo "  1. Edit .aidev/config.sh — fill in your Jira URL, email, token, project key"
-echo "  2. Add GitHub secrets: API_DEPLOY_HOOK_URL, WEB_DEPLOY_HOOK_URL (under SIT environment)"
-echo "  3. Create a 'sit' branch: git checkout -b sit && git push origin sit"
-echo "  4. Start working: tell Claude your task"
+echo " Next steps:"
 echo ""
-echo "Docs: docs/dev-flow.md"
+echo "  1. Edit .aidev/config.sh"
+echo "     → Fill in Jira URL, email, token, project key"
+echo "     → Set GITHUB_ORG, GITHUB_REPO, TICKET_PREFIX"
+echo "     → Set DEV/SIT/UAT/PRD URLs"
+echo ""
+echo "  2. Add GitHub Secrets (Settings → Secrets → Actions):"
+echo "     DEPLOY_HOOK_DEV, DEPLOY_HOOK_SIT, DEPLOY_HOOK_UAT, DEPLOY_HOOK_PRD"
+echo ""
+echo "  3. Add GitHub Variables (Settings → Secrets → Variables):"
+echo "     DEV_URL, SIT_URL, UAT_URL, PRD_URL"
+echo ""
+echo "  4. Create GitHub Environments: dev, sit, uat, prd"
+echo "     Add Required Reviewers to uat + prd (needs GitHub Team plan)"
+echo ""
+echo "  5. Start working:"
+echo "     /binaa-dev feat: your feature description"
+echo ""
+echo " Docs: .aidev/README.md"
+echo ""
