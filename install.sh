@@ -62,9 +62,10 @@ for f in git-flow.sh new-feature.sh \
   chmod +x "scripts/$f" 2>/dev/null || true
 done
 
-# ── GitHub Actions CI/CD workflow ─────────────────────────────────────────────
-info "Downloading CI/CD workflow..."
+# ── GitHub Actions CI/CD workflows ───────────────────────────────────────────
+info "Downloading CI/CD workflows..."
 curl -fsSL "$REPO/.github/workflows/ci.yml" -o ".github/workflows/ci.yml"
+curl -fsSL "$REPO/.github/workflows/deploy-prd.yml" -o ".github/workflows/deploy-prd.yml"
 
 # ── GitHub docs ───────────────────────────────────────────────────────────────
 info "Downloading GitHub docs..."

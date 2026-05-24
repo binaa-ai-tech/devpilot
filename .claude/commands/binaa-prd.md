@@ -23,12 +23,12 @@ Version: **$ARGUMENTS**
    - Delete the release branch
 
 3. **CI triggers automatically** on the `main` push:
-   - lint → test → build → **(manual approval gate)** → **deploy PRD**
+   - lint → test → build → ✅ **prd-ready** (marks commit safe, does NOT deploy)
 
-4. **Print the PRD approval link**:
-   - Open: https://github.com/binaa-ai-tech/maskan/actions
-   - Find the workflow run on `main`
-   - Click **"Review deployments"** → tick **prd** → **Approve and deploy**
+4. **Manually trigger the PRD deploy** (separate workflow, zero auto-deploy risk):
+   - Open: **Actions → "Deploy → PRD" → "Run workflow"**
+   - Select branch `main`
+   - Type `deploy` in the confirmation box → click **"Run workflow"**
 
 5. **Close Jira ticket**:
    ```bash

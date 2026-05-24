@@ -1,0 +1,42 @@
+name: Deploy → PRD
+
+# ─────────────────────────────────────────────────────────────────────────────
+# MANUAL-ONLY production deploy.
+#
+# Push to main NEVER triggers this — it only runs the CI "prd-ready" check.
+# To ship to production:
+#   1. Go to Actions → "Deploy → PRD" → "Run workflow"
+#   2. Type "deploy" in the confirmation box
+#   3. Click "Run workflow"
+# ─────────────────────────────────────────────────────────────────────────────
+on:
+  workflow_dispatch:
+    inputs:
+      confirm:
+        description: 'Type "deploy" to confirm production deployment'
+        required: true
+        type: string
+
+jobs:
+  deploy-prd:
+    name: Deploy → PRD
+    runs-on: ubuntu-latest
+    environment:
+      name: prd
+      url: ${{ vars.PRD_URL }}
+
+    # Extra guard: only run if the user typed the magic word
+    if: github.event.inputs.confirm == 'deploy'
+
+    steps:
+      - name: Trigger PRD deploy
+        run: |
+          echo "▶ Deploying ${{ github.ref_name }} → PRD environment..."
+          echo "   Triggered by: ${{ github.actor }}"
+          echo "   Commit: ${{ github.sha }}"
+          if [ -n "${{ secrets.DEPLOY_HOOK_PRD }}" ]; then
+            curl -s -X POST "${{ secrets.DEPLOY_HOOK_PRD }}" | head -c 200
+            echo ""
+          else
+            echo "⚠ DEPLOY_HOOK_PRD not set — add it in Settings → Secrets → Actions"
+          fi
