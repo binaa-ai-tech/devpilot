@@ -7,26 +7,33 @@ Never skip a phase. Follow `.aidev/rules.md` throughout.
 
 ---
 
-## Step 0 — Load core skills (do this before Phase 1)
+## Step 0 — Load config and skills (before anything else)
 
-Read each file using the Read tool right now:
-1. Read `.aidev/skills/get-shit-done.md` → governs your entire orchestration: no unnecessary pauses, document assumptions, drive to completion
-2. Read `.aidev/skills/architecture-guard.md` → you will apply this when planning in Phase 2 and reviewing in Phase 5
+1. Read `project.config.md` — note: base_branch, active agents, model routing
+2. Read `.aidev/skills/get-shit-done.md`
+3. Read `.aidev/skills/architecture-guard.md`
+4. Read `.aidev/skills/self-heal.md`
+
+Set `BASE_BRANCH` = value of `base_branch` from project.config.md (default: `main`).
+Set `ACTIVE_AGENTS` = agents where `enabled: true`.
 
 ---
 
-## Phase 1 — BA: Requirements Gathering
+## Phase 1 — BA: Autonomous Requirements
 
-**Adopt the Business Analyst persona.** Read `.aidev/prompts/team/ba-agent.md` — it will instruct you to read its own skills.
+**Adopt the Business Analyst persona.** Read `.aidev/prompts/team/ba-agent.md`.
 
 1. Analyze the task: `$ARGUMENTS`
-2. Identify what is unclear or missing
-3. Ask the user **5–8 focused clarifying questions** in a numbered list — cover: user story, acceptance criteria, scope (frontend/backend/both), data/API changes, edge cases, design mockups, constraints
-4. **⏸ STOP — wait for the user's answers before proceeding to Phase 2**
+2. Read the existing codebase to understand context — scan relevant files, routes, components, services
+3. Write `docs/requirements/<task-slug>.md` using `.aidev/templates/team/requirements.md`
+   - Document all assumptions made (no clarifying questions — follow rules.md)
+   - Include user story, acceptance criteria, scope, data/API changes, edge cases
+4. Write `docs/domain-models/<task-slug>.md` using `.aidev/templates/team/domain-model.md`
+5. Announce: "✅ BA Phase complete. Requirements at `docs/requirements/<slug>.md`"
 
-After receiving answers:
-5. Write `docs/requirements/<task-slug>.md` using `.aidev/templates/team/requirements.md`
-6. Announce: "✅ BA Phase complete. Requirements saved to `docs/requirements/<slug>.md`"
+**Do not stop or ask questions.** Make reasonable assumptions and document them.
+If the task is genuinely ambiguous on a critical decision (e.g. data model change that can't be reversed),
+note it as an assumption and pick the safer option.
 
 ---
 
@@ -34,7 +41,7 @@ After receiving answers:
 
 **Resume Team Lead persona.** Read `.aidev/prompts/team/lead-plan.md`.
 
-1. Read the requirements doc written in Phase 1
+1. Read `docs/requirements/<slug>.md`
 2. Create Jira ticket:
    ```bash
    ./scripts/create-jira-ticket.sh "<summary>" "<description>" "Story"
@@ -44,7 +51,8 @@ After receiving answers:
    ```bash
    bash scripts/git-flow.sh feature-start <ticket-number> <slug>
    ```
-5. Determine scope: frontend work needed? backend (.NET) work needed? both?
+5. Determine scope from requirements: frontend needed? backend needed? db changes? integration?
+   Cross-check against `project.config.md → agents` — only plan for enabled agents.
 6. Write `docs/plans/<slug>.md` using `.aidev/templates/team/implementation-plan.md`
 7. Announce: "✅ Planning Phase complete. Plan at `docs/plans/<slug>.md`"
 
@@ -52,25 +60,42 @@ After receiving answers:
 
 ## Phase 3 — Implementation
 
-Use the **Agent tool** to spawn developer agents with `subagent_type` so the correct model is used automatically (see `.aidev/config/models.md`). Run frontend and backend **in parallel** when both are needed.
+Read `project.config.md → models` for each agent's tier1 model.
+Use the **Agent tool** to spawn developer agents. Run frontend and backend **in parallel** when both needed.
 
-### Frontend Agent (if frontend work identified)
-Spawn with `subagent_type: "team-frontend"` (runs on **Sonnet 4.6**):
+### Frontend Agent (if `agents.frontend.enabled: true` AND frontend work identified)
 
-> Task: `[task description]`. Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `feature/<KEY>-<n>-<slug>`. Implement all frontend work per the plan. Run lint + build + tests. Apply security, performance, and DoD checklists. Commit. Report what you built in 3 bullets.
+Spawn with `subagent_type: "team-frontend"`:
 
-### .NET Backend Agent (if backend work identified)
-Spawn with `subagent_type: "team-dotnet"` (runs on **Sonnet 4.6**):
+> Task: `[task description]`. Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `feature/<KEY>-<n>-<slug>`. Implement all frontend work per the plan. Read `.aidev/skills/self-heal.md` for fallback protocol if limits hit. Run lint + build + tests. Apply security, performance, and DoD checklists. Commit. Report what you built in 3 bullets.
 
-> Task: `[task description]`. Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `feature/<KEY>-<n>-<slug>`. Implement all backend work per the plan. Run build + tests. Apply security, performance, architecture, and DoD checklists. Commit. Report what you built in 3 bullets.
+### Backend Agent (if `agents.backend.enabled: true` AND backend work identified)
 
-Wait for all implementation agents to complete before Phase 4.
+Spawn with `subagent_type: "team-dotnet"`:
+
+> Task: `[task description]`. Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `feature/<KEY>-<n>-<slug>`. Implement all backend work per the plan. Read `.aidev/skills/self-heal.md` for fallback protocol if limits hit. Run build + tests. Apply security, performance, architecture, and DoD checklists. Commit. Report what you built in 3 bullets.
+
+### DB Agent (if `agents.db.enabled: true` AND DB schema/migration work identified)
+
+Spawn with `subagent_type: "team-dotnet"` (reuses .NET agent for SQL work):
+
+> Task: DB changes for `[task description]`. Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `feature/<KEY>-<n>-<slug>`. Implement all database migrations and schema changes per the plan. Follow SQL Server rules in `.aidev/rules.md`. Read `.aidev/skills/self-heal.md` for fallback protocol. Run migration tests. Commit. Report what you built in 3 bullets.
+
+### Integration Agent (if `agents.integration.enabled: true` AND integration work identified)
+
+Spawn with `subagent_type: "team-dotnet"`:
+
+> Task: Integration work for `[task description]`. Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `feature/<KEY>-<n>-<slug>`. Implement all integration/messaging work per the plan. Read `.aidev/skills/self-heal.md` for fallback protocol. Run tests. Commit. Report what you built in 3 bullets.
+
+**Wait for all implementation agents to complete (or fall back to opencode) before Phase 4.**
+
+If any agent triggered the opencode fallback: **stop here and wait for `/ceo resume`.**
 
 ---
 
 ## Phase 4 — QA: Testing
 
-Spawn with `subagent_type: "team-qa"` (runs on **Haiku 4.5**):
+Spawn with `subagent_type: "team-qa"`:
 
 > Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `feature/<KEY>-<n>-<slug>`. Verify every acceptance criterion. Apply mutation-mindset testing. Add missing coverage. Write QA report to `docs/qa/<slug>.md`. Report final verdict (PASS / BLOCKED).
 
@@ -82,8 +107,8 @@ Wait for QA agent to complete before Phase 5.
 
 **Resume Team Lead persona.** Read `.aidev/prompts/team/lead-review.md`.
 
-1. Run `git diff develop...HEAD` and review against `.aidev/rules.md`
-2. Check `docs/qa/<slug>.md` for blockers — resolve any before continuing
+1. Run `git diff <BASE_BRANCH>...HEAD` and review against `.aidev/rules.md`
+2. Check `docs/qa/<slug>.md` — if BLOCKED, resolve before continuing
 3. Write `docs/reviews/<slug>.md` using `.aidev/templates/team/review-report.md`
 4. Commit docs:
    ```bash
@@ -93,7 +118,7 @@ Wait for QA agent to complete before Phase 5.
 5. Open PR:
    ```bash
    gh pr create \
-     --base develop \
+     --base <BASE_BRANCH> \
      --title "<KEY>: <description>" \
      --body "$(cat docs/reviews/<slug>.md)"
    gh pr merge --auto --squash --delete-branch
@@ -107,18 +132,18 @@ Wait for QA agent to complete before Phase 5.
 | Artifact | Path / URL |
 |----------|------------|
 | Requirements | `docs/requirements/<slug>.md` |
+| Domain Model | `docs/domain-models/<slug>.md` |
 | Implementation Plan | `docs/plans/<slug>.md` |
 | QA Report | `docs/qa/<slug>.md` |
 | Review Report | `docs/reviews/<slug>.md` |
 | Jira Ticket | `<URL>` |
 | Pull Request | `<URL>` |
 
-## CEO Next Steps
+## Next Steps (after PR merges)
 
-When PR merges → CI auto-deploys to DEV. Then:
+CI auto-deploys to DEV. Then:
 
-1. Test on DEV — when satisfied run: `/binaa-sit <version>`
+1. Test on DEV → `/binaa-sit <version>`
    - Features: bump MINOR (`1.0.0 → 1.1.0`) | Fixes: bump PATCH (`1.0.0 → 1.0.1`)
-   - Check current: `git tag --sort=-version:refname | head -1`
-2. SIT passes → `/binaa-uat` (UAT gate)
-3. UAT approved → `/binaa-prd <version>` (production)
+2. SIT passes → `/binaa-uat`
+3. UAT approved → `/binaa-prd <version>`

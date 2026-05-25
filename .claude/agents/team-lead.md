@@ -1,5 +1,5 @@
 ---
-model: claude-opus-4-7
+model: claude-sonnet-4-6
 description: Team Lead agent — architecture planning, implementation planning, and final code review. Use for Phase 2 (planning) and Phase 5 (review) in the team-task workflow, or standalone via /team-lead.
 ---
 

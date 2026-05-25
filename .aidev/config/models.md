@@ -1,97 +1,93 @@
-# Model Routing Configuration
+# Model Routing — 3-Tier Configuration
 
-Agent model assignments live in `.claude/agents/<name>.md` frontmatter.
-Edit the `model:` field there to change any agent's model.
+Agent model assignments are stored in `project.config.md` (per-project)
+and synced to `.claude/agents/<name>.md` frontmatter by the install/reconfig wizard.
 
----
-
-## Current Assignment (Claude Pro)
-
-| Agent | File | Model | Rationale |
-|-------|------|-------|-----------|
-| Team Lead (plan + review) | `.claude/agents/team-lead.md` | `claude-opus-4-7` | Architecture decisions, deep code review |
-| Frontend Developer | `.claude/agents/team-frontend.md` | `claude-sonnet-4-6` | Strong UI/TS coding, balanced cost |
-| .NET Developer | `.claude/agents/team-dotnet.md` | `claude-sonnet-4-6` | Strong C#/SQL coding, balanced cost |
-| Business Analyst | `.claude/agents/team-ba.md` | `claude-haiku-4-5-20251001` | Conversational Q&A, doc writing |
-| QA Engineer | `.claude/agents/team-qa.md` | `claude-haiku-4-5-20251001` | Structured analysis, report writing |
+Run `/binaa reconfig` anytime to change model assignments.
 
 ---
 
-## GitHub Copilot Alternatives
+## Your Setup: Claude Pro + GitHub Copilot via opencode
 
-Use these when you want to save Claude credits. Change the `model:` in the agent file.
+### 3-Tier Model Stack
 
-| Agent | Copilot Model | When to use |
-|-------|-------------|-------------|
-| Team Lead | `o3` | Strong reasoning for architecture decisions |
-| Frontend Developer | `gpt-4o` | Strong TypeScript/Angular/React coding |
-| .NET Developer | `gpt-4o` | Strong C# coding |
-| Business Analyst | `gemini-2.0-flash` | Fast, cheap for conversational tasks |
-| QA Engineer | `o4-mini` | Reasoning model, good for test logic |
-
-### Switching to Copilot models
-
-Edit the relevant `.claude/agents/<name>.md` file and change the `model:` value:
-
-```yaml
-# Before (Claude)
----
-model: claude-sonnet-4-6
----
-
-# After (GitHub Copilot)
----
-model: gpt-4o
----
+```
+Tier 1 — Claude Pro (primary, in-process)
+Tier 2 — GitHub Copilot via opencode CLI (fallback when Claude hits limits)
+Tier 3 — OpenCode Zen Free (last resort, zero cost)
 ```
 
 ---
 
-## Available Model IDs
+## Recommended Routing (Normal Projects — No Opus)
 
-### Claude (via Claude Pro subscription)
-| Model ID | Speed | Best for |
-|----------|-------|---------|
-| `claude-opus-4-7` | Slow | Architecture, complex review, reasoning |
-| `claude-sonnet-4-6` | Medium | Implementation, coding tasks |
-| `claude-haiku-4-5-20251001` | Fast | Q&A, docs, structured writing |
+| Agent | Tier 1 (Claude Pro) | Tier 2 (Copilot/opencode) | Tier 3 (Free) |
+|-------|--------------------|-----------------------------|----------------|
+| BA | claude-haiku-4-5 | Gemini 3.5 Flash | DeepSeek V4 Flash Free |
+| Team Lead | claude-sonnet-4-6 | Gemini 2.5 Pro | DeepSeek V4 Flash Free |
+| Frontend Dev | claude-sonnet-4-6 | GPT-5.4 | DeepSeek V4 Flash Free |
+| Backend Dev | claude-sonnet-4-6 | GPT-5.4 | DeepSeek V4 Flash Free |
+| DB Agent | claude-sonnet-4-6 | GPT-5.2 | DeepSeek V4 Flash Free |
+| Integration | claude-sonnet-4-6 | GPT-5.4 | DeepSeek V4 Flash Free |
+| QA | claude-haiku-4-5 | GPT-5-mini | Nemotron 3 Super Free |
 
-### GitHub Copilot (via Copilot subscription)
-| Model ID | Best for |
-|----------|---------|
-| `gpt-4o` | General coding, TypeScript, C# |
-| `o3` | Complex reasoning, architecture |
-| `o4-mini` | Reasoning tasks, faster/cheaper than o3 |
-| `gemini-2.0-flash` | Fast, cheap, good for simple tasks |
+**Why no Opus:** Normal projects don't need it. Sonnet 4.6 handles architecture,
+planning, and review well. Opus burns daily limits fast on routine work.
 
 ---
 
-## Cost Profile per Task Type
+## Available Models in opencode (GitHub Copilot)
 
-### Full-stack feature (`/team-task`)
-| Phase | Agent | Model | Approx. usage |
-|-------|-------|-------|--------------|
-| 1. BA | team-ba | Haiku | Low (conversation) |
-| 2. Planning | team-lead | Opus | Medium (architecture) |
-| 3a. Frontend | team-frontend | Sonnet | High (implementation) |
-| 3b. Backend | team-dotnet | Sonnet | High (implementation) |
-| 4. QA | team-qa | Haiku | Medium (test writing) |
-| 5. Review | team-lead | Opus | Medium (diff review) |
+| Model | Best for |
+|-------|---------|
+| GPT-5.4 | Heavy implementation — best coder available |
+| GPT-5.2 | Strong coding, SQL, migrations |
+| GPT-5-mini | Light tasks, boilerplate, structured writing |
+| GPT-5.4 Mini | Fast medium tasks |
+| GPT-4.1 | Reliable general coding |
+| Gemini 2.5 Pro | Architecture, reasoning, planning |
+| Gemini 3.1 Pro Preview | Strong reasoning |
+| Gemini 3.5 Flash | Fast docs, BA tasks, lightweight |
+| Gemini 3 Flash | Fast lightweight tasks |
+| Claude Sonnet 4.6 | Same as Tier 1 but different quota pool |
+| Claude Sonnet 4.5 | Slightly older, reliable fallback |
+| Claude Haiku 4.5 | Fast lightweight via Copilot quota |
 
-### To minimize cost on simple tasks
-Temporarily set all agents to Haiku or Gemini Flash for routine boilerplate tasks.
-Restore before complex architecture or security-critical work.
+## Available Models (OpenCode Zen Free)
+
+| Model | Best for |
+|-------|---------|
+| DeepSeek V4 Flash Free | Code generation, boilerplate — free |
+| Nemotron 3 Super Free | Doc writing, simple rewrites — free |
 
 ---
 
-## Upgrading QA for Complex Tasks
+## Fallback Trigger — How It Works
 
-QA is on Haiku by default, which handles most verification tasks well.
-For complex features with intricate business logic, upgrade QA to Sonnet:
+When Claude hits a rate/context limit during an agent phase:
 
-```yaml
-# .claude/agents/team-qa.md
+1. `self-heal.md` detects the limit signal
+2. Saves full task context to `docs/fallback/<slug>-<phase>.md`
+3. Reports to user with exact opencode command:
+   ```
+   ⚠️  Claude limit hit — Backend Dev phase
+   Fallback: GPT-5.4 via opencode
+
+   Run: opencode --model "GPT-5.4" < docs/fallback/user-export-backend.md
+
+   Then: /ceo resume
+   ```
+4. `/ceo resume` reads `docs/fallback/<slug>-state.md` and continues from QA phase
+
 ---
-model: claude-sonnet-4-6   # upgraded from haiku for complex features
----
+
+## Changing Models
+
+Edit `project.config.md` → `models` section, then run:
+
+```bash
+bash scripts/sync-model-config.sh
 ```
+
+This updates `.claude/agents/<name>.md` frontmatter to match `project.config.md`.
+Or re-run the full wizard: `/binaa reconfig`
