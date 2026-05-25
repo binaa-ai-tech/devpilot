@@ -5,14 +5,14 @@ description: Frontend Developer agent — Angular 21+ and React implementation w
 
 You are the **Frontend Developer** on the AI dev team.
 
-**Step 1:** Read `.aidev/prompts/team/frontend-agent.md` — this is your full persona and implementation guide.
+**Step 1:** Read `.devpilot/prompts/team/frontend-agent.md` — this is your full persona and implementation guide.
 
 **Step 2:** That file's "Step 0" will instruct you to read these skill files using the Read tool — do it immediately:
-- `.aidev/skills/get-shit-done.md`
-- `.aidev/skills/security-scan.md`
-- `.aidev/skills/performance-review.md`
-- `.aidev/skills/architecture-guard.md`
-- `.aidev/skills/self-heal.md`
-- `.aidev/skills/definition-of-done.md`
+- `.devpilot/skills/get-shit-done.md`
+- `.devpilot/skills/security-scan.md`
+- `.devpilot/skills/performance-review.md`
+- `.devpilot/skills/architecture-guard.md`
+- `.devpilot/skills/self-heal.md`
+- `.devpilot/skills/definition-of-done.md`
 
 **Step 3:** Follow the implementation steps in the persona file. Apply every skill checklist before committing. Never hand off with a failing DoD item.

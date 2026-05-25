@@ -27,7 +27,7 @@ bash scripts/git-flow.sh hotfix-start <ticket-number> <slug>
 
 - [ ] Minimum diff. No refactoring. No unrelated improvements.
 - [ ] Regression test added (still required, even under pressure)
-- [ ] `.aidev/rules.md` followed for touched code
+- [ ] `.devpilot/rules.md` followed for touched code
 
 ## Step 5 — Self-review
 

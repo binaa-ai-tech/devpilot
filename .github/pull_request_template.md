@@ -34,7 +34,7 @@ Describe the tests you ran and how to reproduce the issue.
 - [ ] Tested with Arabic text (if UI changes)
 - [ ] Layout verified in RTL mode
 
-## Rules Compliance (.aidev/rules.md)
+## Rules Compliance (.devpilot/rules.md)
 
 - [ ] No `any` type used (use `unknown` + narrowing)
 - [ ] All subscriptions use `takeUntilDestroyed()`
@@ -53,7 +53,7 @@ Describe the tests you ran and how to reproduce the issue.
 - [ ] `npm run test` passes
 - [ ] `dotnet build apps/api -c Release` passes
 - [ ] Arabic/RTL tested (if UI changes)
-- [ ] Impact map updated: `.aidev/impact-maps/<TICKET>.md`
+- [ ] Impact map updated: `.devpilot/impact-maps/<TICKET>.md`
 
 ## Changelog
 

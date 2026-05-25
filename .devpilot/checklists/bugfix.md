@@ -23,7 +23,7 @@
 - [ ] Smallest possible fix applied
 - [ ] No unrelated refactoring
 - [ ] Root cause documented in code comment + PR
-- [ ] `.aidev/rules.md` followed
+- [ ] `.devpilot/rules.md` followed
 
 ## Step 5 — Self-review
 

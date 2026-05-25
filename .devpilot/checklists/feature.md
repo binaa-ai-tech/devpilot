@@ -10,7 +10,7 @@ Tick every box before marking the Jira ticket Done.
 
 ## Step 2 — Investigate
 
-- [ ] Impact Map written and saved to `.aidev/impact-maps/<KEY>.md`
+- [ ] Impact Map written and saved to `.devpilot/impact-maps/<KEY>.md`
 - [ ] Files in/out of scope defined
 - [ ] Risks listed
 - [ ] Rollback plan written
@@ -24,7 +24,7 @@ Tick every box before marking the Jira ticket Done.
 ## Step 4 — Implement
 
 - [ ] All acceptance criteria implemented
-- [ ] Code follows `.aidev/rules.md` (no `any`, takeUntilDestroyed, OnPush, signals, etc.)
+- [ ] Code follows `.devpilot/rules.md` (no `any`, takeUntilDestroyed, OnPush, signals, etc.)
 - [ ] Tests added alongside new code
 - [ ] Commits use Conventional Commits + ticket key
 

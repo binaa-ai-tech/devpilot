@@ -97,7 +97,7 @@ Plan: docs/plans/<slug>.md
 <acceptance criteria not yet met>
 
 ## Rules
-Follow .aidev/rules.md.
+Follow .devpilot/rules.md.
 Commit when done: <conventional commit message>.
 Run: <lint/build/test command for this stack>
 ```

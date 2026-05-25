@@ -25,9 +25,9 @@ git push -u origin "$BRANCH"
 
 echo ""
 echo "→ Creating impact map scaffold..."
-IMPACT_MAP=".aidev/impact-maps/${TICKET}.md"
+IMPACT_MAP=".devpilot/impact-maps/${TICKET}.md"
 if [ ! -f "$IMPACT_MAP" ]; then
-  cp .aidev/templates/impact-map.md "$IMPACT_MAP"
+  cp .devpilot/templates/impact-map.md "$IMPACT_MAP"
   sed -i.bak "s/<TICKET-KEY>/$TICKET/g" "$IMPACT_MAP" && rm -f "${IMPACT_MAP}.bak"
   git add "$IMPACT_MAP"
   git commit -m "chore($TICKET): scaffold impact map"

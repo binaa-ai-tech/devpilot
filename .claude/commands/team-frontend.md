@@ -2,7 +2,7 @@
 
 Context: **$ARGUMENTS**
 
-Read `.aidev/prompts/team/frontend-agent.md` and adopt the Frontend Developer persona.
+Read `.devpilot/prompts/team/frontend-agent.md` and adopt the Frontend Developer persona.
 
 1. Read the requirements and plan paths provided in the context (or infer from context)
 2. Implement all frontend changes on the current branch

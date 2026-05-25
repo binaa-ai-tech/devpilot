@@ -20,7 +20,7 @@ can immediately understand the purpose of a branch.
 ## Naming Rules
 
 - All lowercase, hyphen-separated words.
-- `{PREFIX}` is set in `.aidev/config.sh` → `TICKET_PREFIX` (e.g. `msk`, `key`, `app`).
+- `{PREFIX}` is set in `.devpilot/config.sh` → `TICKET_PREFIX` (e.g. `msk`, `key`, `app`).
 - `{ticket}` is the Jira ticket number (e.g. `12`, `99`, `101`).
 - `{slug}` is a brief imperative description, max 5 words, no spaces.
 - No trailing slashes or dots.
@@ -42,13 +42,13 @@ hotfix/key-99-fix-login-crash
 hotfix/key-102-fix-otp-expiry
 ```
 
-_(Replace `key` with your project's `TICKET_PREFIX` from `.aidev/config.sh`)_
+_(Replace `key` with your project's `TICKET_PREFIX` from `.devpilot/config.sh`)_
 
 ---
 
 ## Creating Branches
 
-Use the helper script — it reads `TICKET_PREFIX` from `.aidev/config.sh` automatically:
+Use the helper script — it reads `TICKET_PREFIX` from `.devpilot/config.sh` automatically:
 
 ```bash
 # Feature

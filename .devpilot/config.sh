@@ -1,7 +1,7 @@
 #!/bin/bash
 # =============================================================================
 # PROJECT CONFIG — fill this in once per project, then keep it out of git
-# (.aidev/config.sh is gitignored by the installer)
+# (.devpilot/config.sh is gitignored by the installer)
 # =============================================================================
 
 # ── Jira ─────────────────────────────────────────────────────────────────────

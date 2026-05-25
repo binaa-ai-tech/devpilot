@@ -86,8 +86,8 @@ Change anytime: `/binaa reconfig`
 
 - **Frontend:** Angular 21+ / React
 - **Backend:** .NET (C#), SQL Server
-- **Rules:** `.aidev/rules.md`
-- **Skills:** `.aidev/skills/` (get-shit-done, security-scan, performance-review, architecture-guard, self-heal, definition-of-done)
+- **Rules:** `.devpilot/rules.md`
+- **Skills:** `.devpilot/skills/` (get-shit-done, security-scan, performance-review, architecture-guard, self-heal, definition-of-done)
 
 ---
 

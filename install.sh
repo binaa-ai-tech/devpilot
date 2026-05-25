@@ -239,7 +239,7 @@ ask "  Base branch [main]: "; read -r BASE_BRANCH
 # ═════════════════════════════════════════════════════════════════════════════
 section "STEP 6 — Downloading dev process files..."
 
-mkdir -p .aidev/{prompts/team,templates/team,checklists,impact-maps,skills,config}
+mkdir -p .devpilot/{prompts/team,templates/team,checklists,impact-maps,skills,config}
 mkdir -p scripts
 mkdir -p .github/workflows .github/ISSUE_TEMPLATE
 mkdir -p .claude/commands .claude/agents
@@ -248,35 +248,35 @@ mkdir -p docs/{requirements,plans,qa,reviews,adrs,domain-models,fallback,team}
 # Core .aidev files
 info "Downloading .aidev files..."
 for f in README.md rules.md config.sh; do
-  curl -fsSL "$REPO/.aidev/$f" -o ".aidev/$f" 2>/dev/null || warn "$f not found — skipping"
+  curl -fsSL "$REPO/.devpilot/$f" -o ".devpilot/$f" 2>/dev/null || warn "$f not found — skipping"
 done
 
 for f in 0-start-work.md 1-triage.md 2-investigate.md \
           4-implement-feature.md 4-implement-bugfix.md 4-implement-refactor.md \
           5-self-review.md 6-env-diff.md 6-generate-tests.md 7-pr-description.md; do
-  curl -fsSL "$REPO/.aidev/prompts/$f" -o ".aidev/prompts/$f" 2>/dev/null || warn "prompts/$f not found — skipping"
+  curl -fsSL "$REPO/.devpilot/prompts/$f" -o ".devpilot/prompts/$f" 2>/dev/null || warn "prompts/$f not found — skipping"
 done
 
 for f in ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md qa-agent.md; do
-  curl -fsSL "$REPO/.aidev/prompts/team/$f" -o ".aidev/prompts/team/$f" 2>/dev/null || warn "team/$f not found — skipping"
+  curl -fsSL "$REPO/.devpilot/prompts/team/$f" -o ".devpilot/prompts/team/$f" 2>/dev/null || warn "team/$f not found — skipping"
 done
 
 for f in impact-map.md pr-description.md ticket.md changelog-entry.md; do
-  curl -fsSL "$REPO/.aidev/templates/$f" -o ".aidev/templates/$f" 2>/dev/null || warn "templates/$f not found — skipping"
+  curl -fsSL "$REPO/.devpilot/templates/$f" -o ".devpilot/templates/$f" 2>/dev/null || warn "templates/$f not found — skipping"
 done
 
 for f in requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md; do
-  curl -fsSL "$REPO/.aidev/templates/team/$f" -o ".aidev/templates/team/$f" 2>/dev/null || warn "templates/team/$f not found — skipping"
+  curl -fsSL "$REPO/.devpilot/templates/team/$f" -o ".devpilot/templates/team/$f" 2>/dev/null || warn "templates/team/$f not found — skipping"
 done
 
 for f in feature.md bugfix.md hotfix.md; do
-  curl -fsSL "$REPO/.aidev/checklists/$f" -o ".aidev/checklists/$f" 2>/dev/null || warn "checklists/$f not found — skipping"
+  curl -fsSL "$REPO/.devpilot/checklists/$f" -o ".devpilot/checklists/$f" 2>/dev/null || warn "checklists/$f not found — skipping"
 done
 
 # Skills
 info "Downloading skills..."
 for f in get-shit-done.md security-scan.md performance-review.md architecture-guard.md self-heal.md definition-of-done.md; do
-  curl -fsSL "$REPO/.aidev/skills/$f" -o ".aidev/skills/$f" 2>/dev/null || warn "skills/$f not found — skipping"
+  curl -fsSL "$REPO/.devpilot/skills/$f" -o ".devpilot/skills/$f" 2>/dev/null || warn "skills/$f not found — skipping"
 done
 
 # Scripts
@@ -316,12 +316,12 @@ done
 [ ! -f ".env.example" ] && curl -fsSL "$REPO/.env.example" -o ".env.example" 2>/dev/null || true
 [ ! -f ".commitlintrc.json" ] && curl -fsSL "$REPO/.commitlintrc.json" -o ".commitlintrc.json" 2>/dev/null || true
 curl -fsSL "$REPO/docs/team/README.md" -o "docs/team/README.md" 2>/dev/null || true
-curl -fsSL "$REPO/.aidev/config/models.md" -o ".aidev/config/models.md" 2>/dev/null || true
+curl -fsSL "$REPO/.devpilot/config/models.md" -o ".devpilot/config/models.md" 2>/dev/null || true
 
 for d in requirements plans qa reviews adrs domain-models fallback; do
   touch "docs/$d/.gitkeep"
 done
-touch .aidev/impact-maps/.gitkeep
+touch .devpilot/impact-maps/.gitkeep
 
 # CLAUDE.md
 if [ ! -f "CLAUDE.md" ]; then
@@ -330,7 +330,7 @@ fi
 
 # .gitignore additions
 if [ -f ".gitignore" ]; then
-  for entry in ".aidev/config.sh" ".env" ".env.local" ".env.*.local" "docs/fallback/"; do
+  for entry in ".devpilot/config.sh" ".env" ".env.local" ".env.*.local" "docs/fallback/"; do
     grep -qF "$entry" .gitignore || echo "$entry" >> .gitignore
   done
 fi
@@ -476,7 +476,7 @@ echo "  Agents:    BA, Team Lead$([ "$AGENT_FRONTEND" = "true" ] && echo ", Fron
 echo ""
 echo "  ── Required setup ──────────────────────────────────────"
 echo ""
-echo "  1. Edit .aidev/config.sh"
+echo "  1. Edit .devpilot/config.sh"
 echo "     → JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN"
 echo "     → GITHUB_ORG, GITHUB_REPO"
 echo "     → DEV/SIT/UAT/PRD environment URLs"

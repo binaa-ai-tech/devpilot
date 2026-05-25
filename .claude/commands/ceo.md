@@ -57,7 +57,7 @@ Speed is critical. Skip BA and go directly to planning.
 **Phase 3 — Implementation (minimal diff only)**
 
 Spawn only the relevant agent (frontend OR backend — not both unless both are broken).
-Brief: minimum diff, no refactoring, no unrelated changes, follow hotfix rules in `.aidev/rules.md`.
+Brief: minimum diff, no refactoring, no unrelated changes, follow hotfix rules in `.devpilot/rules.md`.
 
 **Phase 4 — QA: Smoke Test**
 
@@ -97,7 +97,7 @@ If you are running `/ceo resume`:
     • <bullet 2>
     • <bullet 3>
 
-🔗  Test on DEV:  <DEV_FRONTEND_URL from .aidev/config.sh>
+🔗  Test on DEV:  <DEV_FRONTEND_URL from .devpilot/config.sh>
     (Live ~5 min after PR merges and CI passes)
 
 ──────────────────────────────────────────────────────

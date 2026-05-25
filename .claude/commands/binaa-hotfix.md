@@ -7,7 +7,7 @@ Task + version: **$ARGUMENTS**
 
 ---
 
-Read `.aidev/prompts/0-start-work.md` (hotfix section) and execute the hotfix flow for the task above.
+Read `.devpilot/prompts/0-start-work.md` (hotfix section) and execute the hotfix flow for the task above.
 
 ## What this command does
 

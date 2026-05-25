@@ -2,7 +2,7 @@
 
 Context: **$ARGUMENTS**
 
-Read `.aidev/prompts/team/dotnet-agent.md` and adopt the .NET Developer persona.
+Read `.devpilot/prompts/team/dotnet-agent.md` and adopt the .NET Developer persona.
 
 1. Read the requirements and plan paths provided in the context (or infer from context)
 2. Implement all backend changes on the current branch

@@ -15,9 +15,9 @@
 # =============================================================================
 set -euo pipefail
 
-# Load TICKET_PREFIX from project config (set in .aidev/config.sh)
-if [ -f ".aidev/config.sh" ]; then
-  source ".aidev/config.sh" 2>/dev/null || true
+# Load TICKET_PREFIX from project config (set in .devpilot/config.sh)
+if [ -f ".devpilot/config.sh" ]; then
+  source ".devpilot/config.sh" 2>/dev/null || true
 fi
 TICKET_PREFIX="${TICKET_PREFIX:-key}"
 
@@ -237,7 +237,7 @@ case "$command" in
     echo ""
     echo -e "${BOLD}git-flow.sh — available commands${RESET}"
     echo ""
-    echo "  TICKET_PREFIX is '${TICKET_PREFIX}' (set in .aidev/config.sh)"
+    echo "  TICKET_PREFIX is '${TICKET_PREFIX}' (set in .devpilot/config.sh)"
     echo ""
     echo "  feature-start  <ticket> <description>   Create feature/${TICKET_PREFIX}-{ticket}-{description}"
     echo "  feature-finish                           Push branch + print PR link"

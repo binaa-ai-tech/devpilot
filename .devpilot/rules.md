@@ -128,7 +128,7 @@ ngOnInit() {
 
 Every prompt sent to an AI coding tool must:
 
-1. Reference this file: "Follow the rules in `.aidev/rules.md`."
+1. Reference this file: "Follow the rules in `.devpilot/rules.md`."
 2. Be **autonomous** — no "should I continue?" pauses.
 3. State which files/dirs are in/out of scope.
 4. End with a verification step (run tests / build / lint).

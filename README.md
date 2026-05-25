@@ -222,7 +222,7 @@ devpilot/
 ├── install.sh                    ← run this on any project
 ├── project.config.md             ← template (written per-project at install)
 ├── CLAUDE.md                     ← instructions for Claude Code
-├── .aidev/
+├── .devpilot/
 │   ├── rules.md                  ← coding standards (all stacks)
 │   ├── config.sh                 ← project secrets (gitignored)
 │   ├── config/models.md          ← model routing reference
@@ -251,7 +251,7 @@ devpilot/
 
 ## After Install — Setup Checklist
 
-1. **Edit `.aidev/config.sh`** (gitignored):
+1. **Edit `.devpilot/config.sh`** (gitignored):
    ```bash
    JIRA_BASE_URL="https://your-org.atlassian.net"
    JIRA_EMAIL="you@example.com"

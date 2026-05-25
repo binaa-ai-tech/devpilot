@@ -24,7 +24,7 @@ For each file:
    real HTTP, real DOM beyond component fixtures, or real timers (use
    `fakeAsync` / `tick`).
 
-Follow `.aidev/rules.md`. No `any`. Use proper types for mocks.
+Follow `.devpilot/rules.md`. No `any`. Use proper types for mocks.
 
 After writing, run `npm test`. If any test fails for the wrong reason (your
 mocks are off, not a real bug), fix the test. If it fails for a real reason,

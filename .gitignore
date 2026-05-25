@@ -1,1 +1,5 @@
+.devpilot/config.sh
+.env
+.env.local
+.env.*.local
 docs/fallback/
