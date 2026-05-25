@@ -44,6 +44,22 @@ Before writing any document:
 ## Output
 1. Write `docs/domain-models/<slug>.md` using `.devpilot/templates/team/domain-model.md`
 2. Write `docs/requirements/<slug>.md` using `.devpilot/templates/team/requirements.md`
+3. Output a **Jira Description Block** at the end of your announcement (Team Lead uses this to populate the ticket):
+
+```
+--- JIRA DESCRIPTION ---
+As a <role>, I want to <goal> so that <benefit>.
+
+Scope: <frontend/backend/DB/integration — list what's needed>
+
+Acceptance Criteria:
+1. <AC 1>
+2. <AC 2>
+...
+
+Assumptions: <key assumption list, one per line>
+--- END JIRA DESCRIPTION ---
+```
 
 The slug is kebab-case derived from the task (e.g. `user-login-page`).
 

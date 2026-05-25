@@ -41,7 +41,8 @@ Set `ACTIVE_AGENTS` = agents where `enabled: true` in project.config.md.
    - Document all assumptions made (no clarifying questions — follow rules.md)
    - Include user story, acceptance criteria, scope, data/API changes, edge cases
 4. Write `docs/domain-models/<task-slug>.md` using `.devpilot/templates/team/domain-model.md`
-5. Announce: "✅ BA Phase complete. Requirements at `docs/requirements/<slug>.md`"
+5. Count the acceptance criteria in the requirements doc. Save this count as `AC_COUNT`.
+6. Announce: "✅ BA Phase complete. Requirements at `docs/requirements/<slug>.md`. AC count: <AC_COUNT>"
 
 **Do not stop or ask questions.** Make reasonable assumptions and document them.
 If the task is genuinely ambiguous on a critical decision (e.g. data model change that can't be reversed),
@@ -55,30 +56,57 @@ note it as an assumption and pick the safer option.
 
 1. Read `docs/requirements/<slug>.md`
 
-2. **REQUIRED — Create ticket + transition + comment (run all 3 lines, do not skip any):**
+2. **Determine ticket structure based on AC_COUNT and agent count:**
+   - **Simple task** (AC_COUNT ≤ 5 AND only 1-2 agents): create ONE Task ticket
+   - **Complex feature** (AC_COUNT > 5 OR 3+ agents needed): create one Epic + one child Task per agent
+
+3. **REQUIRED — Create ticket(s) and transition (run all lines, do not skip any):**
+
+   **For simple tasks:**
    ```bash
-   KEY=$(bash scripts/create-jira-ticket.sh "<summary>" "<slug> — devpilot auto-task" "Story")
+   KEY=$(bash scripts/create-jira-ticket.sh "<summary>" "<user story from requirements, first 200 chars>" "Task")
    bash scripts/update-jira-status.sh "$KEY" "In Progress"
    bash scripts/add-jira-comment.sh "$KEY" "[Team Lead | claude-sonnet-4-6] Phase 2 started — branch and implementation plan being created"
    ```
-   Save the value of `KEY` (e.g. `MSK-42`) — use it in every step below.
 
-3. **REQUIRED — Create feature branch:**
+   **For complex features (AC_COUNT > 5 or 3+ agents):**
+   ```bash
+   EPIC_KEY=$(bash scripts/create-jira-epic.sh "<feature name>" "<user story from requirements, first 300 chars>")
+   bash scripts/update-jira-status.sh "$EPIC_KEY" "In Progress"
+   bash scripts/add-jira-comment.sh "$EPIC_KEY" "[Team Lead | claude-sonnet-4-6] Complex feature — creating child tasks per agent"
+
+   # Create one child Task per agent that will run (frontend / backend / db / integration)
+   KEY_FE=$(bash scripts/create-jira-epic.sh "[Frontend] <summary>" "<frontend ACs from requirements>" "$EPIC_KEY")
+   KEY_BE=$(bash scripts/create-jira-epic.sh "[Backend] <summary>" "<backend ACs from requirements>" "$EPIC_KEY")
+   # (add KEY_DB, KEY_INT if those agents will run)
+   bash scripts/update-jira-status.sh "$KEY_FE" "In Progress"
+   bash scripts/update-jira-status.sh "$KEY_BE" "In Progress"
+
+   KEY="$EPIC_KEY"   # use Epic key for branch naming and final close
+   ```
+
+4. **REQUIRED — Update ticket description with full user story:**
+   ```bash
+   USER_STORY=$(grep -A 20 "## User Story" docs/requirements/<slug>.md | head -20)
+   bash scripts/update-jira-description.sh "$KEY" "User Story: $USER_STORY | Task: $ARGUMENTS"
+   ```
+
+5. **REQUIRED — Create feature branch:**
    ```bash
    bash scripts/git-flow.sh feature-start <ticket-number> <slug>
    ```
 
-4. Determine scope from requirements: frontend needed? backend needed? db changes? integration?
+6. Determine scope from requirements: frontend needed? backend needed? db changes? integration?
    Cross-check against `project.config.md → agents` — only plan for enabled agents.
 
-5. Write `docs/plans/<slug>.md` using `.devpilot/templates/team/implementation-plan.md`
+7. Write `docs/plans/<slug>.md` using `.devpilot/templates/team/implementation-plan.md`
 
-6. **REQUIRED — Log plan complete:**
+8. **REQUIRED — Log plan complete:**
    ```bash
    bash scripts/add-jira-comment.sh "$KEY" "[Team Lead | claude-sonnet-4-6] Phase 2 complete — plan: docs/plans/<slug>.md | branch: feature/<KEY>-<n>-<slug>"
    ```
 
-7. Announce: "✅ Planning Phase complete. Plan at `docs/plans/<slug>.md`"
+9. Announce: "✅ Planning Phase complete. Plan at `docs/plans/<slug>.md`"
 
 ---
 
@@ -111,15 +139,63 @@ Spawn with `subagent_type: "team-dotnet"`:
 
 > Task: Integration work for `[task description]`. Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `feature/<KEY>-<n>-<slug>`. Implement all integration/messaging work per the plan. Read `.devpilot/skills/self-heal.md` for fallback protocol. Run tests. Commit. Report what you built in 3 bullets.
 
+---
+
+### ⚠️ Phase 3 Failure Protocol
+
 **Wait for all implementation agents to complete before Phase 4.**
 
-**REQUIRED — Log each agent that ran (one call per agent):**
+After each agent completes or fails, evaluate:
+
+**If agent SUCCEEDED:**
 ```bash
 bash scripts/add-jira-comment.sh "$KEY" "[Frontend Dev | <tier1-model>] Phase 3 complete — <one-line summary>"
-bash scripts/add-jira-comment.sh "$KEY" "[Backend Dev | <tier1-model>] Phase 3 complete — <one-line summary>"
+# (repeat for each agent that ran)
 ```
 
-If any agent triggered the opencode fallback: **stop here and wait for `/ceo resume`.**
+**If agent FAILED (error, timeout, or limit hit):**
+
+1. Read any partial output from the agent
+2. Write `docs/fallback/<slug>-<agent>-prompt.md`:
+   ```markdown
+   # Fallback Prompt — <Agent> — <slug>
+
+   ## Context
+   Task: <original task>
+   Branch: <branch>
+   Requirements: docs/requirements/<slug>.md
+   Plan: docs/plans/<slug>.md
+
+   ## Work Completed So Far
+   <list what this agent did before failing>
+
+   ## Remaining Work
+   <exact implementation steps not yet done>
+   <files to create/modify>
+   <ACs not yet met>
+
+   ## Rules
+   Follow .devpilot/rules.md.
+   Commit when done with: feat(<slug>): <description>
+   Run: <lint/build/test command for this stack>
+   ```
+
+3. Read `project.config.md → models.<agent>.tier2` for the fallback model
+4. Output exactly:
+   ```
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   ⚠️  AGENT FAILED — <Agent Name>
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+   Fallback model: <tier2 model from project.config.md>
+
+   Run this in your terminal:
+     opencode --model "<tier2-model>" < docs/fallback/<slug>-<agent>-prompt.md
+
+   When opencode finishes → run: /ceo resume
+   ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+   ```
+5. **Stop here. Do not proceed to Phase 4.**
 
 ---
 
@@ -153,13 +229,16 @@ bash scripts/add-jira-comment.sh "$KEY" "[QA Engineer | <tier1-model>] Phase 4 c
    git add docs/
    git commit -m "docs(<slug>): add requirements, plan, qa, and review docs"
    ```
-5. **REQUIRED — Open PR, close ticket, log completion (run all in order):**
+5. **REQUIRED — Open PR, close ticket(s), log completion (run all in order):**
    ```bash
    PR_URL=$(gh pr create \
      --base <BASE_BRANCH> \
      --title "<KEY>: <description>" \
      --body "$(cat docs/reviews/<slug>.md)" | tail -1)
    bash scripts/update-jira-status.sh "$KEY" "Done"
+   # For complex features, also close child tasks:
+   # bash scripts/update-jira-status.sh "$KEY_FE" "Done"
+   # bash scripts/update-jira-status.sh "$KEY_BE" "Done"
    bash scripts/add-jira-comment.sh "$KEY" "[Team Lead | claude-sonnet-4-6] Phase 5 complete — PR: $PR_URL targeting <BASE_BRANCH>. Ticket closed."
    ```
 

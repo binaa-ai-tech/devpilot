@@ -1,46 +1,50 @@
 #!/bin/bash
-# Usage: ./scripts/create-jira-ticket.sh "Add OTP retry limit" "Max 3 attempts then lock for 5 min" "Story"
+# Usage: ./scripts/create-jira-ticket.sh "Add OTP retry limit" "User story text" "Task"
+# Issue types available: Task, Epic (no Story in Jira Cloud simple projects)
 set -e
 
 source "$(dirname "$0")/../.devpilot/config.sh"
 
 SUMMARY="$1"
 DESCRIPTION="$2"
-ISSUE_TYPE="${3:-Story}"
+ISSUE_TYPE="${3:-Task}"
 
 if [ -z "$SUMMARY" ]; then
-  echo "Usage: $0 \"Summary\" \"Description\" \"Story|Bug|Task\""
+  echo "Usage: $0 \"Summary\" \"Description\" \"Task|Epic\""
   exit 1
 fi
+
+# Build JSON safely using jq to prevent injection
+BODY=$(jq -n \
+  --arg project "$JIRA_PROJECT_KEY" \
+  --arg summary "$SUMMARY" \
+  --arg desc "$DESCRIPTION" \
+  --arg issuetype "$ISSUE_TYPE" \
+  '{
+    fields: {
+      project: { key: $project },
+      summary: $summary,
+      description: {
+        type: "doc",
+        version: 1,
+        content: [{ type: "paragraph", content: [{ type: "text", text: $desc }] }]
+      },
+      issuetype: { name: $issuetype }
+    }
+  }')
 
 RESPONSE=$(curl -s --request POST \
   --url "$JIRA_BASE_URL/rest/api/3/issue" \
   --user "$JIRA_EMAIL:$JIRA_API_TOKEN" \
   --header "Accept: application/json" \
   --header "Content-Type: application/json" \
-  --data "{
-    \"fields\": {
-      \"project\": { \"key\": \"$JIRA_PROJECT_KEY\" },
-      \"summary\": \"$SUMMARY\",
-      \"description\": {
-        \"type\": \"doc\",
-        \"version\": 1,
-        \"content\": [{
-          \"type\": \"paragraph\",
-          \"content\": [{ \"type\": \"text\", \"text\": \"$DESCRIPTION\" }]
-        }]
-      },
-      \"issuetype\": { \"name\": \"$ISSUE_TYPE\" }
-    }
-  }")
+  --data "$BODY")
 
 KEY=$(echo "$RESPONSE" | jq -r '.key')
 
 if [ "$KEY" = "null" ] || [ -z "$KEY" ]; then
-  echo "Failed to create ticket:"
-  echo "$RESPONSE" | jq .
+  echo "Failed to create ticket: $(echo "$RESPONSE" | jq .)" >&2
   exit 1
 fi
 
 echo "$KEY"
-echo "Created: $JIRA_BASE_URL/browse/$KEY"
