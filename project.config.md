@@ -29,7 +29,21 @@ agents:
   integration:  { enabled: false }  # set false if stack.integration = none
   qa:           { enabled: true }
 
-## Model Routing — 3-Tier Fallback
+## Implementation Engine
+#
+# Who writes the code?
+#   opencode — Claude handles BA/planning/QA/review; opencode CLI runs the coding
+#   claude   — Claude subagents handle everything (use when opencode is unavailable)
+#
+# opencode model: exact model ID to pass to `opencode --model "..."`.
+# Find available models by running: opencode model list
+# Example GitHub Copilot models: github-copilot/gpt-4o, github-copilot/gpt-3.5-codex
+
+implementation:
+  engine: opencode
+  model: "github-copilot/gpt-4o"
+
+## Model Routing — Claude (non-coding phases only)
 #
 # Tier 1: Claude Pro (primary)
 # Tier 2: GitHub Copilot via opencode (fallback when Claude hits limits)
@@ -40,6 +54,9 @@ agents:
 # Tier 3 prefix: "free:"   — triggers opencode CLI with free model
 
 models:
+  # Coding agents (frontend, backend, db, integration) are handled by opencode.
+  # Only BA, Team Lead, and QA use Claude models.
+
   ba:
     tier1: claude-haiku-4-5-20251001
     tier2: "copilot: Gemini 3.5 Flash"
@@ -48,26 +65,6 @@ models:
   team_lead:
     tier1: claude-sonnet-4-6
     tier2: "copilot: Gemini 2.5 Pro"
-    tier3: "free: DeepSeek V4 Flash Free"
-
-  frontend:
-    tier1: claude-sonnet-4-6
-    tier2: "copilot: GPT-5.4"
-    tier3: "free: DeepSeek V4 Flash Free"
-
-  backend:
-    tier1: claude-sonnet-4-6
-    tier2: "copilot: GPT-5.4"
-    tier3: "free: DeepSeek V4 Flash Free"
-
-  db:
-    tier1: claude-sonnet-4-6
-    tier2: "copilot: GPT-5.2"
-    tier3: "free: DeepSeek V4 Flash Free"
-
-  integration:
-    tier1: claude-sonnet-4-6
-    tier2: "copilot: GPT-5.4"
     tier3: "free: DeepSeek V4 Flash Free"
 
   qa:

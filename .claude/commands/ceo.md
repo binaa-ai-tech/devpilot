@@ -71,14 +71,19 @@ After merge: cherry-pick or merge back into develop if it exists.
 
 ---
 
-## Resume After opencode Fallback
+## Resume After opencode Implementation
 
 If you are running `/ceo resume`:
 
-1. Read `docs/fallback/<slug>-state.md` — find `next_phase` and `branch`
-2. Switch to that branch: `git checkout <branch>`
-3. Continue from `next_phase` in the team-task workflow
-4. Do not re-run completed phases
+1. Read `docs/implementation/` — find the slug and which agents were briefed
+2. Run:
+   ```bash
+   git status   # confirm you are on the feature branch
+   git log --oneline -5   # confirm opencode commits are present
+   ```
+3. Continue from **Phase 4 — QA** in team-task.md. Do not re-run Phases 1-3.
+4. If opencode only finished some agents (not all): note which are done, brief the remaining ones,
+   stop again with the same IMPLEMENTATION HANDOFF block, and wait for `/ceo resume` again.
 
 ---
 

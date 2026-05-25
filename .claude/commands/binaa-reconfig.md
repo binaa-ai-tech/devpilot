@@ -1,6 +1,6 @@
-# /binaa reconfig — Re-run Model Configuration Wizard
+# /binaa reconfig — Re-run Configuration Wizard
 
-Re-configure model routing for this project without reinstalling everything.
+Re-configure this project without reinstalling everything.
 
 ---
 
@@ -9,58 +9,69 @@ Re-configure model routing for this project without reinstalling everything.
 Read `project.config.md` and display:
 
 ```
-Current model routing:
-  BA:           <tier1> → <tier2> → <tier3>
-  Team Lead:    <tier1> → <tier2> → <tier3>
-  Frontend Dev: <tier1> → <tier2> → <tier3>
-  Backend Dev:  <tier1> → <tier2> → <tier3>
-  DB Agent:     <tier1> → <tier2> → <tier3>
-  QA:           <tier1> → <tier2> → <tier3>
+Implementation engine: <implementation.engine>
+Coding model:          <implementation.model>
+
+Claude model routing (non-coding phases):
+  BA:        <models.ba.tier1> → <tier2> → <tier3>
+  Team Lead: <models.team_lead.tier1> → <tier2> → <tier3>
+  QA:        <models.qa.tier1> → <tier2> → <tier3>
 
 Active agents: <list enabled agents>
 Base branch:   <base_branch>
 ```
 
-Ask: "What would you like to change? [models / agents / branch / all]"
+Ask: "What would you like to change? [engine / model / claude-models / agents / branch / all]"
 
 ---
 
-## Step 2 — Model routing wizard (if models or all)
+## Step 2 — Implementation engine wizard (if engine or all)
 
-For each enabled agent, present:
+```
+Who writes the code?
+
+  Current: <implementation.engine> using model <implementation.model>
+
+  [1] opencode (recommended)
+      Claude handles BA, planning, QA, review.
+      You run opencode in your terminal for all coding.
+      Set opencode model → ask for exact model ID.
+      Common choices:
+        github-copilot/gpt-4o
+        github-copilot/gpt-3.5-codex
+        github-copilot/claude-3.5-sonnet
+        openai/gpt-4-turbo
+        (run: opencode model list — to see all available)
+
+  [2] claude (subagents)
+      All phases run inside Claude. No opencode needed.
+      Use this if you do not have opencode installed.
+
+  [3] keep current
+```
+
+Update `project.config.md → implementation.engine` and `implementation.model`.
+
+---
+
+## Step 3 — Claude model routing (BA, Team Lead, QA only)
+
+For each of BA, Team Lead, and QA:
 
 ```
 <Agent Name>
-  Tier 1 (Claude Pro primary):
+  Tier 1 (Claude Pro — primary):
     Current: <current>
     Options:
-      [1] claude-sonnet-4-6      ← recommended for planning/implementation
+      [1] claude-sonnet-4-6      ← recommended for planning (Team Lead)
       [2] claude-haiku-4-5       ← recommended for lightweight tasks (BA, QA)
       [3] keep current
       [4] enter custom model ID
-
-  Tier 2 (opencode fallback when Claude hits limits):
-    Current: <current>
-    Options:
-      [1] copilot: GPT-5.4       ← best for implementation (Frontend, Backend)
-      [2] copilot: GPT-5.2       ← strong for SQL/migrations (DB)
-      [3] copilot: Gemini 2.5 Pro ← best for planning/reasoning (Team Lead)
-      [4] copilot: Gemini 3.5 Flash ← fast lightweight (BA, QA)
-      [5] copilot: GPT-5-mini    ← cheapest (QA)
-      [6] keep current
-      [7] enter custom model name
-
-  Tier 3 (free last resort):
-    Current: <current>
-    Options:
-      [1] free: DeepSeek V4 Flash Free  ← recommended for code tasks
-      [2] free: Nemotron 3 Super Free   ← recommended for doc tasks
-      [3] keep current
 ```
 
 ---
 
-## Step 3 — Agent enable/disable wizard (if agents or all)
+## Step 4 — Agent enable/disable wizard (if agents or all)
 
 ```
 Active agents (Y/N):
@@ -75,31 +86,31 @@ Active agents (Y/N):
 
 ---
 
-## Step 4 — Write updated config
+## Step 5 — Write updated config
 
 Update `project.config.md` with all changes.
 
-Sync `.claude/agents/` frontmatter — update each `model:` field to match the new Tier 1 model:
+Sync `.claude/agents/` frontmatter — update `model:` for BA, Team Lead, QA only:
 - `.claude/agents/team-lead.md` → `models.team_lead.tier1`
 - `.claude/agents/team-ba.md` → `models.ba.tier1`
-- `.claude/agents/team-frontend.md` → `models.frontend.tier1`
-- `.claude/agents/team-dotnet.md` → `models.backend.tier1`
 - `.claude/agents/team-qa.md` → `models.qa.tier1`
 
 ---
 
-## Step 5 — Confirm
+## Step 6 — Confirm
 
-Display the updated routing table and confirm:
+Display the updated config and confirm:
 
 ```
-✅ Model config updated.
+✅ Config updated.
 
-New routing:
-  BA:           claude-haiku-4-5 → Gemini 3.5 Flash → DeepSeek V4 Flash Free
-  Team Lead:    claude-sonnet-4-6 → Gemini 2.5 Pro → DeepSeek V4 Flash Free
-  ...
+Implementation: <engine> — model: <implementation.model>
 
-Agent files synced: .claude/agents/*.md
+Claude routing (non-coding phases):
+  BA:        <tier1>
+  Team Lead: <tier1>
+  QA:        <tier1>
+
+Agent files synced: .claude/agents/team-ba.md, team-lead.md, team-qa.md
 Config saved: project.config.md
 ```
