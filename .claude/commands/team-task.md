@@ -7,9 +7,17 @@ Never skip a phase. Follow `.aidev/rules.md` throughout.
 
 ---
 
+## Step 0 — Load core skills (do this before Phase 1)
+
+Read each file using the Read tool right now:
+1. Read `.aidev/skills/get-shit-done.md` → governs your entire orchestration: no unnecessary pauses, document assumptions, drive to completion
+2. Read `.aidev/skills/architecture-guard.md` → you will apply this when planning in Phase 2 and reviewing in Phase 5
+
+---
+
 ## Phase 1 — BA: Requirements Gathering
 
-**Adopt the Business Analyst persona.** Read `.aidev/prompts/team/ba-agent.md`.
+**Adopt the Business Analyst persona.** Read `.aidev/prompts/team/ba-agent.md` — it will instruct you to read its own skills.
 
 1. Analyze the task: `$ARGUMENTS`
 2. Identify what is unclear or missing
