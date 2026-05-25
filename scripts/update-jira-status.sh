@@ -2,7 +2,7 @@
 # Usage: ./scripts/update-jira-status.sh KEY-5 "In Progress"
 set -e
 
-source "$(dirname "$0")/../.env"
+source "$(dirname "$0")/../.devpilot/config.sh"
 
 KEY="$1"
 STATUS="$2"

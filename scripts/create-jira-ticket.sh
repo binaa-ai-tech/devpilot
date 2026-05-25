@@ -2,7 +2,7 @@
 # Usage: ./scripts/create-jira-ticket.sh "Add OTP retry limit" "Max 3 attempts then lock for 5 min" "Story"
 set -e
 
-source "$(dirname "$0")/../.env"
+source "$(dirname "$0")/../.devpilot/config.sh"
 
 SUMMARY="$1"
 DESCRIPTION="$2"
