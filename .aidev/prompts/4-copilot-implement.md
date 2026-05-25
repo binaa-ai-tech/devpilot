@@ -13,11 +13,11 @@ Confirm you have `.aidev/impact-maps/<KEY>.md` with files to touch and logic per
 ## Run opencode
 
 ```bash
-cd /path/to/maskan
+cd /path/to/<project>
 opencode
 ```
 
-Inside opencode, switch model to `github-copilot/gpt-5.4-codex` (best for code generation).
+Inside opencode, switch model to `github-copilot/gpt-5.3-codex` (best for code generation).
 
 Then paste this prompt:
 

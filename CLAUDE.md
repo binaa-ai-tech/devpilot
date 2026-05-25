@@ -1,6 +1,6 @@
 # Dev Process — AI Team System
 
-This repository defines the development workflow for Maskan projects. It combines:
+This repository defines the development workflow for AI-assisted projects. It combines:
 
 1. **`.aidev/`** — classic single-agent workflow (prompts, rules, templates)
 2. **`.claude/commands/team-*`** — multi-agent AI dev team (new)
@@ -42,6 +42,16 @@ Angular/React impl          API/service/DB impl
         Review + PR → docs/reviews/<slug>.md
 ```
 
+## Deploy Pipeline Commands
+
+| Command | When to use |
+|---------|-------------|
+| `/binaa-dev feat: <description>` | Start a new feature or fix → lands on DEV |
+| `/binaa-sit <version>` | Promote develop → SIT for QA testing |
+| `/binaa-uat` | Approve UAT gate after SIT passes |
+| `/binaa-prd <version>` | Finish release → tag → deploy PRD |
+| `/binaa-hotfix <n> <slug> <version>` | Emergency production fix |
+
 ## Tech Stack
 
 - **Frontend:** Angular 21+ / React
@@ -62,7 +72,7 @@ Angular/React impl          API/service/DB impl
 Every agent loads applicable skills from `.aidev/skills/`:
 
 | Skill | File | Applied By |
-|-------|------|-----------|
+|-------|------|------------|
 | Autonomous execution | `get-shit-done.md` | All agents |
 | Security scanning | `security-scan.md` | Frontend Dev, .NET Dev, Team Lead |
 | Performance review | `performance-review.md` | Frontend Dev, .NET Dev, Team Lead |

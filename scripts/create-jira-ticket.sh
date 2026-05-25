@@ -1,8 +1,8 @@
 #!/bin/bash
-# Usage: ./scripts/create-jira-ticket.sh "Summary" "Description" "Story|Bug|Task"
+# Usage: ./scripts/create-jira-ticket.sh "Add OTP retry limit" "Max 3 attempts then lock for 5 min" "Story"
 set -e
 
-source "$(dirname "$0")/../.aidev/config.sh"
+source "$(dirname "$0")/../.env"
 
 SUMMARY="$1"
 DESCRIPTION="$2"

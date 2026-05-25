@@ -13,7 +13,7 @@ stop condition is hit.
 ./scripts/create-jira-ticket.sh "<summary>" "<description>" "<Story|Bug|Task>"
 ```
 
-Note the ticket key (e.g. MSK-8).
+Note the ticket key (e.g. KEY-8).
 
 ---
 
@@ -29,12 +29,12 @@ Note the ticket key (e.g. MSK-8).
 
 ```bash
 bash scripts/git-flow.sh feature-start <ticket-number> <short-slug>
-# e.g. bash scripts/git-flow.sh feature-start 42 map-filters
+# e.g. bash scripts/git-flow.sh feature-start 8 search-reranking
 
 ./scripts/update-jira-status.sh <KEY> "In Progress"
 ```
 
-> For hotfixes: `bash scripts/git-flow.sh hotfix-start <n> <slug>` (branches from main)
+> For hotfixes: use `bash scripts/git-flow.sh hotfix-start <n> <slug>` (branches from main)
 
 ---
 
@@ -86,44 +86,65 @@ gh pr merge --auto --squash --delete-branch
 
 ---
 
-### 7. Pipeline — walk through environments
+### 7. Pipeline — wait for CI, then walk through environments
 
 #### 7a. DEV (automatic)
 After the PR merges to `develop`, CI triggers automatically:
 - lint → test → build → **deploy DEV**
 
+Watch: https://github.com/<org>/<repo>/actions
+
 #### 7b. Cut release branch → SIT (automatic)
-When ready to ship:
+When the feature is ready to ship:
+
 ```bash
 bash scripts/git-flow.sh release-start <X.Y.Z>
 ```
-CI triggers on the `release/X.Y.Z` push → **deploy SIT**
 
-#### 7c. UAT (manual approval)
-After SIT passes, approve in GitHub Actions:
-1. Open the Actions tab for the `release/X.Y.Z` workflow run
-2. Click **Review deployments → uat → Approve**
+CI triggers automatically on the `release/X.Y.Z` push:
+- lint → test → build → **deploy SIT**
 
-#### 7d. Merge to main → PRD (manual approval)
+#### 7c. UAT (manual approval required)
+After SIT deploys, CI waits for a human to approve UAT in GitHub Actions:
+
+1. Go to https://github.com/<org>/<repo>/actions
+2. Find the running workflow for `release/X.Y.Z`
+3. Click **Review deployments → uat → Approve**
+
+CI then deploys to UAT automatically.
+
+> ⚠ Manual approval requires GitHub Team plan. On the free plan, UAT deploys
+> automatically after SIT — add a required reviewer in
+> **Settings → Environments → uat** once you upgrade.
+
+#### 7d. Merge to main → PRD (manual approval required)
+After UAT sign-off, finish the release:
+
 ```bash
 bash scripts/git-flow.sh release-finish <X.Y.Z>
+# merges release/X.Y.Z → main, tags vX.Y.Z, merges back → develop
 ```
-CI triggers on `main` push → approve **PRD** in GitHub Actions the same way.
+
+CI triggers on the `main` push:
+- lint → test → build → **(manual approval)** → **deploy PRD**
+
+Approve in GitHub Actions the same way as UAT.
 
 #### 7e. Close ticket
+
 ```bash
 ./scripts/update-jira-status.sh <KEY> "Done"
 ```
 
 ---
 
-## Hotfix flow
+## Hotfix flow (skip to here for production emergencies)
 
 ```bash
 bash scripts/git-flow.sh hotfix-start <n> <slug>
-# implement + commit
+# implement fix
 bash scripts/git-flow.sh hotfix-finish <X.Y.Z>
-# CI on main → approve PRD in GitHub Actions
+# CI runs on main → approve PRD deployment in GitHub Actions
 ./scripts/update-jira-status.sh <KEY> "Done"
 ```
 

@@ -29,14 +29,14 @@ jobs:
     if: github.event.inputs.confirm == 'deploy'
 
     steps:
-      - name: Trigger PRD deploy
+      - name: Trigger PRD deploy (Render / Azure)
         run: |
           echo "▶ Deploying ${{ github.ref_name }} → PRD environment..."
           echo "   Triggered by: ${{ github.actor }}"
           echo "   Commit: ${{ github.sha }}"
           if [ -n "${{ secrets.DEPLOY_HOOK_PRD }}" ]; then
             curl -s -X POST "${{ secrets.DEPLOY_HOOK_PRD }}" | head -c 200
-            echo ""
           else
-            echo "⚠ DEPLOY_HOOK_PRD not set — add it in Settings → Secrets → Actions"
+            echo "⚠ DEPLOY_HOOK_PRD secret not set — skipping deploy trigger."
+            echo "  Add it in: Settings → Secrets → Actions → New repository secret"
           fi

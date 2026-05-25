@@ -1,38 +1,44 @@
 #!/usr/bin/env bash
-# =============================================================================
-# new-feature.sh — Create a feature/fix branch from develop
-#
-# Usage: ./scripts/new-feature.sh <TICKET-KEY> <short-slug>
-# Example: ./scripts/new-feature.sh MSK-101 otp-retry-limit
-#
-# Prefer using git-flow.sh instead:
-#   bash scripts/git-flow.sh feature-start 101 otp-retry-limit
-# =============================================================================
+# Stage 3 — Branch + scaffold
+# Usage: ./scripts/new-feature.sh KEY-101 "short description of work"
 set -euo pipefail
 
-source "$(dirname "$0")/../.aidev/config.sh"
+TICKET=${1:?"Usage: $0 <TICKET-KEY> \"<short description>\""}
+DESC=${2:?"Usage: $0 <TICKET-KEY> \"<short description>\""}
 
-KEY="${1:-}"
-SLUG="${2:-}"
+# Normalise description → kebab-case slug
+SLUG=$(echo "$DESC" \
+  | tr '[:upper:]' '[:lower:]' \
+  | sed 's/[^a-z0-9]/-/g' \
+  | sed 's/--*/-/g' \
+  | sed 's/^-//;s/-$//')
 
-if [ -z "$KEY" ] || [ -z "$SLUG" ]; then
-  echo "Usage: $0 <TICKET-KEY> <short-slug>"
-  echo "Example: $0 MSK-101 otp-retry-limit"
-  exit 1
+BRANCH="feature/${TICKET}-${SLUG}"
+
+echo "→ Syncing main..."
+git checkout main
+git pull origin main
+
+echo "→ Creating branch: $BRANCH"
+git checkout -b "$BRANCH"
+git push -u origin "$BRANCH"
+
+echo ""
+echo "→ Creating impact map scaffold..."
+IMPACT_MAP=".aidev/impact-maps/${TICKET}.md"
+if [ ! -f "$IMPACT_MAP" ]; then
+  cp .aidev/templates/impact-map.md "$IMPACT_MAP"
+  sed -i.bak "s/<TICKET-KEY>/$TICKET/g" "$IMPACT_MAP" && rm -f "${IMPACT_MAP}.bak"
+  git add "$IMPACT_MAP"
+  git commit -m "chore($TICKET): scaffold impact map"
+  git push
+  echo "→ Impact map created: $IMPACT_MAP"
+else
+  echo "→ Impact map already exists: $IMPACT_MAP"
 fi
 
-BRANCH="feature/${TICKET_PREFIX:-mas}-${KEY}-${SLUG}"
-
-git checkout "${DEVELOP_BRANCH:-develop}"
-git pull origin "${DEVELOP_BRANCH:-develop}"
-git checkout -b "$BRANCH"
-
-# Scaffold impact map
-IMPACT_MAP=".aidev/impact-maps/${KEY}.md"
-cp .aidev/templates/impact-map.md "$IMPACT_MAP"
-sed -i.bak "s/TICKET_KEY/$KEY/g" "$IMPACT_MAP" && rm "${IMPACT_MAP}.bak"
-
-echo "Branch '$BRANCH' created from ${DEVELOP_BRANCH:-develop}."
-echo "Impact map scaffolded at $IMPACT_MAP"
 echo ""
-echo "Next: fill in $IMPACT_MAP then run opencode to implement."
+echo "✅ Ready."
+echo "   Branch : $BRANCH"
+echo "   Next   : Run prompt 2-investigate with ticket $TICKET, then fill in $IMPACT_MAP"
+echo "            Get your plan approved, then run prompt 4-implement-feature."
