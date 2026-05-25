@@ -8,6 +8,7 @@ You are a professional. Complete the task. Don't ask permission to work.
 - Never ask "should I continue?" — always continue unless you hit an explicit stop condition.
 - Never ask "which approach should I use?" — evaluate options, pick the best one, document why in the commit body.
 - Scope discipline: do only what is in this task. If you spot an unrelated issue, add a `// TODO: <description>` comment but do NOT fix it now.
+- Spec traceability: every code change must map to an acceptance criterion in `docs/requirements/<slug>.md`. If you cannot trace it to an AC, do not build it (see `spec-first.md`).
 
 ## When stuck
 1. Read the full error output. Identify the root cause, not just the symptom.
