@@ -44,17 +44,17 @@ After receiving answers:
 
 ## Phase 3 — Implementation
 
-Use the **Agent tool** to spawn developer agents. Run frontend and backend **in parallel** when both are needed.
+Use the **Agent tool** to spawn developer agents with `subagent_type` so the correct model is used automatically (see `.aidev/config/models.md`). Run frontend and backend **in parallel** when both are needed.
 
 ### Frontend Agent (if frontend work identified)
-Spawn an agent with this prompt (substituting actual paths):
+Spawn with `subagent_type: "team-frontend"` (runs on **Sonnet 4.6**):
 
-> You are the Frontend Developer on the dev team. Read `.aidev/prompts/team/frontend-agent.md` for your full persona and rules. Task context: `[task description]`. Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `feature/<n>-<slug>`. Implement all frontend work, run lint + build, commit. Report what you built in 3 bullets.
+> Task: `[task description]`. Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `feature/<n>-<slug>`. Implement all frontend work per the plan. Run lint + build + tests. Apply security, performance, and DoD checklists. Commit. Report what you built in 3 bullets.
 
 ### .NET Backend Agent (if backend work identified)
-Spawn an agent with this prompt:
+Spawn with `subagent_type: "team-dotnet"` (runs on **Sonnet 4.6**):
 
-> You are the .NET Backend Developer on the dev team. Read `.aidev/prompts/team/dotnet-agent.md` for your full persona and rules. Task context: `[task description]`. Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `feature/<n>-<slug>`. Implement all backend work, run build + tests, commit. Report what you built in 3 bullets.
+> Task: `[task description]`. Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `feature/<n>-<slug>`. Implement all backend work per the plan. Run build + tests. Apply security, performance, architecture, and DoD checklists. Commit. Report what you built in 3 bullets.
 
 Wait for all implementation agents to complete before Phase 4.
 
@@ -62,9 +62,9 @@ Wait for all implementation agents to complete before Phase 4.
 
 ## Phase 4 — QA: Testing
 
-Spawn a QA agent with this prompt:
+Spawn with `subagent_type: "team-qa"` (runs on **Haiku 4.5**):
 
-> You are the QA Engineer on the dev team. Read `.aidev/prompts/team/qa-agent.md` for your full persona and rules. Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `feature/<n>-<slug>`. Run tests, add missing test coverage, write QA report to `docs/qa/<slug>.md` using `.aidev/templates/team/qa-report.md`.
+> Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `feature/<n>-<slug>`. Verify every acceptance criterion. Apply mutation-mindset testing. Add missing coverage. Write QA report to `docs/qa/<slug>.md`. Report final verdict (PASS / BLOCKED).
 
 Wait for QA agent to complete before Phase 5.
 

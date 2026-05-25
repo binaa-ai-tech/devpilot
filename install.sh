@@ -84,10 +84,22 @@ fi
 
 # ── Claude Code commands ──────────────────────────────────────────────────────
 info "Downloading Claude Code commands..."
+mkdir -p .claude/commands .claude/agents
 for f in binaa.md binaa-dev.md binaa-sit.md binaa-uat.md binaa-prd.md binaa-hotfix.md \
           team-task.md team-ba.md team-lead.md team-frontend.md team-dotnet.md team-qa.md; do
   curl -fsSL "$REPO/.claude/commands/$f" -o ".claude/commands/$f"
 done
+
+# ── Claude Code agent definitions (model-routed) ─────────────────────────────
+info "Downloading Claude Code agent definitions..."
+for f in team-lead.md team-ba.md team-frontend.md team-dotnet.md team-qa.md; do
+  curl -fsSL "$REPO/.claude/agents/$f" -o ".claude/agents/$f"
+done
+
+# ── Model config ──────────────────────────────────────────────────────────────
+info "Downloading model config..."
+mkdir -p .aidev/config
+curl -fsSL "$REPO/.aidev/config/models.md" -o ".aidev/config/models.md"
 
 # ── AI team agent prompts ─────────────────────────────────────────────────────
 info "Downloading AI team prompts..."
