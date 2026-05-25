@@ -288,20 +288,35 @@ If BLOCKED: fix the issue (spawn the relevant agent again), then re-run QA.
    git add docs/
    git commit -m "docs(<slug>): add requirements, plan, qa, and review docs"
    ```
-5. **REQUIRED — Open PR, close tickets, log completion:**
+5. **REQUIRED — Open PR, merge it, then close ticket (run in order, do not skip):**
    ```bash
+   # Step A — Open the PR
    PR_URL=$(gh pr create \
      --base <BASE_BRANCH> \
      --title "<KEY>: <description>" \
      --body "$(cat docs/reviews/<slug>.md)" | tail -1)
-   bash scripts/update-jira-status.sh "$KEY" "Done"
-   # For complex features, also:
-   # bash scripts/update-jira-status.sh "$KEY_FE" "Done"
-   # bash scripts/update-jira-status.sh "$KEY_BE" "Done"
-   bash scripts/add-jira-comment.sh "$KEY" "[Team Lead | claude-sonnet-4-6] Phase 5 complete — PR: $PR_URL targeting <BASE_BRANCH>. Ticket closed."
+   PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+
+   bash scripts/add-jira-comment.sh "$KEY" "[Team Lead | claude-sonnet-4-6] PR opened: $PR_URL targeting <BASE_BRANCH>"
+
+   # Step B — Merge the PR into <BASE_BRANCH>
+   gh pr merge "$PR_NUM" --squash --delete-branch
+
+   # Step C — Confirm merge succeeded before closing ticket
+   MERGE_STATE=$(gh pr view "$PR_NUM" --json state --jq '.state')
+   if [ "$MERGE_STATE" = "MERGED" ]; then
+     bash scripts/update-jira-status.sh "$KEY" "Done"
+     bash scripts/add-jira-comment.sh "$KEY" "[Team Lead | claude-sonnet-4-6] PR #${PR_NUM} merged into <BASE_BRANCH>. Ticket closed. Feature live on DEV after CI."
+   else
+     echo "⚠️  Merge failed (branch protection or CI required). Merge manually then run:"
+     echo "   bash scripts/update-jira-status.sh $KEY Done"
+     echo "   bash scripts/add-jira-comment.sh $KEY 'PR merged into <BASE_BRANCH>. Ticket closed.'"
+   fi
    ```
 
-6. Announce: "✅ Review complete. PR opened."
+   **Never close the Jira ticket before the PR is merged.**
+
+6. Announce: "✅ Review complete. PR merged into <BASE_BRANCH>. Ticket closed."
 
 ---
 
