@@ -9,13 +9,25 @@ Never skip a phase. Follow `.devpilot/rules.md` throughout.
 
 ## Step 0 — Load config and skills (before anything else)
 
-1. Read `project.config.md` — note: base_branch, active agents, model routing
-2. Read `.devpilot/skills/get-shit-done.md`
-3. Read `.devpilot/skills/architecture-guard.md`
-4. Read `.devpilot/skills/self-heal.md`
+1. Read `project.config.md` — extract and announce:
+   ```
+   Project: <project_name>
+   Base branch: <base_branch>
+   Active agents: <list>
+   ```
+   **If project_name is missing or this looks like the wrong project, stop and tell the user to open the correct project in Claude Code.**
 
-Set `BASE_BRANCH` = value of `base_branch` from project.config.md (default: `main`).
-Set `ACTIVE_AGENTS` = agents where `enabled: true`.
+2. Set `BASE_BRANCH` by running:
+   ```bash
+   grep 'base_branch' project.config.md | head -1 | sed 's/.*base_branch:[[:space:]]*//'
+   ```
+   Use the result as BASE_BRANCH throughout. Never default to `main` without reading the config.
+
+3. Read `.devpilot/skills/get-shit-done.md`
+4. Read `.devpilot/skills/architecture-guard.md`
+5. Read `.devpilot/skills/self-heal.md`
+
+Set `ACTIVE_AGENTS` = agents where `enabled: true` in project.config.md.
 
 ---
 
@@ -47,14 +59,26 @@ note it as an assumption and pick the safer option.
    ./scripts/create-jira-ticket.sh "<summary>" "<description>" "Story"
    ```
 3. Note the ticket key (e.g. `KEY-42`)
-4. Create feature branch:
+4. Transition ticket to **In Progress** (team lead took ownership):
+   ```bash
+   bash scripts/update-jira-status.sh <KEY> "In Progress"
+   ```
+5. Add a Jira comment logging who started planning:
+   ```bash
+   bash scripts/add-jira-comment.sh <KEY> "[Team Lead | claude-sonnet-4-6] Phase 2 started — creating implementation plan"
+   ```
+6. Create feature branch:
    ```bash
    bash scripts/git-flow.sh feature-start <ticket-number> <slug>
    ```
-5. Determine scope from requirements: frontend needed? backend needed? db changes? integration?
+7. Determine scope from requirements: frontend needed? backend needed? db changes? integration?
    Cross-check against `project.config.md → agents` — only plan for enabled agents.
-6. Write `docs/plans/<slug>.md` using `.devpilot/templates/team/implementation-plan.md`
-7. Announce: "✅ Planning Phase complete. Plan at `docs/plans/<slug>.md`"
+8. Write `docs/plans/<slug>.md` using `.devpilot/templates/team/implementation-plan.md`
+9. Add Jira comment confirming plan is ready:
+   ```bash
+   bash scripts/add-jira-comment.sh <KEY> "[Team Lead | claude-sonnet-4-6] Phase 2 complete — implementation plan at docs/plans/<slug>.md. Branch: feature/<KEY>-<n>-<slug>"
+   ```
+10. Announce: "✅ Planning Phase complete. Plan at `docs/plans/<slug>.md`"
 
 ---
 
@@ -87,7 +111,12 @@ Spawn with `subagent_type: "team-dotnet"`:
 
 > Task: Integration work for `[task description]`. Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `feature/<KEY>-<n>-<slug>`. Implement all integration/messaging work per the plan. Read `.devpilot/skills/self-heal.md` for fallback protocol. Run tests. Commit. Report what you built in 3 bullets.
 
-**Wait for all implementation agents to complete (or fall back to opencode) before Phase 4.**
+**Wait for all implementation agents to complete before Phase 4.**
+After all agents finish, add a Jira comment for each agent that ran:
+```bash
+bash scripts/add-jira-comment.sh <KEY> "[Frontend Dev | <tier1-model>] Phase 3 complete — <3-line summary of what was built>"
+bash scripts/add-jira-comment.sh <KEY> "[Backend Dev | <tier1-model>] Phase 3 complete — <3-line summary of what was built>"
+```
 
 If any agent triggered the opencode fallback: **stop here and wait for `/ceo resume`.**
 
@@ -100,6 +129,14 @@ Spawn with `subagent_type: "team-qa"`:
 > Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `feature/<KEY>-<n>-<slug>`. Verify every acceptance criterion. Apply mutation-mindset testing. Add missing coverage. Write QA report to `docs/qa/<slug>.md`. Report final verdict (PASS / BLOCKED).
 
 Wait for QA agent to complete before Phase 5.
+
+After QA completes, add a Jira comment:
+```bash
+# If PASS:
+bash scripts/add-jira-comment.sh <KEY> "[QA Engineer | <tier1-model>] Phase 4 complete — ✅ PASS. All acceptance criteria verified. Report: docs/qa/<slug>.md"
+# If BLOCKED:
+bash scripts/add-jira-comment.sh <KEY> "[QA Engineer | <tier1-model>] Phase 4 complete — ❌ BLOCKED. See docs/qa/<slug>.md for details."
+```
 
 ---
 
@@ -115,15 +152,22 @@ Wait for QA agent to complete before Phase 5.
    git add docs/
    git commit -m "docs(<slug>): add requirements, plan, qa, and review docs"
    ```
-5. Open PR:
+5. Open PR targeting BASE_BRANCH (read from project.config.md — e.g. `develop`):
    ```bash
    gh pr create \
      --base <BASE_BRANCH> \
      --title "<KEY>: <description>" \
      --body "$(cat docs/reviews/<slug>.md)"
-   gh pr merge --auto --squash --delete-branch
    ```
-6. Announce: "✅ Review complete. PR opened."
+6. Transition Jira ticket to **Done**:
+   ```bash
+   bash scripts/update-jira-status.sh <KEY> "Done"
+   ```
+7. Add final Jira comment with PR link:
+   ```bash
+   bash scripts/add-jira-comment.sh <KEY> "[Team Lead | claude-sonnet-4-6] Phase 5 complete — ✅ PR opened: <PR_URL> targeting <BASE_BRANCH>. Ready for review."
+   ```
+8. Announce: "✅ Review complete. PR opened."
 
 ---
 
