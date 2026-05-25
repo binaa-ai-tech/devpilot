@@ -5,11 +5,19 @@ This repository defines the development workflow for AI-assisted projects. It co
 1. **`.aidev/`** — classic single-agent workflow (prompts, rules, templates)
 2. **`.claude/commands/team-*`** — multi-agent AI dev team (new)
 
+## CEO Entry Point
+
+| Command | What it does |
+|---------|-------------|
+| `/ceo <description>` | Submit any task — auto-classifies as feature/bug/hotfix, runs the full team, delivers PR with status report and next steps |
+
+This is the primary command. Use it to delegate any feature, bug, or production emergency.
+
 ## AI Team Commands
 
 | Command | Role | When to Use |
 |---------|------|-------------|
-| `/team-task <description>` | Full team workflow | Start any feature, bug, or story end-to-end |
+| `/team-task <description>` | Full team workflow | Used by `/ceo` internally — or run directly for more control |
 | `/team-ba <description>` | Business Analyst only | Just need requirements written |
 | `/team-lead <context>` | Team Lead only | Planning or review only |
 | `/team-frontend <context>` | Frontend Developer only | UI work only |
@@ -19,10 +27,10 @@ This repository defines the development workflow for AI-assisted projects. It co
 ## Team Workflow (Full)
 
 ```
-/team-task "description"
+/ceo "description"  →  /team-task
       │
       ▼
-[BA] Asks clarifying questions → docs/requirements/<slug>.md
+[BA] Clarifying questions → docs/requirements/<slug>.md
       │
       ▼
 [Team Lead] Plans + creates ticket + branch → docs/plans/<slug>.md
@@ -44,13 +52,13 @@ Angular/React impl          API/service/DB impl
 
 ## Deploy Pipeline Commands
 
-| Command | When to use |
+| Command | When to run |
 |---------|-------------|
-| `/binaa-dev feat: <description>` | Start a new feature or fix → lands on DEV |
-| `/binaa-sit <version>` | Promote develop → SIT for QA testing |
-| `/binaa-uat` | Approve UAT gate after SIT passes |
-| `/binaa-prd <version>` | Finish release → tag → deploy PRD |
-| `/binaa-hotfix <n> <slug> <version>` | Emergency production fix |
+| `/binaa-sit <version>` | DEV tested → promote to SIT (e.g. `/binaa-sit 1.1.0`) |
+| `/binaa-uat` | SIT passed → approve UAT gate |
+| `/binaa-prd <version>` | UAT signed off → deploy to production |
+| `/binaa-hotfix <n> <slug> <version>` | Production emergency |
+| `/binaa-dev <type>: <description>` | Developer-assisted flow (uses opencode) |
 
 ## Tech Stack
 
