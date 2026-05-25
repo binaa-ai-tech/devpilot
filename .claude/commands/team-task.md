@@ -54,31 +54,31 @@ note it as an assumption and pick the safer option.
 **Resume Team Lead persona.** Read `.devpilot/prompts/team/lead-plan.md`.
 
 1. Read `docs/requirements/<slug>.md`
-2. Create Jira ticket:
+
+2. **REQUIRED — Create ticket + transition + comment (run all 3 lines, do not skip any):**
    ```bash
-   ./scripts/create-jira-ticket.sh "<summary>" "<description>" "Story"
+   KEY=$(bash scripts/create-jira-ticket.sh "<summary>" "<slug> — devpilot auto-task" "Story")
+   bash scripts/update-jira-status.sh "$KEY" "In Progress"
+   bash scripts/add-jira-comment.sh "$KEY" "[Team Lead | claude-sonnet-4-6] Phase 2 started — branch and implementation plan being created"
    ```
-3. Note the ticket key (e.g. `KEY-42`)
-4. Transition ticket to **In Progress** (team lead took ownership):
-   ```bash
-   bash scripts/update-jira-status.sh <KEY> "In Progress"
-   ```
-5. Add a Jira comment logging who started planning:
-   ```bash
-   bash scripts/add-jira-comment.sh <KEY> "[Team Lead | claude-sonnet-4-6] Phase 2 started — creating implementation plan"
-   ```
-6. Create feature branch:
+   Save the value of `KEY` (e.g. `MSK-42`) — use it in every step below.
+
+3. **REQUIRED — Create feature branch:**
    ```bash
    bash scripts/git-flow.sh feature-start <ticket-number> <slug>
    ```
-7. Determine scope from requirements: frontend needed? backend needed? db changes? integration?
+
+4. Determine scope from requirements: frontend needed? backend needed? db changes? integration?
    Cross-check against `project.config.md → agents` — only plan for enabled agents.
-8. Write `docs/plans/<slug>.md` using `.devpilot/templates/team/implementation-plan.md`
-9. Add Jira comment confirming plan is ready:
+
+5. Write `docs/plans/<slug>.md` using `.devpilot/templates/team/implementation-plan.md`
+
+6. **REQUIRED — Log plan complete:**
    ```bash
-   bash scripts/add-jira-comment.sh <KEY> "[Team Lead | claude-sonnet-4-6] Phase 2 complete — implementation plan at docs/plans/<slug>.md. Branch: feature/<KEY>-<n>-<slug>"
+   bash scripts/add-jira-comment.sh "$KEY" "[Team Lead | claude-sonnet-4-6] Phase 2 complete — plan: docs/plans/<slug>.md | branch: feature/<KEY>-<n>-<slug>"
    ```
-10. Announce: "✅ Planning Phase complete. Plan at `docs/plans/<slug>.md`"
+
+7. Announce: "✅ Planning Phase complete. Plan at `docs/plans/<slug>.md`"
 
 ---
 
@@ -112,10 +112,11 @@ Spawn with `subagent_type: "team-dotnet"`:
 > Task: Integration work for `[task description]`. Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `feature/<KEY>-<n>-<slug>`. Implement all integration/messaging work per the plan. Read `.devpilot/skills/self-heal.md` for fallback protocol. Run tests. Commit. Report what you built in 3 bullets.
 
 **Wait for all implementation agents to complete before Phase 4.**
-After all agents finish, add a Jira comment for each agent that ran:
+
+**REQUIRED — Log each agent that ran (one call per agent):**
 ```bash
-bash scripts/add-jira-comment.sh <KEY> "[Frontend Dev | <tier1-model>] Phase 3 complete — <3-line summary of what was built>"
-bash scripts/add-jira-comment.sh <KEY> "[Backend Dev | <tier1-model>] Phase 3 complete — <3-line summary of what was built>"
+bash scripts/add-jira-comment.sh "$KEY" "[Frontend Dev | <tier1-model>] Phase 3 complete — <one-line summary>"
+bash scripts/add-jira-comment.sh "$KEY" "[Backend Dev | <tier1-model>] Phase 3 complete — <one-line summary>"
 ```
 
 If any agent triggered the opencode fallback: **stop here and wait for `/ceo resume`.**
@@ -130,12 +131,12 @@ Spawn with `subagent_type: "team-qa"`:
 
 Wait for QA agent to complete before Phase 5.
 
-After QA completes, add a Jira comment:
+**REQUIRED — Log QA verdict:**
 ```bash
-# If PASS:
-bash scripts/add-jira-comment.sh <KEY> "[QA Engineer | <tier1-model>] Phase 4 complete — ✅ PASS. All acceptance criteria verified. Report: docs/qa/<slug>.md"
-# If BLOCKED:
-bash scripts/add-jira-comment.sh <KEY> "[QA Engineer | <tier1-model>] Phase 4 complete — ❌ BLOCKED. See docs/qa/<slug>.md for details."
+# PASS:
+bash scripts/add-jira-comment.sh "$KEY" "[QA Engineer | <tier1-model>] Phase 4 complete — PASS. All acceptance criteria verified."
+# BLOCKED:
+bash scripts/add-jira-comment.sh "$KEY" "[QA Engineer | <tier1-model>] Phase 4 complete — BLOCKED. See docs/qa/<slug>.md"
 ```
 
 ---
@@ -152,22 +153,17 @@ bash scripts/add-jira-comment.sh <KEY> "[QA Engineer | <tier1-model>] Phase 4 co
    git add docs/
    git commit -m "docs(<slug>): add requirements, plan, qa, and review docs"
    ```
-5. Open PR targeting BASE_BRANCH (read from project.config.md — e.g. `develop`):
+5. **REQUIRED — Open PR, close ticket, log completion (run all in order):**
    ```bash
-   gh pr create \
+   PR_URL=$(gh pr create \
      --base <BASE_BRANCH> \
      --title "<KEY>: <description>" \
-     --body "$(cat docs/reviews/<slug>.md)"
+     --body "$(cat docs/reviews/<slug>.md)" | tail -1)
+   bash scripts/update-jira-status.sh "$KEY" "Done"
+   bash scripts/add-jira-comment.sh "$KEY" "[Team Lead | claude-sonnet-4-6] Phase 5 complete — PR: $PR_URL targeting <BASE_BRANCH>. Ticket closed."
    ```
-6. Transition Jira ticket to **Done**:
-   ```bash
-   bash scripts/update-jira-status.sh <KEY> "Done"
-   ```
-7. Add final Jira comment with PR link:
-   ```bash
-   bash scripts/add-jira-comment.sh <KEY> "[Team Lead | claude-sonnet-4-6] Phase 5 complete — ✅ PR opened: <PR_URL> targeting <BASE_BRANCH>. Ready for review."
-   ```
-8. Announce: "✅ Review complete. PR opened."
+
+6. Announce: "✅ Review complete. PR opened."
 
 ---
 
