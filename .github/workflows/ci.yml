@@ -4,12 +4,12 @@ name: CI / CD
 # Trigger matrix
 #
 #  branch          CI (lint/test/build)   deploy
-#  ─────────────── ─────────────────────  ────────────────────────────────────
+#  ─────────────── ─────────────────────  ──────────────────────────────────
 #  feature/**      ✓                      —
 #  hotfix/**       ✓                      —
 #  develop         ✓                      → DEV  (auto)
 #  release/**      ✓                      → SIT  (auto) → UAT (manual gate)
-#  main            ✓                      → PRD  (manual workflow_dispatch)
+#  main            ✓                      → PRD  (manual gate)
 # ─────────────────────────────────────────────────────────────────────────────
 on:
   push:
@@ -24,62 +24,123 @@ on:
       - main
       - develop
 
+# Cancel in-progress runs on the same branch when a new push arrives
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
-  # ── 1. Lint ──────────────────────────────────────────────────────────────────
+  # ── 1. Lint & Type-check ────────────────────────────────────────────────────
   lint:
-    name: Lint
+    name: Lint & Type-check
     runs-on: ubuntu-latest
+
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20.x'
           cache: 'npm'
-      - run: npm ci
-      - name: Lint
-        run: npm run lint --if-present
 
-  # ── 2. Test ──────────────────────────────────────────────────────────────────
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Derive NX base
+        run: |
+          git fetch origin develop --depth=1 2>/dev/null || true
+          echo "NX_BASE=origin/develop" >> $GITHUB_ENV
+
+      - name: Lint (affected)
+        run: npx nx affected --target=lint --base=$NX_BASE --head=HEAD --parallel=3
+
+      - name: Type-check (affected)
+        run: npx nx affected --target=type-check --base=$NX_BASE --head=HEAD --parallel=3
+
+  # ── 2. Test ─────────────────────────────────────────────────────────────────
   test:
     name: Test
     runs-on: ubuntu-latest
     needs: lint
+
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20.x'
           cache: 'npm'
-      - run: npm ci
-      - name: Test
-        run: npm test --if-present -- --ci --passWithNoTests
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install dependencies
+        run: npm ci && dotnet restore
+
+      - name: Derive NX base
+        run: |
+          git fetch origin develop --depth=1 2>/dev/null || true
+          echo "NX_BASE=origin/develop" >> $GITHUB_ENV
+
+      - name: Test Frontend (affected)
+        run: >
+          npx nx affected
+          --target=test
+          --base=$NX_BASE --head=HEAD
+          --ci --passWithNoTests --forceExit
+          --exclude=api
+          --parallel=3
+
+      - name: Test .NET API
+        run: dotnet test apps/api.tests --no-restore
 
   # ── 3. Build ─────────────────────────────────────────────────────────────────
   build:
     name: Build
     runs-on: ubuntu-latest
     needs: lint
+
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
       - uses: actions/setup-node@v4
         with:
           node-version: '20.x'
           cache: 'npm'
-      - run: npm ci
-      - name: Build
-        run: npm run build --if-present
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Install dependencies
+        run: npm ci && dotnet restore
+
+      - name: Derive NX base
+        run: |
+          git fetch origin develop --depth=1 2>/dev/null || true
+          echo "NX_BASE=origin/develop" >> $GITHUB_ENV
+
+      - name: Build Angular apps (affected, production)
+        run: >
+          npx nx affected
+          --target=build
+          --base=$NX_BASE --head=HEAD
+          --configuration=production
+          --exclude=mobile
+          --parallel=3
+
+      - name: Build .NET API (Release)
+        run: dotnet build apps/api -c Release --no-restore
 
   # ── 4. Deploy → DEV ──────────────────────────────────────────────────────────
+  # Triggers: push to develop only
   deploy-dev:
     name: Deploy → DEV
     runs-on: ubuntu-latest
@@ -88,17 +149,28 @@ jobs:
     environment:
       name: dev
       url: ${{ vars.DEV_URL }}
+
     steps:
-      - name: Trigger DEV deploy
+      - name: Trigger DEV API deploy (Render)
         run: |
-          if [ -n "${{ secrets.DEPLOY_HOOK_DEV }}" ]; then
-            curl -s -X POST "${{ secrets.DEPLOY_HOOK_DEV }}" | head -c 200
-            echo ""
+          echo "▶ Deploying develop → DEV API (Render)..."
+          if [ -n "${{ secrets.DEPLOY_HOOK_DEV_API }}" ]; then
+            curl -s -X POST "${{ secrets.DEPLOY_HOOK_DEV_API }}" | head -c 200
           else
-            echo "⚠ DEPLOY_HOOK_DEV not set — add it in Settings → Secrets → Actions"
+            echo "⚠ DEPLOY_HOOK_DEV_API secret not set — skipping."
+          fi
+
+      - name: Trigger DEV UI deploy (Cloudflare Pages)
+        run: |
+          echo "▶ Deploying develop → DEV UI (Cloudflare Pages)..."
+          if [ -n "${{ secrets.DEPLOY_HOOK_DEV_UI }}" ]; then
+            curl -s -d "" "${{ secrets.DEPLOY_HOOK_DEV_UI }}" | head -c 200
+          else
+            echo "⚠ DEPLOY_HOOK_DEV_UI secret not set — skipping."
           fi
 
   # ── 5. Deploy → SIT ──────────────────────────────────────────────────────────
+  # Triggers: push to release/** only
   deploy-sit:
     name: Deploy → SIT
     runs-on: ubuntu-latest
@@ -107,19 +179,21 @@ jobs:
     environment:
       name: sit
       url: ${{ vars.SIT_URL }}
+
     steps:
-      - name: Trigger SIT deploy
+      - name: Trigger SIT deploy (Render)
         run: |
+          echo "▶ Deploying ${{ github.ref_name }} → SIT environment..."
           if [ -n "${{ secrets.DEPLOY_HOOK_SIT }}" ]; then
             curl -s -X POST "${{ secrets.DEPLOY_HOOK_SIT }}" | head -c 200
-            echo ""
           else
-            echo "⚠ DEPLOY_HOOK_SIT not set — add it in Settings → Secrets → Actions"
+            echo "⚠ DEPLOY_HOOK_SIT secret not set — skipping deploy trigger."
+            echo "  Add it in: Settings → Secrets → Actions → New repository secret"
           fi
 
   # ── 6. Deploy → UAT ──────────────────────────────────────────────────────────
-  # Gate: manual approval in GitHub Actions
-  # Configure: Settings → Environments → uat → Required reviewers
+  # Triggers: after SIT deploy, same release/** branch
+  # Gate:     manual approval required (configure in Settings → Environments → uat)
   deploy-uat:
     name: Deploy → UAT
     runs-on: ubuntu-latest
@@ -128,14 +202,25 @@ jobs:
     environment:
       name: uat
       url: ${{ vars.UAT_URL }}
+
     steps:
-      - name: Trigger UAT deploy
+      - name: Trigger UAT deploy (Azure)
         run: |
+          echo "▶ Deploying ${{ github.ref_name }} → UAT environment..."
           if [ -n "${{ secrets.DEPLOY_HOOK_UAT }}" ]; then
+            # Render hook (same as SIT pattern):
+            # curl -s -X POST "${{ secrets.DEPLOY_HOOK_UAT }}"
+            #
+            # Azure App Service (swap staging slot to UAT):
+            # az webapp deployment slot swap \
+            #   --resource-group <resource-group> \
+            #   --name <app-name>-uat \
+            #   --slot staging \
+            #   --target-slot production
             curl -s -X POST "${{ secrets.DEPLOY_HOOK_UAT }}" | head -c 200
-            echo ""
           else
-            echo "⚠ DEPLOY_HOOK_UAT not set — add it in Settings → Secrets → Actions"
+            echo "⚠ DEPLOY_HOOK_UAT secret not set — skipping deploy trigger."
+            echo "  Add it in: Settings → Secrets → Actions → New repository secret"
           fi
 
   # ── 7. PRD readiness check ────────────────────────────────────────────────────

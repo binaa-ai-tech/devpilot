@@ -14,9 +14,8 @@
 
 ## Step 3 — Branch
 
-- [ ] Branch named `fix/{prefix}-<n>-<slug>`
+- [ ] Branch named `fix/<KEY>-<slug>`
 - [ ] Branched from latest **`develop`** (not main)
-- [ ] Reproducer confirmed on branch before fixing
 
 ## Step 4 — Implement
 
