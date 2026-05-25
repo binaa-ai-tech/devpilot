@@ -35,13 +35,21 @@ agents:
 #   opencode — Claude handles BA/planning/QA/review; opencode CLI runs the coding
 #   claude   — Claude subagents handle everything (use when opencode is unavailable)
 #
-# opencode model: exact model ID to pass to `opencode --model "..."`.
-# Find available models by running: opencode model list
-# Example GitHub Copilot models: github-copilot/gpt-4o, github-copilot/gpt-3.5-codex
+# Per-agent opencode models — configure each developer role separately.
+# All default to gpt-4o. Change individual agents if you want different models.
+# Run: opencode model list   (to see all available models)
+#
+# Common GitHub Copilot models:
+#   github-copilot/gpt-4o           — best all-round
+#   github-copilot/gpt-3.5-codex    — fast and cheap
+#   github-copilot/claude-3.5-sonnet — strong reasoning + code quality
 
 implementation:
   engine: opencode
-  model: "github-copilot/gpt-4o"
+  model_frontend:    "github-copilot/gpt-4o"    # Angular / React / Vue
+  model_backend:     "github-copilot/gpt-4o"    # .NET / Node / Python
+  model_db:          "github-copilot/gpt-4o"    # DB migrations and SQL
+  model_integration: "github-copilot/gpt-4o"    # Messaging / Services
 
 ## Model Routing — Claude (non-coding phases only)
 #

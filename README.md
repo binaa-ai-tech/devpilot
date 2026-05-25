@@ -177,13 +177,21 @@ After the PR merges and CI deploys to DEV, promote through environments:
 
 Version convention: features → bump MINOR (`1.0.0 → 1.1.0`), bug fixes → bump PATCH (`1.0.0 → 1.0.1`).
 
+### Index the Project
+
+```
+/binaa-index
+```
+
+Regenerate `docs/project-index.md` — run this after major refactoring, after adding new modules, or before starting work on an unfamiliar area of the codebase. The BA agent generates the index automatically on every task, but you can also refresh it manually anytime.
+
 ### Reconfigure Anytime
 
 ```
 /binaa reconfig
 ```
 
-Change implementation engine, opencode model, or Claude models without reinstalling.
+Change implementation engine, opencode models per agent, or Claude models without reinstalling.
 
 ---
 
@@ -201,14 +209,17 @@ devpilot cleanly separates concerns between Claude and opencode:
 
 **Why this split?** Claude excels at understanding codebases, writing precise requirements, and verifying acceptance criteria. opencode with GitHub Copilot models generates large amounts of correct code quickly across multiple files. Each tool does what it does best.
 
-### Configuring the Coding Model
+### Configuring Coding Models (per agent)
 
-Set in `project.config.md`:
+Each developer role can use a different opencode model. Set in `project.config.md`:
 
 ```yaml
 implementation:
-  engine: opencode                        # opencode | claude
-  model: "github-copilot/gpt-4o"         # any model opencode supports
+  engine: opencode                                # opencode | claude
+  model_frontend:    "github-copilot/gpt-4o"     # Angular / React / Vue
+  model_backend:     "github-copilot/gpt-4o"     # .NET / Node / Python
+  model_db:          "github-copilot/gpt-4o"     # DB migrations and SQL
+  model_integration: "github-copilot/gpt-4o"     # Messaging / Services
 ```
 
 Run `opencode model list` to see all available models. Common choices:
@@ -216,7 +227,7 @@ Run `opencode model list` to see all available models. Common choices:
 - `github-copilot/gpt-3.5-codex` — fast and cheap
 - `github-copilot/claude-3.5-sonnet` — strong reasoning + code quality
 
-Run `/binaa reconfig` → choose "engine" to change anytime.
+Run `/binaa reconfig` → choose "models" to change any agent's model anytime.
 
 ---
 
@@ -271,7 +282,10 @@ agents:
 
 implementation:
   engine: opencode             # opencode | claude
-  model: "github-copilot/gpt-4o"
+  model_frontend:    "github-copilot/gpt-4o"
+  model_backend:     "github-copilot/gpt-4o"
+  model_db:          "github-copilot/gpt-4o"
+  model_integration: "github-copilot/gpt-4o"
 
 models:
   ba:         { tier1: claude-haiku-4-5-20251001 }
@@ -359,6 +373,7 @@ devpilot/
 │       ├── team-ba.md                 ← /team-ba — BA agent standalone
 │       ├── team-lead.md               ← /team-lead — Team Lead standalone
 │       ├── team-qa.md                 ← /team-qa — QA agent standalone
+│       ├── binaa-index.md             ← /binaa-index — refresh project index
 │       ├── binaa-sit.md               ← /binaa-sit — promote to SIT
 │       ├── binaa-uat.md               ← /binaa-uat — promote to UAT
 │       ├── binaa-prd.md               ← /binaa-prd — promote to PRD

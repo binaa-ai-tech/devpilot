@@ -156,7 +156,10 @@ section "STEP 4 — Implementation engine + model config..."
 
 # Defaults
 IMPL_ENGINE="opencode"
-IMPL_MODEL="github-copilot/gpt-4o"
+IMPL_MODEL_FE="github-copilot/gpt-4o"
+IMPL_MODEL_BE="github-copilot/gpt-4o"
+IMPL_MODEL_DB="github-copilot/gpt-4o"
+IMPL_MODEL_INT="github-copilot/gpt-4o"
 
 T1_BA="claude-haiku-4-5-20251001"
 T2_BA="copilot: Gemini 3.5 Flash"
@@ -185,20 +188,34 @@ ask "  Choice [1]: "; read -r ENG_CHOICE
 case "${ENG_CHOICE:-1}" in
   2)
     IMPL_ENGINE="claude"
-    IMPL_MODEL=""
+    IMPL_MODEL_FE=""
+    IMPL_MODEL_BE=""
+    IMPL_MODEL_DB=""
+    IMPL_MODEL_INT=""
     info "Engine set to: claude (subagents)"
     ;;
   *)
     IMPL_ENGINE="opencode"
     echo ""
-    echo "  Common opencode models (run: opencode model list — to see all):"
+    echo "  Common GitHub Copilot models (run: opencode model list — to see all):"
+    echo ""
     echo "    github-copilot/gpt-4o           — best all-round (default)"
     echo "    github-copilot/gpt-3.5-codex    — fast and cheap"
-    echo "    github-copilot/claude-3.5-sonnet — strong reasoning + code"
+    echo "    github-copilot/claude-3.5-sonnet — strong reasoning + code quality"
     echo ""
-    ask "  opencode model [$IMPL_MODEL]: "; read -r v
-    [ -n "$v" ] && IMPL_MODEL="$v"
-    info "Engine set to: opencode — model: $IMPL_MODEL"
+    echo "  Configure one model per developer role."
+    echo "  Press Enter to use the default (github-copilot/gpt-4o) for each."
+    echo ""
+    ask "  Frontend dev model (Angular/React/Vue) [$IMPL_MODEL_FE]: "; read -r v; [ -n "$v" ] && IMPL_MODEL_FE="$v"
+    ask "  Backend dev model (.NET/Node/Python)   [$IMPL_MODEL_BE]: "; read -r v; [ -n "$v" ] && IMPL_MODEL_BE="$v"
+    ask "  DB dev model (migrations/SQL)          [$IMPL_MODEL_DB]: "; read -r v; [ -n "$v" ] && IMPL_MODEL_DB="$v"
+    ask "  Integration dev model (messaging)      [$IMPL_MODEL_INT]: "; read -r v; [ -n "$v" ] && IMPL_MODEL_INT="$v"
+    echo ""
+    info "opencode models configured:"
+    info "  Frontend:    $IMPL_MODEL_FE"
+    info "  Backend:     $IMPL_MODEL_BE"
+    info "  DB:          $IMPL_MODEL_DB"
+    info "  Integration: $IMPL_MODEL_INT"
     ;;
 esac
 
@@ -384,7 +401,10 @@ agents:
 
 implementation:
   engine: $IMPL_ENGINE
-  model: "$IMPL_MODEL"
+  model_frontend:    "$IMPL_MODEL_FE"    # Angular / React / Vue
+  model_backend:     "$IMPL_MODEL_BE"    # .NET / Node / Python
+  model_db:          "$IMPL_MODEL_DB"    # DB migrations and SQL
+  model_integration: "$IMPL_MODEL_INT"   # Messaging / Services
 
 ## Model Routing — Claude (non-coding phases only)
 #

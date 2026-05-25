@@ -14,8 +14,12 @@ Never skip a phase. Follow `.devpilot/rules.md` throughout.
    Project:               <project_name>
    Base branch:           <base_branch>
    Implementation engine: <implementation.engine>
-   Coding model:          <implementation.model>
-   Active agents:         <list>
+   Coding models:
+     Frontend:    <implementation.model_frontend>
+     Backend:     <implementation.model_backend>
+     DB:          <implementation.model_db>
+     Integration: <implementation.model_integration>
+   Active agents: <list>
    ```
    **If project_name is missing or this looks like the wrong project, stop and tell the user to open the correct project in Claude Code.**
 
@@ -25,7 +29,13 @@ Never skip a phase. Follow `.devpilot/rules.md` throughout.
    ```
 
 3. Set `IMPL_ENGINE` from `project.config.md → implementation.engine` (`opencode` or `claude`).
-4. Set `IMPL_MODEL` from `project.config.md → implementation.model`.
+4. Set per-agent models from `project.config.md`:
+   ```bash
+   IMPL_MODEL_FE=$(grep 'model_frontend:'    project.config.md | head -1 | sed 's/.*model_frontend:[[:space:]]*//'    | tr -d '"')
+   IMPL_MODEL_BE=$(grep 'model_backend:'     project.config.md | head -1 | sed 's/.*model_backend:[[:space:]]*//'     | tr -d '"')
+   IMPL_MODEL_DB=$(grep 'model_db:'          project.config.md | head -1 | sed 's/.*model_db:[[:space:]]*//'          | tr -d '"')
+   IMPL_MODEL_INT=$(grep 'model_integration:' project.config.md | head -1 | sed 's/.*model_integration:[[:space:]]*//' | tr -d '"')
+   ```
 
 5. Read `.devpilot/skills/get-shit-done.md`
 6. Read `.devpilot/skills/architecture-guard.md`
@@ -193,19 +203,21 @@ Output exactly this block:
 ⏸  IMPLEMENTATION HANDOFF — opencode
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Model: <IMPL_MODEL from project.config.md>
 Branch: <feature branch>
 
 Run each command below in your terminal:
 
-  # Frontend
-  opencode --model "<IMPL_MODEL>" < docs/implementation/<slug>-frontend.md
+  # Frontend  (model: <IMPL_MODEL_FE>)
+  opencode --model "<IMPL_MODEL_FE>" < docs/implementation/<slug>-frontend.md
 
-  # Backend
-  opencode --model "<IMPL_MODEL>" < docs/implementation/<slug>-backend.md
+  # Backend   (model: <IMPL_MODEL_BE>)
+  opencode --model "<IMPL_MODEL_BE>" < docs/implementation/<slug>-backend.md
 
-  # DB (if applicable)
-  opencode --model "<IMPL_MODEL>" < docs/implementation/<slug>-db.md
+  # DB (if applicable)  (model: <IMPL_MODEL_DB>)
+  opencode --model "<IMPL_MODEL_DB>" < docs/implementation/<slug>-db.md
+
+  # Integration (if applicable)  (model: <IMPL_MODEL_INT>)
+  opencode --model "<IMPL_MODEL_INT>" < docs/implementation/<slug>-integration.md
 
 Run them one at a time. Wait for each to finish before starting the next.
 

@@ -10,7 +10,11 @@ Read `project.config.md` and display:
 
 ```
 Implementation engine: <implementation.engine>
-Coding model:          <implementation.model>
+Coding models (opencode — per developer role):
+  Frontend:    <implementation.model_frontend>
+  Backend:     <implementation.model_backend>
+  DB:          <implementation.model_db>
+  Integration: <implementation.model_integration>
 
 Claude model routing (non-coding phases):
   BA:        <models.ba.tier1> → <tier2> → <tier3>
@@ -21,36 +25,47 @@ Active agents: <list enabled agents>
 Base branch:   <base_branch>
 ```
 
-Ask: "What would you like to change? [engine / model / claude-models / agents / branch / all]"
+Ask: "What would you like to change? [engine / models / claude-models / agents / branch / all]"
 
 ---
 
-## Step 2 — Implementation engine wizard (if engine or all)
+## Step 2 — Implementation engine + opencode model wizard (if engine or models or all)
 
 ```
 Who writes the code?
 
-  Current: <implementation.engine> using model <implementation.model>
+  Current: <implementation.engine>
 
   [1] opencode (recommended)
       Claude handles BA, planning, QA, review.
       You run opencode in your terminal for all coding.
-      Set opencode model → ask for exact model ID.
-      Common choices:
-        github-copilot/gpt-4o
-        github-copilot/gpt-3.5-codex
-        github-copilot/claude-3.5-sonnet
-        openai/gpt-4-turbo
-        (run: opencode model list — to see all available)
 
   [2] claude (subagents)
       All phases run inside Claude. No opencode needed.
-      Use this if you do not have opencode installed.
 
-  [3] keep current
+  [3] keep current engine
 ```
 
-Update `project.config.md → implementation.engine` and `implementation.model`.
+If [1] opencode is selected or current engine is opencode:
+
+```
+Configure opencode model per developer role:
+(run: opencode model list — to see all available)
+
+Common GitHub Copilot models:
+  github-copilot/gpt-4o           — best all-round
+  github-copilot/gpt-3.5-codex    — fast and cheap
+  github-copilot/claude-3.5-sonnet — strong reasoning + code quality
+
+Press Enter to keep current value for each.
+
+  Frontend dev (Angular/React/Vue): [<current>] →
+  Backend dev (.NET/Node/Python):   [<current>] →
+  DB dev (migrations/SQL):          [<current>] →
+  Integration dev (messaging):      [<current>] →
+```
+
+Update `project.config.md → implementation.engine`, `model_frontend`, `model_backend`, `model_db`, `model_integration`.
 
 ---
 
