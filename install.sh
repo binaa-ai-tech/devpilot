@@ -84,9 +84,54 @@ fi
 
 # ── Claude Code commands ──────────────────────────────────────────────────────
 info "Downloading Claude Code commands..."
-for f in binaa.md binaa-dev.md binaa-sit.md binaa-uat.md binaa-prd.md binaa-hotfix.md; do
+mkdir -p .claude/commands .claude/agents
+for f in binaa.md binaa-dev.md binaa-sit.md binaa-uat.md binaa-prd.md binaa-hotfix.md \
+          team-task.md team-ba.md team-lead.md team-frontend.md team-dotnet.md team-qa.md; do
   curl -fsSL "$REPO/.claude/commands/$f" -o ".claude/commands/$f"
 done
+
+# ── Claude Code agent definitions (model-routed) ─────────────────────────────
+info "Downloading Claude Code agent definitions..."
+for f in team-lead.md team-ba.md team-frontend.md team-dotnet.md team-qa.md; do
+  curl -fsSL "$REPO/.claude/agents/$f" -o ".claude/agents/$f"
+done
+
+# ── Model config ──────────────────────────────────────────────────────────────
+info "Downloading model config..."
+mkdir -p .aidev/config
+curl -fsSL "$REPO/.aidev/config/models.md" -o ".aidev/config/models.md"
+
+# ── AI team agent prompts ─────────────────────────────────────────────────────
+info "Downloading AI team prompts..."
+mkdir -p .aidev/prompts/team .aidev/templates/team .aidev/skills
+for f in ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md qa-agent.md; do
+  curl -fsSL "$REPO/.aidev/prompts/team/$f" -o ".aidev/prompts/team/$f"
+done
+for f in requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md; do
+  curl -fsSL "$REPO/.aidev/templates/team/$f" -o ".aidev/templates/team/$f"
+done
+
+# ── AI team power skills ──────────────────────────────────────────────────────
+info "Downloading AI team skills..."
+for f in get-shit-done.md security-scan.md performance-review.md architecture-guard.md self-heal.md definition-of-done.md; do
+  curl -fsSL "$REPO/.aidev/skills/$f" -o ".aidev/skills/$f"
+done
+
+# ── Docs structure for task outputs ──────────────────────────────────────────
+info "Creating docs structure..."
+mkdir -p docs/{requirements,plans,qa,reviews,team,adrs,domain-models}
+for d in requirements plans qa reviews adrs domain-models; do
+  touch "docs/$d/.gitkeep"
+done
+curl -fsSL "$REPO/docs/team/README.md" -o "docs/team/README.md"
+
+# ── CLAUDE.md ─────────────────────────────────────────────────────────────────
+if [ ! -f "CLAUDE.md" ]; then
+  curl -fsSL "$REPO/CLAUDE.md" -o "CLAUDE.md"
+  info "Downloaded CLAUDE.md"
+else
+  info "CLAUDE.md already exists — skipping (keep your project-specific content)"
+fi
 
 # ── .gitignore additions ──────────────────────────────────────────────────────
 GITIGNORE_ENTRIES=(
@@ -143,7 +188,8 @@ echo "  4. Create GitHub Environments: dev, sit, uat, prd"
 echo "     Add Required Reviewers to uat + prd (needs GitHub Team plan)"
 echo ""
 echo "  5. Start working:"
-echo "     /binaa-dev feat: your feature description"
+echo "     /team-task feat: your feature description   ← full AI team workflow"
+echo "     /binaa-dev feat: your feature description   ← classic single-agent workflow"
 echo ""
-echo " Docs: .aidev/README.md"
+echo " Docs: .aidev/README.md | docs/team/README.md"
 echo ""

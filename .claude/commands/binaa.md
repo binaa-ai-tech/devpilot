@@ -25,3 +25,16 @@ Use the environment-specific command instead:
         ↓ Manual approval in GitHub Actions
         ↓ CI auto-deploys PRD
 ```
+
+---
+
+## AI Dev Team Commands
+
+| Command | When to use | Example |
+|---------|-------------|---------|
+| `/team-task <description>` | Start any task end-to-end with the full AI team | `/team-task feat: add user profile avatar upload` |
+| `/team-ba <description>` | Business Analyst only — just need requirements | `/team-ba add a notifications panel` |
+| `/team-lead <context>` | Team Lead planning or review only | `/team-lead docs/requirements/notifications.md` |
+| `/team-frontend <context>` | Frontend Developer only | `/team-frontend docs/plans/notifications.md` |
+| `/team-dotnet <context>` | .NET Developer only | `/team-dotnet docs/plans/notifications.md` |
+| `/team-qa <context>` | QA Engineer only | `/team-qa docs/requirements/notifications.md` |
