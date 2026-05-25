@@ -56,8 +56,16 @@ Speed is critical. Skip BA and go directly to planning.
 
 **Phase 3 — Implementation (minimal diff only)**
 
-Spawn only the relevant agent (frontend OR backend — not both unless both are broken).
-Brief: minimum diff, no refactoring, no unrelated changes, follow hotfix rules in `.devpilot/rules.md`.
+Read `project.config.md → implementation.engine`.
+
+If engine = `opencode`:
+  Write `docs/implementation/<slug>-hotfix.md` with the minimal fix scope (one agent only).
+  Output the IMPLEMENTATION HANDOFF block exactly as in team-task.md Phase 3.
+  Stop and wait for `/ceo resume`.
+
+If engine = `claude`:
+  Spawn only the relevant agent (frontend OR backend — not both unless both are broken).
+  Brief: minimum diff, no refactoring, no unrelated changes, follow hotfix rules in `.devpilot/rules.md`.
 
 **Phase 4 — QA: Smoke Test**
 

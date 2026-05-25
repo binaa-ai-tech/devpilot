@@ -241,9 +241,9 @@ section "STEP 6 — Downloading dev process files..."
 
 mkdir -p .devpilot/{prompts/team,templates/team,checklists,impact-maps,skills,config}
 mkdir -p scripts
-mkdir -p .github/workflows .github/ISSUE_TEMPLATE
+mkdir -p .github/ISSUE_TEMPLATE
 mkdir -p .claude/commands .claude/agents
-mkdir -p docs/{requirements,plans,qa,reviews,adrs,domain-models,fallback,team}
+mkdir -p docs/{requirements,plans,qa,reviews,adrs,domain-models,fallback,implementation,team}
 
 # Core .aidev files
 info "Downloading .aidev files..."
@@ -301,10 +301,8 @@ for f in team-lead.md team-ba.md team-frontend.md team-dotnet.md team-qa.md; do
   curl -fsSL "$REPO/.claude/agents/$f" -o ".claude/agents/$f" 2>/dev/null || warn "agents/$f not found — skipping"
 done
 
-# GitHub templates and workflows
+# GitHub templates (no CI/CD workflows — devpilot does not ship app workflows)
 info "Downloading GitHub templates..."
-curl -fsSL "$REPO/.github/workflows/ci.yml"        -o ".github/workflows/ci.yml"        2>/dev/null || true
-curl -fsSL "$REPO/.github/workflows/deploy-prd.yml" -o ".github/workflows/deploy-prd.yml" 2>/dev/null || true
 for f in BRANCH_NAMING.md COMMIT_CONVENTION.md pull_request_template.md; do
   curl -fsSL "$REPO/.github/$f" -o ".github/$f" 2>/dev/null || true
 done
