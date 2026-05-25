@@ -39,7 +39,7 @@ After receiving answers:
    ```bash
    ./scripts/create-jira-ticket.sh "<summary>" "<description>" "Story"
    ```
-3. Note the ticket key (e.g. `MSK-42`)
+3. Note the ticket key (e.g. `KEY-42`)
 4. Create feature branch:
    ```bash
    bash scripts/git-flow.sh feature-start <ticket-number> <slug>
@@ -57,12 +57,12 @@ Use the **Agent tool** to spawn developer agents with `subagent_type` so the cor
 ### Frontend Agent (if frontend work identified)
 Spawn with `subagent_type: "team-frontend"` (runs on **Sonnet 4.6**):
 
-> Task: `[task description]`. Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `feature/<n>-<slug>`. Implement all frontend work per the plan. Run lint + build + tests. Apply security, performance, and DoD checklists. Commit. Report what you built in 3 bullets.
+> Task: `[task description]`. Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `feature/<KEY>-<n>-<slug>`. Implement all frontend work per the plan. Run lint + build + tests. Apply security, performance, and DoD checklists. Commit. Report what you built in 3 bullets.
 
 ### .NET Backend Agent (if backend work identified)
 Spawn with `subagent_type: "team-dotnet"` (runs on **Sonnet 4.6**):
 
-> Task: `[task description]`. Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `feature/<n>-<slug>`. Implement all backend work per the plan. Run build + tests. Apply security, performance, architecture, and DoD checklists. Commit. Report what you built in 3 bullets.
+> Task: `[task description]`. Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `feature/<KEY>-<n>-<slug>`. Implement all backend work per the plan. Run build + tests. Apply security, performance, architecture, and DoD checklists. Commit. Report what you built in 3 bullets.
 
 Wait for all implementation agents to complete before Phase 4.
 
@@ -72,7 +72,7 @@ Wait for all implementation agents to complete before Phase 4.
 
 Spawn with `subagent_type: "team-qa"` (runs on **Haiku 4.5**):
 
-> Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `feature/<n>-<slug>`. Verify every acceptance criterion. Apply mutation-mindset testing. Add missing coverage. Write QA report to `docs/qa/<slug>.md`. Report final verdict (PASS / BLOCKED).
+> Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `feature/<KEY>-<n>-<slug>`. Verify every acceptance criterion. Apply mutation-mindset testing. Add missing coverage. Write QA report to `docs/qa/<slug>.md`. Report final verdict (PASS / BLOCKED).
 
 Wait for QA agent to complete before Phase 5.
 
@@ -105,10 +105,20 @@ Wait for QA agent to complete before Phase 5.
 ## Final Report
 
 | Artifact | Path / URL |
-|----------|-----------|
+|----------|------------|
 | Requirements | `docs/requirements/<slug>.md` |
 | Implementation Plan | `docs/plans/<slug>.md` |
 | QA Report | `docs/qa/<slug>.md` |
 | Review Report | `docs/reviews/<slug>.md` |
 | Jira Ticket | `<URL>` |
 | Pull Request | `<URL>` |
+
+## CEO Next Steps
+
+When PR merges → CI auto-deploys to DEV. Then:
+
+1. Test on DEV — when satisfied run: `/binaa-sit <version>`
+   - Features: bump MINOR (`1.0.0 → 1.1.0`) | Fixes: bump PATCH (`1.0.0 → 1.0.1`)
+   - Check current: `git tag --sort=-version:refname | head -1`
+2. SIT passes → `/binaa-uat` (UAT gate)
+3. UAT approved → `/binaa-prd <version>` (production)

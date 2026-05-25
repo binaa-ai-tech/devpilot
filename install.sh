@@ -25,7 +25,7 @@ echo ""
 mkdir -p .aidev/{prompts,templates,checklists,impact-maps}
 mkdir -p scripts
 mkdir -p .github/workflows
-mkdir -p .github
+mkdir -p .github/ISSUE_TEMPLATE
 mkdir -p .claude/commands
 
 # ── .aidev core files ─────────────────────────────────────────────────────────
@@ -67,12 +67,25 @@ info "Downloading CI/CD workflows..."
 curl -fsSL "$REPO/.github/workflows/ci.yml" -o ".github/workflows/ci.yml"
 curl -fsSL "$REPO/.github/workflows/deploy-prd.yml" -o ".github/workflows/deploy-prd.yml"
 
-# ── GitHub docs ───────────────────────────────────────────────────────────────
-info "Downloading GitHub docs..."
+# ── GitHub docs and templates ─────────────────────────────────────────────────
+info "Downloading GitHub templates and docs..."
 for f in BRANCH_NAMING.md COMMIT_CONVENTION.md pull_request_template.md; do
   curl -fsSL "$REPO/.github/$f" -o ".github/$f" 2>/dev/null || \
     warn ".github/$f not found — skipping"
 done
+
+for f in bug_report.md feature_request.md; do
+  curl -fsSL "$REPO/.github/ISSUE_TEMPLATE/$f" -o ".github/ISSUE_TEMPLATE/$f" 2>/dev/null || \
+    warn ".github/ISSUE_TEMPLATE/$f not found — skipping"
+done
+
+# ── Environment variable template ─────────────────────────────────────────────
+if [ ! -f ".env.example" ]; then
+  curl -fsSL "$REPO/.env.example" -o ".env.example"
+  info "Downloaded .env.example"
+else
+  info ".env.example already exists — skipping"
+fi
 
 # ── Commitlint config ─────────────────────────────────────────────────────────
 if [ ! -f ".commitlintrc.json" ]; then
@@ -85,7 +98,8 @@ fi
 # ── Claude Code commands ──────────────────────────────────────────────────────
 info "Downloading Claude Code commands..."
 mkdir -p .claude/commands .claude/agents
-for f in binaa.md binaa-dev.md binaa-sit.md binaa-uat.md binaa-prd.md binaa-hotfix.md \
+for f in ceo.md \
+          binaa.md binaa-dev.md binaa-sit.md binaa-uat.md binaa-prd.md binaa-hotfix.md \
           team-task.md team-ba.md team-lead.md team-frontend.md team-dotnet.md team-qa.md; do
   curl -fsSL "$REPO/.claude/commands/$f" -o ".claude/commands/$f"
 done
@@ -136,6 +150,7 @@ fi
 # ── .gitignore additions ──────────────────────────────────────────────────────
 GITIGNORE_ENTRIES=(
   ".aidev/config.sh"
+  ".env"
   ".env.local"
   ".env.*.local"
 )
@@ -171,25 +186,31 @@ echo "━━━━━━━━━━━━━━━━━━━━━━━━�
 echo " ✅  binaa-ai dev process installed"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
-echo " Next steps:"
+echo " Setup checklist:"
 echo ""
 echo "  1. Edit .aidev/config.sh"
-echo "     → Fill in Jira URL, email, token, project key"
-echo "     → Set GITHUB_ORG, GITHUB_REPO, TICKET_PREFIX"
-echo "     → Set DEV/SIT/UAT/PRD URLs"
+echo "     → JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN, JIRA_PROJECT_KEY"
+echo "     → GITHUB_ORG, GITHUB_REPO, TICKET_PREFIX (e.g. msk, app, prj)"
+echo "     → DEV/SIT/UAT/PRD URLs"
 echo ""
-echo "  2. Add GitHub Secrets (Settings → Secrets → Actions):"
-echo "     DEPLOY_HOOK_DEV, DEPLOY_HOOK_SIT, DEPLOY_HOOK_UAT, DEPLOY_HOOK_PRD"
+echo "  2. Copy .env.example → .env"
+echo "     → Add DEPLOY_HOOK_* and JIRA_API_TOKEN values"
 echo ""
-echo "  3. Add GitHub Variables (Settings → Secrets → Variables):"
+echo "  3. Add GitHub Secrets (Settings → Secrets → Actions):"
+echo "     DEPLOY_HOOK_DEV_API, DEPLOY_HOOK_DEV_UI,"
+echo "     DEPLOY_HOOK_SIT, DEPLOY_HOOK_UAT, DEPLOY_HOOK_PRD"
+echo ""
+echo "  4. Add GitHub Variables (Settings → Secrets → Variables):"
 echo "     DEV_URL, SIT_URL, UAT_URL, PRD_URL"
 echo ""
-echo "  4. Create GitHub Environments: dev, sit, uat, prd"
+echo "  5. Create GitHub Environments: dev, sit, uat, prd"
 echo "     Add Required Reviewers to uat + prd (needs GitHub Team plan)"
 echo ""
-echo "  5. Start working:"
-echo "     /team-task feat: your feature description   ← full AI team workflow"
-echo "     /binaa-dev feat: your feature description   ← classic single-agent workflow"
+echo " Start working:"
 echo ""
-echo " Docs: .aidev/README.md | docs/team/README.md"
+echo "   /ceo your feature or bug description   ← CEO entry point"
+echo "   /team-task your feature description     ← full AI team workflow"
+echo "   /binaa-dev feat: description            ← developer-assisted workflow"
+echo ""
+echo " Docs: README.md | .aidev/README.md | docs/team/README.md"
 echo ""
