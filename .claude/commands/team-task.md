@@ -39,6 +39,12 @@ Set `ACTIVE_AGENTS` = agents where `enabled: true` in project.config.md.
 
 **Adopt the Business Analyst persona.** Read `.devpilot/prompts/team/ba-agent.md`.
 
+**Before anything else — ensure the project index is fresh:**
+```bash
+bash scripts/generate-project-index.sh
+```
+Read `docs/project-index.md`. Use it to scope all file reading (3-8 files max).
+
 1. Analyze the task: `$ARGUMENTS`
 2. Read the existing codebase to understand context — scan relevant files, routes, components, services
 3. Write `docs/requirements/<task-slug>.md` using `.devpilot/templates/team/requirements.md`
