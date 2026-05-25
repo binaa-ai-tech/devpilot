@@ -310,7 +310,8 @@ done
 
 # Claude Code commands
 info "Downloading Claude Code commands..."
-for f in ceo.md binaa.md binaa-dev.md binaa-sit.md binaa-uat.md binaa-prd.md binaa-hotfix.md binaa-reconfig.md \
+for f in ceo.md binaa.md binaa-dev.md binaa-sit.md binaa-uat.md binaa-prd.md binaa-hotfix.md \
+          binaa-reconfig.md binaa-models.md binaa-index.md \
           team-task.md team-ba.md team-lead.md team-frontend.md team-dotnet.md team-qa.md; do
   curl -fsSL "$REPO/.claude/commands/$f" -o ".claude/commands/$f" 2>/dev/null || warn "commands/$f not found — skipping"
 done

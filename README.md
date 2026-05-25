@@ -177,6 +177,18 @@ After the PR merges and CI deploys to DEV, promote through environments:
 
 Version convention: features → bump MINOR (`1.0.0 → 1.1.0`), bug fixes → bump PATCH (`1.0.0 → 1.0.1`).
 
+### Change any agent's model
+
+```
+/binaa-models backend github-copilot/gpt-5.3-codex   ← set one agent directly
+/binaa-models                                          ← interactive wizard for all agents
+/binaa-models list                                     ← show available models
+```
+
+Agent names: `ba` · `lead` · `qa` · `frontend` · `backend` · `db` · `integration`
+
+The command reads `project.config.md`, updates the relevant field, and syncs agent frontmatter for Claude agents. Changes take effect on the next `/ceo` run.
+
 ### Index the Project
 
 ```
@@ -185,13 +197,13 @@ Version convention: features → bump MINOR (`1.0.0 → 1.1.0`), bug fixes → b
 
 Regenerate `docs/project-index.md` — run this after major refactoring, after adding new modules, or before starting work on an unfamiliar area of the codebase. The BA agent generates the index automatically on every task, but you can also refresh it manually anytime.
 
-### Reconfigure Anytime
+### Full reconfiguration wizard
 
 ```
 /binaa reconfig
 ```
 
-Change implementation engine, opencode models per agent, or Claude models without reinstalling.
+Change implementation engine, agent enable/disable, base branch, or all model settings at once.
 
 ---
 
@@ -373,6 +385,7 @@ devpilot/
 │       ├── team-ba.md                 ← /team-ba — BA agent standalone
 │       ├── team-lead.md               ← /team-lead — Team Lead standalone
 │       ├── team-qa.md                 ← /team-qa — QA agent standalone
+│       ├── binaa-models.md            ← /binaa-models — set any agent's model
 │       ├── binaa-index.md             ← /binaa-index — refresh project index
 │       ├── binaa-sit.md               ← /binaa-sit — promote to SIT
 │       ├── binaa-uat.md               ← /binaa-uat — promote to UAT
