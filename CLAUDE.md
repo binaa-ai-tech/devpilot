@@ -56,3 +56,23 @@ Angular/React impl          API/service/DB impl
 | Implementation Plan | `docs/plans/<slug>.md` | Team Lead |
 | QA Report | `docs/qa/<slug>.md` | QA Engineer |
 | Review Report | `docs/reviews/<slug>.md` | Team Lead |
+
+## Power Skills (All Agents)
+
+Every agent loads applicable skills from `.aidev/skills/`:
+
+| Skill | File | Applied By |
+|-------|------|-----------|
+| Autonomous execution | `get-shit-done.md` | All agents |
+| Security scanning | `security-scan.md` | Frontend Dev, .NET Dev, Team Lead |
+| Performance review | `performance-review.md` | Frontend Dev, .NET Dev, Team Lead |
+| Architecture guardrails | `architecture-guard.md` | Team Lead, .NET Dev, Frontend Dev |
+| Self-healing | `self-heal.md` | All implementation agents |
+| Definition of Done gate | `definition-of-done.md` | All agents |
+
+## Additional Docs per Task
+
+| Document | Path | Written By |
+|----------|------|------------|
+| Domain Model | `docs/domain-models/<slug>.md` | BA |
+| Architecture Decision Records | `docs/adrs/ADR-<N>-<slug>.md` | Team Lead |

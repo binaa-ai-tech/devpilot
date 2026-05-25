@@ -91,18 +91,24 @@ done
 
 # ── AI team agent prompts ─────────────────────────────────────────────────────
 info "Downloading AI team prompts..."
-mkdir -p .aidev/prompts/team .aidev/templates/team
+mkdir -p .aidev/prompts/team .aidev/templates/team .aidev/skills
 for f in ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md qa-agent.md; do
   curl -fsSL "$REPO/.aidev/prompts/team/$f" -o ".aidev/prompts/team/$f"
 done
-for f in requirements.md implementation-plan.md qa-report.md review-report.md; do
+for f in requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md; do
   curl -fsSL "$REPO/.aidev/templates/team/$f" -o ".aidev/templates/team/$f"
+done
+
+# ── AI team power skills ──────────────────────────────────────────────────────
+info "Downloading AI team skills..."
+for f in get-shit-done.md security-scan.md performance-review.md architecture-guard.md self-heal.md definition-of-done.md; do
+  curl -fsSL "$REPO/.aidev/skills/$f" -o ".aidev/skills/$f"
 done
 
 # ── Docs structure for task outputs ──────────────────────────────────────────
 info "Creating docs structure..."
-mkdir -p docs/{requirements,plans,qa,reviews,team}
-for d in requirements plans qa reviews; do
+mkdir -p docs/{requirements,plans,qa,reviews,team,adrs,domain-models}
+for d in requirements plans qa reviews adrs domain-models; do
   touch "docs/$d/.gitkeep"
 done
 curl -fsSL "$REPO/docs/team/README.md" -o "docs/team/README.md"
