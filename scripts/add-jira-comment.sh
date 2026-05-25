@@ -12,20 +12,19 @@ if [ -z "$KEY" ] || [ -z "$COMMENT" ]; then
   exit 1
 fi
 
+BODY=$(jq -n --arg comment "$COMMENT" '{
+  body: {
+    type: "doc",
+    version: 1,
+    content: [{ type: "paragraph", content: [{ type: "text", text: $comment }] }]
+  }
+}')
+
 curl -s --request POST \
   --url "$JIRA_BASE_URL/rest/api/3/issue/$KEY/comment" \
   --user "$JIRA_EMAIL:$JIRA_API_TOKEN" \
   --header "Accept: application/json" \
   --header "Content-Type: application/json" \
-  --data "{
-    \"body\": {
-      \"type\": \"doc\",
-      \"version\": 1,
-      \"content\": [{
-        \"type\": \"paragraph\",
-        \"content\": [{ \"type\": \"text\", \"text\": \"$COMMENT\" }]
-      }]
-    }
-  }" > /dev/null
+  --data "$BODY" > /dev/null
 
 echo "Comment added to $KEY"

@@ -41,21 +41,28 @@ require_clean_tree() {
 current_branch() { git branch --show-current; }
 
 # =============================================================================
-# feature-start <ticket> <description>
+# feature-start <ticket> <description> [base-branch]
 # =============================================================================
 feature_start() {
   local ticket="${1:-}"
   local desc="${2:-}"
-  [[ -z "$ticket" ]] && error "Usage: feature-start <ticket-number> <description>"
-  [[ -z "$desc"   ]] && error "Usage: feature-start <ticket-number> <description>"
+  [[ -z "$ticket" ]] && error "Usage: feature-start <ticket-number> <description> [base-branch]"
+  [[ -z "$desc"   ]] && error "Usage: feature-start <ticket-number> <description> [base-branch]"
+
+  # 3rd arg overrides; otherwise read from project.config.md; fallback to develop
+  local base="${3:-}"
+  if [ -z "$base" ]; then
+    base=$(grep -E '^base_branch:' project.config.md 2>/dev/null | head -1 | sed 's/base_branch:[[:space:]]*//' | tr -d '"' || true)
+    [ -z "$base" ] && base="develop"
+  fi
 
   local branch="feature/${TICKET_PREFIX}-${ticket}-${desc}"
   require_clean_tree
 
   section "Starting feature: $branch"
-  info "Switching to develop and pulling latest..."
-  git checkout develop
-  git pull origin develop
+  info "Switching to $base and pulling latest..."
+  git checkout "$base"
+  git pull origin "$base"
 
   info "Creating branch: $branch"
   git checkout -b "$branch"

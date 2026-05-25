@@ -150,11 +150,14 @@ if [[ "$ACCEPT_TEAM" =~ ^[Nn] ]]; then
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════
-# STEP 4 — MODEL ROUTING CONFIG
+# STEP 4 — IMPLEMENTATION ENGINE + MODEL CONFIG
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 4 — Model routing configuration..."
+section "STEP 4 — Implementation engine + model config..."
 
-# Defaults (recommended for Claude Pro + GitHub Copilot via opencode)
+# Defaults
+IMPL_ENGINE="opencode"
+IMPL_MODEL="github-copilot/gpt-4o"
+
 T1_BA="claude-haiku-4-5-20251001"
 T2_BA="copilot: Gemini 3.5 Flash"
 T3_BA="free: DeepSeek V4 Flash Free"
@@ -163,60 +166,58 @@ T1_LEAD="claude-sonnet-4-6"
 T2_LEAD="copilot: Gemini 2.5 Pro"
 T3_LEAD="free: DeepSeek V4 Flash Free"
 
-T1_FRONTEND="claude-sonnet-4-6"
-T2_FRONTEND="copilot: GPT-5.4"
-T3_FRONTEND="free: DeepSeek V4 Flash Free"
-
-T1_BACKEND="claude-sonnet-4-6"
-T2_BACKEND="copilot: GPT-5.4"
-T3_BACKEND="free: DeepSeek V4 Flash Free"
-
-T1_DB="claude-sonnet-4-6"
-T2_DB="copilot: GPT-5.2"
-T3_DB="free: DeepSeek V4 Flash Free"
-
-T1_INTEGRATION="claude-sonnet-4-6"
-T2_INTEGRATION="copilot: GPT-5.4"
-T3_INTEGRATION="free: DeepSeek V4 Flash Free"
-
 T1_QA="claude-haiku-4-5-20251001"
 T2_QA="copilot: GPT-5-mini"
 T3_QA="free: Nemotron 3 Super Free"
 
-echo "  Recommended model routing (Claude Pro + GitHub Copilot via opencode):"
 echo ""
-echo "  Agent          Tier 1 (primary)          Tier 2 (fallback)          Tier 3 (free)"
-echo "  ─────────────────────────────────────────────────────────────────────────────────"
-echo "  BA             claude-haiku-4-5           Gemini 3.5 Flash           DeepSeek V4 Flash Free"
-echo "  Team Lead      claude-sonnet-4-6          Gemini 2.5 Pro             DeepSeek V4 Flash Free"
-echo "  Frontend Dev   claude-sonnet-4-6          GPT-5.4                    DeepSeek V4 Flash Free"
-echo "  Backend Dev    claude-sonnet-4-6          GPT-5.4                    DeepSeek V4 Flash Free"
-echo "  DB Agent       claude-sonnet-4-6          GPT-5.2                    DeepSeek V4 Flash Free"
-echo "  Integration    claude-sonnet-4-6          GPT-5.4                    DeepSeek V4 Flash Free"
-echo "  QA             claude-haiku-4-5           GPT-5-mini                 Nemotron 3 Super Free"
+echo "  Who writes the code?"
 echo ""
+echo "    [1] opencode (recommended)"
+echo "        Claude handles BA, planning, QA, review."
+echo "        You run opencode in your terminal for all coding."
+echo "    [2] claude (subagents)"
+echo "        All phases run inside Claude. No opencode needed."
+echo "        Use this if you do not have opencode installed."
+echo ""
+ask "  Choice [1]: "; read -r ENG_CHOICE
 
-ask "  Use recommended config? [Y/n]: "
-read -r ACCEPT_MODELS
+case "${ENG_CHOICE:-1}" in
+  2)
+    IMPL_ENGINE="claude"
+    IMPL_MODEL=""
+    info "Engine set to: claude (subagents)"
+    ;;
+  *)
+    IMPL_ENGINE="opencode"
+    echo ""
+    echo "  Common opencode models (run: opencode model list — to see all):"
+    echo "    github-copilot/gpt-4o           — best all-round (default)"
+    echo "    github-copilot/gpt-3.5-codex    — fast and cheap"
+    echo "    github-copilot/claude-3.5-sonnet — strong reasoning + code"
+    echo ""
+    ask "  opencode model [$IMPL_MODEL]: "; read -r v
+    [ -n "$v" ] && IMPL_MODEL="$v"
+    info "Engine set to: opencode — model: $IMPL_MODEL"
+    ;;
+esac
+
+echo ""
+echo "  Claude model routing (BA, Team Lead, QA only — coding is handled by opencode):"
+echo ""
+echo "  Defaults:"
+echo "    BA:        claude-haiku-4-5-20251001   (lightweight, fast)"
+echo "    Team Lead: claude-sonnet-4-6           (planning + code review)"
+echo "    QA:        claude-haiku-4-5-20251001   (lightweight, fast)"
+echo ""
+ask "  Use defaults? [Y/n]: "; read -r ACCEPT_MODELS
 
 if [[ "$ACCEPT_MODELS" =~ ^[Nn] ]]; then
-  echo "  Customize per agent (press Enter to keep default):"
+  echo "  Press Enter to keep the default for any field."
   echo ""
-  echo "  Available Tier 1 (Claude Pro): claude-sonnet-4-6, claude-haiku-4-5-20251001"
-  echo "  Available Tier 2 (Copilot):    GPT-5.4, GPT-5.2, GPT-5-mini, Gemini 2.5 Pro, Gemini 3.5 Flash, Claude Sonnet 4.6"
-  echo "  Available Tier 3 (Free):       DeepSeek V4 Flash Free, Nemotron 3 Super Free"
-  echo ""
-
-  ask "  BA — Tier 1 [$T1_BA]: ";            read -r v; [ -n "$v" ] && T1_BA="$v"
-  ask "  BA — Tier 2 [$T2_BA]: ";            read -r v; [ -n "$v" ] && T2_BA="copilot: $v"
-  ask "  Team Lead — Tier 1 [$T1_LEAD]: ";   read -r v; [ -n "$v" ] && T1_LEAD="$v"
-  ask "  Team Lead — Tier 2 [$T2_LEAD]: ";   read -r v; [ -n "$v" ] && T2_LEAD="copilot: $v"
-  ask "  Frontend — Tier 1 [$T1_FRONTEND]: "; read -r v; [ -n "$v" ] && T1_FRONTEND="$v"
-  ask "  Frontend — Tier 2 [$T2_FRONTEND]: "; read -r v; [ -n "$v" ] && T2_FRONTEND="copilot: $v"
-  ask "  Backend — Tier 1 [$T1_BACKEND]: ";   read -r v; [ -n "$v" ] && T1_BACKEND="$v"
-  ask "  Backend — Tier 2 [$T2_BACKEND]: ";   read -r v; [ -n "$v" ] && T2_BACKEND="copilot: $v"
-  ask "  QA — Tier 1 [$T1_QA]: ";            read -r v; [ -n "$v" ] && T1_QA="$v"
-  ask "  QA — Tier 2 [$T2_QA]: ";            read -r v; [ -n "$v" ] && T2_QA="copilot: $v"
+  ask "  BA — Tier 1 [$T1_BA]: ";         read -r v; [ -n "$v" ] && T1_BA="$v"
+  ask "  Team Lead — Tier 1 [$T1_LEAD]: "; read -r v; [ -n "$v" ] && T1_LEAD="$v"
+  ask "  QA — Tier 1 [$T1_QA]: ";         read -r v; [ -n "$v" ] && T1_QA="$v"
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -275,7 +276,7 @@ done
 
 # Skills
 info "Downloading skills..."
-for f in get-shit-done.md security-scan.md performance-review.md architecture-guard.md self-heal.md definition-of-done.md; do
+for f in get-shit-done.md spec-first.md security-scan.md performance-review.md architecture-guard.md self-heal.md definition-of-done.md; do
   curl -fsSL "$REPO/.devpilot/skills/$f" -o ".devpilot/skills/$f" 2>/dev/null || warn "skills/$f not found — skipping"
 done
 
@@ -283,7 +284,9 @@ done
 info "Downloading scripts..."
 for f in git-flow.sh new-feature.sh \
           deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh \
-          create-jira-ticket.sh update-jira-status.sh; do
+          create-jira-ticket.sh create-jira-epic.sh \
+          update-jira-status.sh update-jira-description.sh \
+          add-jira-comment.sh generate-project-index.sh; do
   curl -fsSL "$REPO/scripts/$f" -o "scripts/$f" 2>/dev/null || warn "scripts/$f not found — skipping"
   chmod +x "scripts/$f" 2>/dev/null || true
 done
@@ -316,7 +319,7 @@ done
 curl -fsSL "$REPO/docs/team/README.md" -o "docs/team/README.md" 2>/dev/null || true
 curl -fsSL "$REPO/.devpilot/config/models.md" -o ".devpilot/config/models.md" 2>/dev/null || true
 
-for d in requirements plans qa reviews adrs domain-models fallback; do
+for d in requirements plans qa reviews adrs domain-models fallback implementation; do
   touch "docs/$d/.gitkeep"
 done
 touch .devpilot/impact-maps/.gitkeep
@@ -358,6 +361,8 @@ stack:
   integration: $DETECT_INTEGRATION
 
 ## Active Agents
+# BA, Team Lead, and QA always enabled.
+# Disable frontend/backend/db/integration if that layer is not in your project.
 
 agents:
   ba:           { enabled: true }
@@ -368,11 +373,26 @@ agents:
   integration:  { enabled: $AGENT_INTEGRATION }
   qa:           { enabled: true }
 
-## Model Routing — 3-Tier Fallback
+## Implementation Engine
+#
+# Who writes the code?
+#   opencode — Claude handles BA/planning/QA/review; you run opencode CLI for coding
+#   claude   — Claude subagents handle everything (use when opencode is unavailable)
+#
+# opencode model: exact model ID passed to \`opencode --model "..."\`
+# Run: opencode model list — to see available models
+
+implementation:
+  engine: $IMPL_ENGINE
+  model: "$IMPL_MODEL"
+
+## Model Routing — Claude (non-coding phases only)
 #
 # Tier 1: Claude Pro (primary)
 # Tier 2: GitHub Copilot via opencode (fallback when Claude hits limits)
 # Tier 3: OpenCode Zen Free (last resort)
+#
+# Coding agents (frontend, backend, db, integration) use opencode above — not Claude.
 
 models:
   ba:
@@ -384,26 +404,6 @@ models:
     tier1: $T1_LEAD
     tier2: "$T2_LEAD"
     tier3: "$T3_LEAD"
-
-  frontend:
-    tier1: $T1_FRONTEND
-    tier2: "$T2_FRONTEND"
-    tier3: "$T3_FRONTEND"
-
-  backend:
-    tier1: $T1_BACKEND
-    tier2: "$T2_BACKEND"
-    tier3: "$T3_BACKEND"
-
-  db:
-    tier1: $T1_DB
-    tier2: "$T2_DB"
-    tier3: "$T3_DB"
-
-  integration:
-    tier1: $T1_INTEGRATION
-    tier2: "$T2_INTEGRATION"
-    tier3: "$T3_INTEGRATION"
 
   qa:
     tier1: $T1_QA
@@ -437,11 +437,11 @@ sync_agent_model() {
   fi
 }
 
-sync_agent_model ".claude/agents/team-lead.md"     "$T1_LEAD"
-sync_agent_model ".claude/agents/team-ba.md"       "$T1_BA"
-sync_agent_model ".claude/agents/team-frontend.md" "$T1_FRONTEND"
-sync_agent_model ".claude/agents/team-dotnet.md"   "$T1_BACKEND"
-sync_agent_model ".claude/agents/team-qa.md"       "$T1_QA"
+sync_agent_model ".claude/agents/team-lead.md" "$T1_LEAD"
+sync_agent_model ".claude/agents/team-ba.md"   "$T1_BA"
+sync_agent_model ".claude/agents/team-qa.md"   "$T1_QA"
+# Note: team-frontend.md and team-dotnet.md are only used when engine=claude.
+# Their model frontmatter is informational — opencode is the default coding engine.
 
 # ═════════════════════════════════════════════════════════════════════════════
 # STEP 9 — GIT BRANCH SETUP
