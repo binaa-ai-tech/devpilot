@@ -1,15 +1,23 @@
 # Dev Process — AI Team System
 
-This repository defines the development workflow for Maskan projects. It combines:
+This repository defines the development workflow for AI-assisted projects. It combines:
 
 1. **`.aidev/`** — classic single-agent workflow (prompts, rules, templates)
 2. **`.claude/commands/team-*`** — multi-agent AI dev team (new)
+
+## CEO Entry Point
+
+| Command | What it does |
+|---------|-------------|
+| `/ceo <description>` | Submit any task — auto-classifies as feature/bug/hotfix, runs the full team, delivers PR with status report and next steps |
+
+This is the primary command. Use it to delegate any feature, bug, or production emergency.
 
 ## AI Team Commands
 
 | Command | Role | When to Use |
 |---------|------|-------------|
-| `/team-task <description>` | Full team workflow | Start any feature, bug, or story end-to-end |
+| `/team-task <description>` | Full team workflow | Used by `/ceo` internally — or run directly for more control |
 | `/team-ba <description>` | Business Analyst only | Just need requirements written |
 | `/team-lead <context>` | Team Lead only | Planning or review only |
 | `/team-frontend <context>` | Frontend Developer only | UI work only |
@@ -19,10 +27,10 @@ This repository defines the development workflow for Maskan projects. It combine
 ## Team Workflow (Full)
 
 ```
-/team-task "description"
+/ceo "description"  →  /team-task
       │
       ▼
-[BA] Asks clarifying questions → docs/requirements/<slug>.md
+[BA] Clarifying questions → docs/requirements/<slug>.md
       │
       ▼
 [Team Lead] Plans + creates ticket + branch → docs/plans/<slug>.md
@@ -41,6 +49,16 @@ Angular/React impl          API/service/DB impl
           [Team Lead]
         Review + PR → docs/reviews/<slug>.md
 ```
+
+## Deploy Pipeline Commands
+
+| Command | When to run |
+|---------|-------------|
+| `/binaa-sit <version>` | DEV tested → promote to SIT (e.g. `/binaa-sit 1.1.0`) |
+| `/binaa-uat` | SIT passed → approve UAT gate |
+| `/binaa-prd <version>` | UAT signed off → deploy to production |
+| `/binaa-hotfix <n> <slug> <version>` | Production emergency |
+| `/binaa-dev <type>: <description>` | Developer-assisted flow (uses opencode) |
 
 ## Tech Stack
 
@@ -62,7 +80,7 @@ Angular/React impl          API/service/DB impl
 Every agent loads applicable skills from `.aidev/skills/`:
 
 | Skill | File | Applied By |
-|-------|------|-----------|
+|-------|------|------------|
 | Autonomous execution | `get-shit-done.md` | All agents |
 | Security scanning | `security-scan.md` | Frontend Dev, .NET Dev, Team Lead |
 | Performance review | `performance-review.md` | Frontend Dev, .NET Dev, Team Lead |

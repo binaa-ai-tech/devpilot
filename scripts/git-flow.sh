@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # =============================================================================
-# git-flow.sh — Maskan Git Flow helper
+# git-flow.sh — Git Flow helper
 # =============================================================================
 # Usage:
 #   bash scripts/git-flow.sh <command> [args...]
@@ -14,6 +14,12 @@
 #   hotfix-finish  <version>                 Merge, tag, clean up
 # =============================================================================
 set -euo pipefail
+
+# Load TICKET_PREFIX from project config (set in .aidev/config.sh)
+if [ -f ".aidev/config.sh" ]; then
+  source ".aidev/config.sh" 2>/dev/null || true
+fi
+TICKET_PREFIX="${TICKET_PREFIX:-key}"
 
 BOLD="\033[1m"
 GREEN="\033[0;32m"
@@ -43,7 +49,7 @@ feature_start() {
   [[ -z "$ticket" ]] && error "Usage: feature-start <ticket-number> <description>"
   [[ -z "$desc"   ]] && error "Usage: feature-start <ticket-number> <description>"
 
-  local branch="feature/mas-${ticket}-${desc}"
+  local branch="feature/${TICKET_PREFIX}-${ticket}-${desc}"
   require_clean_tree
 
   section "Starting feature: $branch"
@@ -124,31 +130,25 @@ release_finish() {
 
   section "Finishing release: $version"
 
-  # Ensure branch exists
   git fetch origin
   git checkout "$branch" 2>/dev/null || error "Branch $branch not found locally or on origin."
 
-  # Merge into main
   info "Merging $branch → main..."
   git checkout main
   git pull origin main
   git merge --no-ff "$branch" -m "chore(git): merge $branch into main"
 
-  # Tag
   info "Tagging v$version..."
   git tag -a "v${version}" -m "Release v${version}"
 
-  # Merge back into develop
   info "Merging $branch → develop..."
   git checkout develop
   git pull origin develop
   git merge --no-ff "$branch" -m "chore(git): merge $branch back into develop"
 
-  # Push everything
   info "Pushing main, develop, and tag..."
   git push origin main develop "v${version}"
 
-  # Delete branch
   info "Deleting release branch..."
   git branch -d "$branch"
   git push origin --delete "$branch" 2>/dev/null || warn "Remote branch already deleted."
@@ -167,7 +167,7 @@ hotfix_start() {
   [[ -z "$ticket" ]] && error "Usage: hotfix-start <ticket-number> <description>"
   [[ -z "$desc"   ]] && error "Usage: hotfix-start <ticket-number> <description>"
 
-  local branch="hotfix/mas-${ticket}-${desc}"
+  local branch="hotfix/${TICKET_PREFIX}-${ticket}-${desc}"
   require_clean_tree
 
   section "Starting hotfix: $branch"
@@ -195,27 +195,22 @@ hotfix_finish() {
 
   section "Finishing hotfix: $branch → v$version"
 
-  # Merge into main
   info "Merging $branch → main..."
   git checkout main
   git pull origin main
   git merge --no-ff "$branch" -m "chore(git): merge $branch into main"
 
-  # Tag
   info "Tagging v$version..."
   git tag -a "v${version}" -m "Hotfix v${version}"
 
-  # Merge back into develop
   info "Merging $branch → develop..."
   git checkout develop
   git pull origin develop
   git merge --no-ff "$branch" -m "chore(git): merge $branch back into develop"
 
-  # Push everything
   info "Pushing main, develop, and tag..."
   git push origin main develop "v${version}"
 
-  # Delete branch
   info "Deleting hotfix branch..."
   git branch -d "$branch"
   git push origin --delete "$branch" 2>/dev/null || warn "Remote branch already deleted."
@@ -240,17 +235,19 @@ case "$command" in
   hotfix-finish)  hotfix_finish  "$@" ;;
   *)
     echo ""
-    echo -e "${BOLD}Maskan git-flow.sh — available commands${RESET}"
+    echo -e "${BOLD}git-flow.sh — available commands${RESET}"
     echo ""
-    echo "  feature-start  <ticket> <description>   Create feature/mas-{ticket}-{description}"
+    echo "  TICKET_PREFIX is '${TICKET_PREFIX}' (set in .aidev/config.sh)"
+    echo ""
+    echo "  feature-start  <ticket> <description>   Create feature/${TICKET_PREFIX}-{ticket}-{description}"
     echo "  feature-finish                           Push branch + print PR link"
     echo "  release-start  <version>                 Create release/{version}, bump package.json"
     echo "  release-finish <version>                 Merge to main+develop, tag, delete branch"
-    echo "  hotfix-start   <ticket> <description>   Create hotfix/mas-{ticket}-{description}"
+    echo "  hotfix-start   <ticket> <description>   Create hotfix/${TICKET_PREFIX}-{ticket}-{description}"
     echo "  hotfix-finish  <version>                 Merge to main+develop, tag, delete branch"
     echo ""
     echo "Examples:"
-    echo "  bash scripts/git-flow.sh feature-start 12 qdrant-reranking"
+    echo "  bash scripts/git-flow.sh feature-start 12 user-search"
     echo "  bash scripts/git-flow.sh release-start 1.0.0"
     echo "  bash scripts/git-flow.sh hotfix-start 99 fix-login-crash"
     echo ""

@@ -1,6 +1,6 @@
-# Commit Message Convention — Maskan
+# Commit Message Convention
 
-Maskan uses **Conventional Commits 1.0** enforced by commitlint on every
+This project uses **Conventional Commits 1.0** enforced by commitlint on every
 `git commit`. Non-conforming messages are rejected at the pre-commit hook.
 
 ---
@@ -42,45 +42,47 @@ Maskan uses **Conventional Commits 1.0** enforced by commitlint on every
 
 ## Allowed Scopes
 
-| Scope     | Covers                                            |
-| --------- | ------------------------------------------------- |
-| `rentals` | Short / medium / long-term rental module          |
-| `resale`  | Buy / sell apartment module                       |
-| `land`    | Government land transfer (تنازل) module           |
-| `auth`    | Authentication, OTP, JWT                          |
-| `api`     | .NET Web API, endpoints, middleware               |
-| `mobile`  | Ionic / Capacitor mobile app                      |
-| `web`     | Angular consumer web app                          |
-| `admin`   | Admin portal                                      |
-| `shared`  | Shared libs: shared-models, shared-ui, api-client |
-| `i18n`    | Translations, RTL, language switching             |
-| `db`      | EF Core migrations, schema changes                |
-| `infra`   | Azure IaC (Bicep/Terraform)                       |
-| `ci`      | GitHub Actions workflows                          |
-| `git`     | Branch strategy, hooks, commit tooling            |
+Scopes are project-defined. Add your project's domain scopes to `.commitlintrc.json`.
+
+Common infrastructure scopes included by default:
+
+| Scope    | Covers                                     |
+| -------- | ------------------------------------------ |
+| `api`    | Backend endpoints, middleware              |
+| `web`    | Frontend web app                           |
+| `mobile` | Mobile app                                 |
+| `admin`  | Admin portal                               |
+| `shared` | Shared libraries                           |
+| `auth`   | Authentication, sessions, permissions      |
+| `db`     | Migrations, schema changes                 |
+| `infra`  | Infrastructure, cloud config               |
+| `ci`     | GitHub Actions workflows                   |
+| `git`    | Branch strategy, hooks, commit tooling     |
+
+Add your domain-specific scopes (e.g. `payments`, `listings`, `search`) in `.commitlintrc.json`.
 
 ---
 
 ## Examples
 
 ```
-feat(rentals): add availability calendar to listing detail page
+feat(auth): add OTP retry limit with 5-minute lockout
 
-fix(auth): prevent OTP reuse after successful verification
+fix(api): prevent null reference in search endpoint
 
-chore(shared): bump jest-preset-angular to 14.2.0
+chore(shared): bump angular to 21.0.0
 
-refactor(api): replace IOptions with IOptionsMonitor for Gemini settings
+refactor(web): replace BehaviorSubject with signal in user store
 
-test(land): add integration tests for تنازل installment calculator
+test(db): add integration tests for migration rollback
 
 docs(git): add branch naming and commit convention guides
 
 ci(api): replace --no-build with --no-restore in dotnet test step
 
-feat(land): implement government contract transfer matching engine
+feat(payments): implement invoice generation
 
-BREAKING CHANGE: WantDto shape updated — field `area` renamed to `areaSqm`
+BREAKING CHANGE: UserDto shape updated — field `name` renamed to `fullName`
 ```
 
 ---

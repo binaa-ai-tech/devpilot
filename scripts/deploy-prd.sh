@@ -1,18 +1,18 @@
 #!/usr/bin/env bash
 # =============================================================================
-# deploy-prd.sh — Manual PRODUCTION deploy re-trigger (emergency use only)
+# deploy-prd.sh — Manual PRODUCTION deploy trigger (emergency use only)
 #
-# ⚠  PRODUCTION — real users, real data.
+# ⚠  PRODUCTION — use with extreme care.
 #
-# Normal flow: merge release/* → main → CI → manual approval in GitHub Actions
-# → production deploys automatically.
-# Run this ONLY if the CI deploy failed and needs re-triggering.
+# Normal flow: merge release/* → main in GitHub → CI runs → manual approval
+# in GitHub Actions → production deploys automatically.
+#
+# Run this script ONLY if the CI deploy failed and you need to re-trigger.
 #
 # Usage:  bash scripts/deploy-prd.sh
+# Env var: DEPLOY_HOOK_PRD
 # =============================================================================
 set -euo pipefail
-
-source "$(dirname "$0")/../.aidev/config.sh" 2>/dev/null || true
 
 HOOK="${DEPLOY_HOOK_PRD:-}"
 
@@ -24,6 +24,7 @@ fi
 
 echo ""
 echo "⚠  You are about to deploy to PRODUCTION."
+echo "   This affects real users and real data."
 read -r -p "   Type 'yes' to confirm: " confirm
 if [ "$confirm" != "yes" ]; then
   echo "Aborted."
@@ -35,5 +36,5 @@ echo "▶ Triggering PRODUCTION deploy..."
 curl -s -X POST "$HOOK" | head -c 200
 echo ""
 echo "✅ Deploy triggered."
-echo "   Watch: https://github.com/${GITHUB_ORG}/${GITHUB_REPO}/actions"
-echo "   URL:   ${PRD_FRONTEND_URL:-<set PRD_FRONTEND_URL in config.sh>}"
+echo "   Watch:  https://github.com/<org>/<repo>/actions"
+echo "   URL:    ${PRD_URL:-<your-prd-url>}"

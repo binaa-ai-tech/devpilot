@@ -17,7 +17,7 @@
 ## Step 3 — Branch
 
 - [ ] Branched from **`main`** (the live production code)
-- [ ] Named `hotfix/{prefix}-<n>-<slug>`
+- [ ] Named `hotfix/<KEY>-<slug>`
 
 ```bash
 bash scripts/git-flow.sh hotfix-start <ticket-number> <slug>
@@ -37,17 +37,17 @@ bash scripts/git-flow.sh hotfix-start <ticket-number> <slug>
 
 ## Step 6 — Test & Verify
 
-- [ ] Tests green
+- [ ] `npm test` + `dotnet test` green
 - [ ] Manual smoke test done
 
 ## Step 7 — Deploy pipeline
 
 ```bash
-bash scripts/git-flow.sh hotfix-finish <X.Y.Z>
+bash scripts/git-flow.sh hotfix-finish X.Y.Z
 # merges hotfix → main, tags vX.Y.Z, merges back → develop
 ```
 
-- [ ] CI runs on `main` — lint + test + build pass ✅
+- [ ] CI runs on `main` push — lint + test + build pass ✅
 - [ ] **PRD** approved in GitHub Actions ✅ (manual gate)
 - [ ] Fix verified on production
 - [ ] `develop` also has the fix (git-flow.sh handles this automatically)

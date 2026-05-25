@@ -8,12 +8,13 @@
 JIRA_BASE_URL="https://YOUR-ORG.atlassian.net"
 JIRA_EMAIL="your-email@example.com"
 JIRA_API_TOKEN="YOUR_JIRA_API_TOKEN"
-JIRA_PROJECT_KEY="XXX"        # e.g. MSK, NSP, RAF
+JIRA_PROJECT_KEY="KEY"        # e.g. MSK, APP, PRJ
 
 # ── Git / GitHub ──────────────────────────────────────────────────────────────
 GITHUB_ORG="your-org"
 GITHUB_REPO="your-repo"
-TICKET_PREFIX="mas"            # used in branch names: feature/mas-12-slug
+TICKET_PREFIX="key"           # project abbreviation, used in branch names: feature/key-12-slug
+                               # e.g. msk, app, prj — should match your Jira project key (lowercase)
 
 # ── Branches (do not change unless you know what you're doing) ───────────────
 MAIN_BRANCH="main"

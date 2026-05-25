@@ -17,14 +17,14 @@ Tick every box before marking the Jira ticket Done.
 
 ## Step 3 — Branch
 
-- [ ] Branch named `feature/{prefix}-<n>-<slug>`
+- [ ] Branch named `feature/<KEY>-<slug>`
 - [ ] Branched from latest **`develop`** (not main)
 - [ ] Baseline tests pass on branch
 
 ## Step 4 — Implement
 
 - [ ] All acceptance criteria implemented
-- [ ] Code follows `.aidev/rules.md`
+- [ ] Code follows `.aidev/rules.md` (no `any`, takeUntilDestroyed, OnPush, signals, etc.)
 - [ ] Tests added alongside new code
 - [ ] Commits use Conventional Commits + ticket key
 
@@ -36,20 +36,22 @@ Tick every box before marking the Jira ticket Done.
 
 ## Step 6 — Test & Verify
 
-- [ ] Tests green
-- [ ] Lint clean
-- [ ] Build clean
-- [ ] Manual smoke test done
+- [ ] `npm test` green
+- [ ] `npm run lint` clean
+- [ ] `dotnet build apps/api -c Release` clean
+- [ ] Arabic/RTL tested (if UI changes)
 
 ## Step 7 — Deploy pipeline
 
 - [ ] PR opened targeting **`develop`**
-- [ ] Merged → CI passes → **DEV** auto-deployed ✅
+- [ ] PR merged → CI passes → **DEV** auto-deployed ✅
 - [ ] `bash scripts/git-flow.sh release-start X.Y.Z`
-- [ ] **SIT** auto-deployed ✅ — smoke test passed
-- [ ] **UAT** approved in GitHub Actions ✅ — smoke test passed
-- [ ] `bash scripts/git-flow.sh release-finish X.Y.Z`
-- [ ] **PRD** approved in GitHub Actions ✅
+- [ ] Release branch pushed → CI passes → **SIT** auto-deployed ✅
+- [ ] Smoke test on SIT passed
+- [ ] **UAT** approved in GitHub Actions ✅ (manual gate)
+- [ ] Smoke test on UAT passed
+- [ ] `bash scripts/git-flow.sh release-finish X.Y.Z` (tags vX.Y.Z, merges → main + develop)
+- [ ] **PRD** approved in GitHub Actions ✅ (manual gate)
 - [ ] Smoke test on production passed
 - [ ] Jira ticket moved to Done with PR link
 - [ ] Changelog entry added
