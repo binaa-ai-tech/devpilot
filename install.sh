@@ -114,7 +114,11 @@ DETECT_BACKEND="none"
 DETECT_DB="none"
 DETECT_INTEGRATION="none"
 
-if [ -f "angular.json" ];                               then DETECT_FRONTEND="angular";  echo "  ✅ Angular (angular.json)"
+if [ -f "angular.json" ] || \
+   grep -q '"@angular/core"' package.json 2>/dev/null || \
+   grep -q '"@nx/angular"' package.json 2>/dev/null || \
+   find . -maxdepth 4 -name "angular.json" 2>/dev/null | grep -q .; then
+                                                             DETECT_FRONTEND="angular";  echo "  ✅ Angular"
 elif grep -q '"next"' package.json 2>/dev/null;         then DETECT_FRONTEND="nextjs";   echo "  ✅ Next.js"
 elif grep -q '"react"' package.json 2>/dev/null;        then DETECT_FRONTEND="react";    echo "  ✅ React"
 elif grep -q '"vue"' package.json 2>/dev/null;          then DETECT_FRONTEND="vue";      echo "  ✅ Vue"
