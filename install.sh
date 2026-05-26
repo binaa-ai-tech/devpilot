@@ -2,15 +2,33 @@
 # =============================================================================
 # devpilot — Installer
 #
-# Run from the root of any project:
-#   curl -s https://raw.githubusercontent.com/binaa-ai-tech/devpilot/main/install.sh | bash
-# Or locally:
+# Installs the devpilot AI team system into any project.
+#
+# Remote install (from any project root):
+#   curl -fsSL https://raw.githubusercontent.com/binaa-ai-tech/devpilot/main/install.sh | bash
+#
+# Local install (from a cloned copy):
 #   bash /path/to/devpilot/install.sh
+#
+# This installs:
+#   .claude/          — Claude Code commands + agent definitions
+#   .opencode/        — opencode project config + AGENTS.md
+#   .devpilot/        — shared rules, prompts, templates, skills
+#   scripts/          — git-flow, Jira, deploy helpers
+#   AGENTS.md         — project context (opencode / antigravity)
+#   CLAUDE.md         — project context (Claude Code)
+#   project.config.md — engine + model config (edit with /binaa reconfig)
 # =============================================================================
 set -euo pipefail
 
 REPO="https://raw.githubusercontent.com/binaa-ai-tech/devpilot/main"
 PROJECT_ROOT=$(pwd)
+
+# Detect if running from a local clone (DEVPILOT_LOCAL set, or install.sh is in the same dir as .claude/)
+DEVPILOT_LOCAL=""
+if [ -d "$(dirname "$0")/.claude" ]; then
+  DEVPILOT_LOCAL="$(cd "$(dirname "$0")" && pwd)"
+fi
 
 GREEN="\033[0;32m"
 YELLOW="\033[1;33m"
@@ -21,14 +39,33 @@ RESET="\033[0m"
 info()    { echo -e "${GREEN}[install]${RESET} $*"; }
 warn()    { echo -e "${YELLOW}[warn]${RESET} $*"; }
 section() { echo -e "\n${CYAN}${BOLD}$*${RESET}"; }
-ask()     { echo -e "${BOLD}$*${RESET}"; }
+ask()     { printf "${BOLD}%s${RESET}" "$*"; }
 
-# ── Banner ────────────────────────────────────────────────────────────────────
+# Download a file — from local clone if available, else from GitHub
+fetch() {
+  local src="$1"  # path relative to devpilot root
+  local dst="$2"  # destination path
+
+  mkdir -p "$(dirname "$dst")"
+
+  if [ -n "$DEVPILOT_LOCAL" ] && [ -f "$DEVPILOT_LOCAL/$src" ]; then
+    cp "$DEVPILOT_LOCAL/$src" "$dst"
+  else
+    curl -fsSL "$REPO/$src" -o "$dst" 2>/dev/null || warn "$src not found — skipping"
+  fi
+}
+
+# ── Banner ─────────────────────────────────────────────────────────────────────
 echo ""
-DEVPILOT_VERSION=$(curl -fsSL "$REPO/VERSION" 2>/dev/null | tr -d '[:space:]' || echo "1.1.0")
+DEVPILOT_VERSION=""
+if [ -n "$DEVPILOT_LOCAL" ] && [ -f "$DEVPILOT_LOCAL/VERSION" ]; then
+  DEVPILOT_VERSION=$(cat "$DEVPILOT_LOCAL/VERSION" | tr -d '[:space:]')
+else
+  DEVPILOT_VERSION=$(curl -fsSL "$REPO/VERSION" 2>/dev/null | tr -d '[:space:]' || echo "2.0.0")
+fi
 
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
-echo -e "${BOLD}  devpilot v${DEVPILOT_VERSION} — Installer${RESET}"
+echo -e "${BOLD}  devpilot v${DEVPILOT_VERSION} — AI Team System Installer${RESET}"
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
 echo ""
 echo "  Project: $PROJECT_ROOT"
@@ -37,23 +74,33 @@ echo ""
 # ═════════════════════════════════════════════════════════════════════════════
 # STEP 1 — SYSTEM SCAN
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 1 — Scanning system..."
+section "STEP 1 — Scanning installed AI tools..."
 
 HAS_CLAUDE=false
 HAS_OPENCODE=false
+HAS_ANTIGRAVITY=false
 HAS_GH=false
 HAS_GIT=false
-HAS_JQ=false
 
-command -v claude    &>/dev/null && HAS_CLAUDE=true    && echo "  ✅ claude CLI found     — Claude Pro agents available"    || echo "  ❌ claude not found     — Install Claude Code to use Claude agents"
-command -v opencode  &>/dev/null && HAS_OPENCODE=true  && echo "  ✅ opencode found       — GitHub Copilot fallback available" || echo "  ⚠️  opencode not found   — No Copilot fallback (install opencode for resilience)"
-command -v gh        &>/dev/null && HAS_GH=true        && echo "  ✅ gh CLI found         — GitHub PRs and Actions supported" || echo "  ❌ gh not found         — Install GitHub CLI for PR automation"
-command -v git       &>/dev/null && HAS_GIT=true       && echo "  ✅ git found"                                              || echo "  ❌ git not found        — Required"
-command -v jq        &>/dev/null && HAS_JQ=true        && echo "  ✅ jq found"                                              || echo "  ⚠️  jq not found         — Some scripts may be limited"
+command -v claude       &>/dev/null && HAS_CLAUDE=true       && echo "  ✅ claude       — Claude Code CLI"           || echo "  ⚠️  claude       — not found (install for Claude agent mode)"
+command -v opencode     &>/dev/null && HAS_OPENCODE=true     && echo "  ✅ opencode     — GitHub Copilot models"      || echo "  ⚠️  opencode     — not found"
+command -v antigravity  &>/dev/null && HAS_ANTIGRAVITY=true  && echo "  ✅ antigravity  — antigravity AI"              || echo "  ⚠️  antigravity  — not found"
+command -v gh           &>/dev/null && HAS_GH=true           && echo "  ✅ gh           — GitHub CLI (PR automation)" || echo "  ❌ gh           — not found (install for PR automation)"
+command -v git          &>/dev/null && HAS_GIT=true          && echo "  ✅ git"                                        || echo "  ❌ git          — REQUIRED"
+command -v jq           &>/dev/null                          && echo "  ✅ jq"                                        || echo "  ⚠️  jq           — not found (some scripts limited)"
 
 if [ "$HAS_GIT" = false ]; then
   echo ""
   echo "  ❌ git is required. Install git and re-run."
+  exit 1
+fi
+
+if [ "$HAS_CLAUDE" = false ] && [ "$HAS_OPENCODE" = false ] && [ "$HAS_ANTIGRAVITY" = false ]; then
+  echo ""
+  echo "  ❌ No AI CLI found. Install at least one:"
+  echo "     claude       — https://claude.ai/code"
+  echo "     opencode     — https://opencode.ai"
+  echo "     antigravity  — https://antigravity.ai"
   exit 1
 fi
 
@@ -67,101 +114,201 @@ DETECT_BACKEND="none"
 DETECT_DB="none"
 DETECT_INTEGRATION="none"
 
-# Frontend detection
-if [ -f "angular.json" ];                    then DETECT_FRONTEND="angular";  echo "  ✅ Angular detected (angular.json)"
-elif grep -q '"next"' package.json 2>/dev/null; then DETECT_FRONTEND="nextjs"; echo "  ✅ Next.js detected (package.json)"
-elif grep -q '"react"' package.json 2>/dev/null; then DETECT_FRONTEND="react"; echo "  ✅ React detected (package.json)"
-elif grep -q '"vue"' package.json 2>/dev/null;   then DETECT_FRONTEND="vue";   echo "  ✅ Vue detected (package.json)"
-elif [ -f "package.json" ];                  then DETECT_FRONTEND="node";    echo "  ✅ Node/JS project detected (package.json)"
+if [ -f "angular.json" ];                               then DETECT_FRONTEND="angular";  echo "  ✅ Angular (angular.json)"
+elif grep -q '"next"' package.json 2>/dev/null;         then DETECT_FRONTEND="nextjs";   echo "  ✅ Next.js"
+elif grep -q '"react"' package.json 2>/dev/null;        then DETECT_FRONTEND="react";    echo "  ✅ React"
+elif grep -q '"vue"' package.json 2>/dev/null;          then DETECT_FRONTEND="vue";      echo "  ✅ Vue"
+elif [ -f "package.json" ];                             then DETECT_FRONTEND="node";     echo "  ✅ Node/JS"
 fi
 
-# Backend detection
-if find . -maxdepth 3 -name "*.sln" -o -name "*.csproj" 2>/dev/null | grep -q .; then
-  DETECT_BACKEND="dotnet"; echo "  ✅ .NET detected (*.csproj / *.sln)"
+if find . -maxdepth 3 \( -name "*.sln" -o -name "*.csproj" \) 2>/dev/null | grep -q .; then
+  DETECT_BACKEND="dotnet"; echo "  ✅ .NET"
 elif [ -f "requirements.txt" ] || [ -f "pyproject.toml" ]; then
-  DETECT_BACKEND="python"; echo "  ✅ Python detected"
-elif [ -f "go.mod" ]; then
-  DETECT_BACKEND="go"; echo "  ✅ Go detected"
-elif [ -f "pom.xml" ] || [ -f "build.gradle" ]; then
-  DETECT_BACKEND="java"; echo "  ✅ Java detected"
+  DETECT_BACKEND="python"; echo "  ✅ Python"
+elif [ -f "go.mod" ];   then DETECT_BACKEND="go";   echo "  ✅ Go"
+elif [ -f "pom.xml" ];  then DETECT_BACKEND="java"; echo "  ✅ Java"
 fi
 
-# Database detection
 if find . -maxdepth 4 \( -name "*.sql" -o -name "*migration*" -o -name "*Migration*" \) 2>/dev/null | grep -q .; then
   DETECT_DB="sqlserver"; echo "  ✅ Database migrations detected"
-elif [ -f "flyway.conf" ] || find . -maxdepth 3 -name "*.flyway" 2>/dev/null | grep -q .; then
-  DETECT_DB="sqlserver"; echo "  ✅ Flyway migrations detected"
 fi
 
-# Integration services detection
-if grep -rq -i "rabbitmq\|kafka\|servicebus\|azure.messaging\|masstransit" . --include="*.json" --include="*.cs" --include="*.ts" 2>/dev/null; then
+if grep -rq -i "rabbitmq\|kafka\|servicebus\|azure.messaging\|masstransit" . \
+    --include="*.json" --include="*.cs" --include="*.ts" 2>/dev/null; then
   DETECT_INTEGRATION="yes"; echo "  ✅ Integration/messaging detected"
 fi
 
-# Determine project type
-if [ "$DETECT_FRONTEND" != "none" ] && [ "$DETECT_BACKEND" != "none" ]; then
-  DETECTED_TYPE="fullstack"
-elif [ "$DETECT_FRONTEND" != "none" ]; then
-  DETECTED_TYPE="frontend"
-elif [ "$DETECT_BACKEND" != "none" ]; then
-  DETECTED_TYPE="backend"
-else
-  DETECTED_TYPE="fullstack"
+if   [ "$DETECT_FRONTEND" != "none" ] && [ "$DETECT_BACKEND" != "none" ]; then DETECTED_TYPE="fullstack"
+elif [ "$DETECT_FRONTEND" != "none" ]; then DETECTED_TYPE="frontend"
+elif [ "$DETECT_BACKEND" != "none" ];  then DETECTED_TYPE="backend"
+else DETECTED_TYPE="fullstack"
 fi
 
-echo ""
-echo "  Detected stack:"
-echo "    Frontend:    $DETECT_FRONTEND"
-echo "    Backend:     $DETECT_BACKEND"
-echo "    Database:    $DETECT_DB"
-echo "    Integration: $DETECT_INTEGRATION"
-echo "    Project type: $DETECTED_TYPE"
-
 # ═════════════════════════════════════════════════════════════════════════════
-# STEP 3 — RECOMMEND AGENT TEAM
+# STEP 3 — AGENT TEAM
 # ═════════════════════════════════════════════════════════════════════════════
 section "STEP 3 — Recommended agent team..."
 
-AGENT_FRONTEND="false"
-AGENT_BACKEND="false"
-AGENT_DB="false"
-AGENT_INTEGRATION="false"
+AGENT_FRONTEND="false"; AGENT_BACKEND="false"; AGENT_DB="false"; AGENT_INTEGRATION="false"
+[ "$DETECT_FRONTEND" != "none" ]  && AGENT_FRONTEND="true"
+[ "$DETECT_BACKEND" != "none" ]   && AGENT_BACKEND="true"
+[ "$DETECT_DB" != "none" ]        && AGENT_DB="true"
+[ "$DETECT_INTEGRATION" = "yes" ] && AGENT_INTEGRATION="true"
 
-[ "$DETECT_FRONTEND" != "none" ]     && AGENT_FRONTEND="true"
-[ "$DETECT_BACKEND" != "none" ]      && AGENT_BACKEND="true"
-[ "$DETECT_DB" != "none" ]           && AGENT_DB="true"
-[ "$DETECT_INTEGRATION" = "yes" ]    && AGENT_INTEGRATION="true"
-
-echo "  Recommended team:"
-echo "    ✅ BA Agent"
-echo "    ✅ Team Lead"
-[ "$AGENT_FRONTEND" = "true" ]     && echo "    ✅ Frontend Developer"    || echo "    ⬜ Frontend Developer (not detected)"
-[ "$AGENT_BACKEND" = "true" ]      && echo "    ✅ Backend Developer"     || echo "    ⬜ Backend Developer (not detected)"
-[ "$AGENT_DB" = "true" ]           && echo "    ✅ DB Agent"              || echo "    ⬜ DB Agent (not detected)"
-[ "$AGENT_INTEGRATION" = "true" ]  && echo "    ✅ Integration Agent"     || echo "    ⬜ Integration Agent (not detected)"
-echo "    ✅ QA Engineer"
+echo "  Recommended:"
+echo "    ✅ BA · Team Lead · QA   (always on)"
+[ "$AGENT_FRONTEND" = "true" ]    && echo "    ✅ Frontend Developer"    || echo "    ⬜ Frontend Developer (not detected)"
+[ "$AGENT_BACKEND" = "true" ]     && echo "    ✅ Backend Developer"     || echo "    ⬜ Backend Developer (not detected)"
+[ "$AGENT_DB" = "true" ]          && echo "    ✅ DB Agent"              || echo "    ⬜ DB Agent (not detected)"
+[ "$AGENT_INTEGRATION" = "true" ] && echo "    ✅ Integration Agent"     || echo "    ⬜ Integration Agent (not detected)"
 
 echo ""
-ask "  Accept recommended team? [Y/n]: "
-read -r ACCEPT_TEAM
-if [[ "$ACCEPT_TEAM" =~ ^[Nn] ]]; then
-  ask "  Enable Frontend agent? [y/N]: ";    read -r v; [[ "$v" =~ ^[Yy] ]] && AGENT_FRONTEND="true"  || AGENT_FRONTEND="false"
-  ask "  Enable Backend agent? [y/N]: ";     read -r v; [[ "$v" =~ ^[Yy] ]] && AGENT_BACKEND="true"   || AGENT_BACKEND="false"
-  ask "  Enable DB agent? [y/N]: ";          read -r v; [[ "$v" =~ ^[Yy] ]] && AGENT_DB="true"        || AGENT_DB="false"
-  ask "  Enable Integration agent? [y/N]: "; read -r v; [[ "$v" =~ ^[Yy] ]] && AGENT_INTEGRATION="true" || AGENT_INTEGRATION="false"
+ask "  Accept recommended team? [Y/n]: "; read -r ACCEPT_TEAM
+if [[ "${ACCEPT_TEAM:-Y}" =~ ^[Nn] ]]; then
+  ask "  Enable Frontend agent? [y/N]: ";    read -r v; [[ "${v:-N}" =~ ^[Yy] ]] && AGENT_FRONTEND="true"    || AGENT_FRONTEND="false"
+  ask "  Enable Backend agent? [y/N]: ";     read -r v; [[ "${v:-N}" =~ ^[Yy] ]] && AGENT_BACKEND="true"     || AGENT_BACKEND="false"
+  ask "  Enable DB agent? [y/N]: ";          read -r v; [[ "${v:-N}" =~ ^[Yy] ]] && AGENT_DB="true"          || AGENT_DB="false"
+  ask "  Enable Integration agent? [y/N]: "; read -r v; [[ "${v:-N}" =~ ^[Yy] ]] && AGENT_INTEGRATION="true" || AGENT_INTEGRATION="false"
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════
-# STEP 4 — IMPLEMENTATION ENGINE + MODEL CONFIG
+# STEP 4 — CODING ENGINE
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 4 — Implementation engine + model config..."
+section "STEP 4 — Coding engine (who writes the implementation code)..."
 
-# Defaults
-IMPL_ENGINE="claude"
-IMPL_MODEL_FE="github-copilot/gpt-4o"
-IMPL_MODEL_BE="github-copilot/gpt-4o"
-IMPL_MODEL_DB="github-copilot/gpt-4o"
-IMPL_MODEL_INT="github-copilot/gpt-4o"
+CODING_ENGINE="claude"
+FALLBACK_ENGINE="none"
+
+echo ""
+echo "  [1] claude       — Claude subagents write all code (fully automatic, no terminal steps)"
+echo "  [2] opencode     — Claude orchestrates; opencode writes code (GitHub Copilot models)"
+echo "  [3] antigravity  — Claude orchestrates; antigravity writes code"
+echo ""
+
+if [ "$HAS_CLAUDE" = true ] && [ "$HAS_OPENCODE" = false ] && [ "$HAS_ANTIGRAVITY" = false ]; then
+  DEFAULT_ENG=1
+elif [ "$HAS_OPENCODE" = true ] && [ "$HAS_CLAUDE" = false ]; then
+  DEFAULT_ENG=2
+elif [ "$HAS_ANTIGRAVITY" = true ] && [ "$HAS_CLAUDE" = false ]; then
+  DEFAULT_ENG=3
+else
+  DEFAULT_ENG=1
+fi
+
+ask "  Choice [$DEFAULT_ENG]: "; read -r ENG_CHOICE
+case "${ENG_CHOICE:-$DEFAULT_ENG}" in
+  2) CODING_ENGINE="opencode" ;;
+  3) CODING_ENGINE="antigravity" ;;
+  *) CODING_ENGINE="claude" ;;
+esac
+
+# Fallback engine
+if [ "$CODING_ENGINE" = "claude" ]; then
+  if [ "$HAS_OPENCODE" = true ] || [ "$HAS_ANTIGRAVITY" = true ]; then
+    echo ""
+    echo "  Fallback when Claude hits limits:"
+    echo "  [1] opencode    [2] antigravity    [3] none"
+    ask "  Choice [1]: "; read -r FB_CHOICE
+    case "${FB_CHOICE:-1}" in
+      2) FALLBACK_ENGINE="antigravity" ;;
+      3) FALLBACK_ENGINE="none" ;;
+      *) FALLBACK_ENGINE="${HAS_OPENCODE:+opencode}"; [ "$FALLBACK_ENGINE" = "" ] && FALLBACK_ENGINE="antigravity" ;;
+    esac
+  fi
+elif [ "$CODING_ENGINE" = "opencode" ] && [ "$HAS_ANTIGRAVITY" = true ]; then
+  echo ""
+  ask "  Fallback when opencode hits limits? (antigravity) [Y/n]: "; read -r v
+  [[ "${v:-Y}" =~ ^[Yy] ]] && FALLBACK_ENGINE="antigravity" || FALLBACK_ENGINE="none"
+elif [ "$CODING_ENGINE" = "antigravity" ] && [ "$HAS_OPENCODE" = true ]; then
+  echo ""
+  ask "  Fallback when antigravity hits limits? (opencode) [Y/n]: "; read -r v
+  [[ "${v:-Y}" =~ ^[Yy] ]] && FALLBACK_ENGINE="opencode" || FALLBACK_ENGINE="none"
+fi
+
+info "Coding engine: $CODING_ENGINE  (fallback: $FALLBACK_ENGINE)"
+
+# ═════════════════════════════════════════════════════════════════════════════
+# STEP 5 — CODING MODELS (opencode + antigravity)
+# ═════════════════════════════════════════════════════════════════════════════
+section "STEP 5 — Coding models..."
+
+OC_MODEL_FE="github-copilot/gpt-4o"
+OC_MODEL_BE="github-copilot/gpt-4o"
+OC_MODEL_DB="github-copilot/gpt-4o"
+OC_MODEL_INT="github-copilot/gpt-4o"
+
+AG_MODEL_FE=""
+AG_MODEL_BE=""
+AG_MODEL_DB=""
+AG_MODEL_INT=""
+
+# opencode models
+if [ "$CODING_ENGINE" = "opencode" ] || [ "$FALLBACK_ENGINE" = "opencode" ] || [ "$HAS_OPENCODE" = true ]; then
+  echo ""
+  echo "  opencode / GitHub Copilot models:"
+  echo "    github-copilot/gpt-4o           — best all-round (default)"
+  echo "    github-copilot/gpt-3.5-codex    — fast and cheap"
+  echo "    github-copilot/claude-3.5-sonnet — strong reasoning"
+  echo "  Run: opencode model list — to see all available"
+  echo ""
+  ask "  Frontend model [$OC_MODEL_FE]: "; read -r v; [ -n "$v" ] && OC_MODEL_FE="$v"
+  ask "  Backend model  [$OC_MODEL_BE]: "; read -r v; [ -n "$v" ] && OC_MODEL_BE="$v"
+  ask "  DB model       [$OC_MODEL_DB]: "; read -r v; [ -n "$v" ] && OC_MODEL_DB="$v"
+  if [ "$AGENT_INTEGRATION" = "true" ]; then
+    ask "  Integration    [$OC_MODEL_INT]: "; read -r v; [ -n "$v" ] && OC_MODEL_INT="$v"
+  fi
+fi
+
+# antigravity models
+if [ "$CODING_ENGINE" = "antigravity" ] || [ "$FALLBACK_ENGINE" = "antigravity" ] || [ "$HAS_ANTIGRAVITY" = true ]; then
+  echo ""
+  echo "  antigravity models (run: antigravity model list — to see all available):"
+  echo ""
+  ask "  Frontend model [leave blank to set later]: "; read -r v; AG_MODEL_FE="$v"
+  ask "  Backend model  [leave blank to set later]: "; read -r v; AG_MODEL_BE="$v"
+  ask "  DB model       [leave blank to set later]: "; read -r v; AG_MODEL_DB="$v"
+  if [ "$AGENT_INTEGRATION" = "true" ]; then
+    ask "  Integration    [leave blank to set later]: "; read -r v; AG_MODEL_INT="$v"
+  fi
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════
+# STEP 6 — TERMINAL RUNNER (which AI CLI runs /ceo from scripts/)
+# ═════════════════════════════════════════════════════════════════════════════
+section "STEP 6 — Terminal runner (runs /ceo from bash scripts)..."
+
+RUNNER_CLI="claude"
+
+echo ""
+echo "  How will you run commands from the terminal? (bash scripts/ceo.sh)"
+echo "  Inside Claude Code: slash commands always work natively."
+echo ""
+echo "  [1] claude       — Claude Code CLI"
+echo "  [2] opencode     — opencode CLI"
+echo "  [3] antigravity  — antigravity CLI"
+echo "  [4] same as coding engine"
+echo ""
+
+DEFAULT_RUNNER=1
+[ "$CODING_ENGINE" = "opencode" ]     && DEFAULT_RUNNER=2
+[ "$CODING_ENGINE" = "antigravity" ]  && DEFAULT_RUNNER=3
+[ "$HAS_CLAUDE" = false ] && [ "$HAS_OPENCODE" = true ]    && DEFAULT_RUNNER=2
+[ "$HAS_CLAUDE" = false ] && [ "$HAS_ANTIGRAVITY" = true ] && DEFAULT_RUNNER=3
+
+ask "  Choice [$DEFAULT_RUNNER]: "; read -r RUNNER_CHOICE
+case "${RUNNER_CHOICE:-$DEFAULT_RUNNER}" in
+  2) RUNNER_CLI="opencode" ;;
+  3) RUNNER_CLI="antigravity" ;;
+  4) RUNNER_CLI="$CODING_ENGINE" ;;
+  *) RUNNER_CLI="claude" ;;
+esac
+
+info "Runner: $RUNNER_CLI"
+
+# ═════════════════════════════════════════════════════════════════════════════
+# STEP 7 — CLAUDE ORCHESTRATOR MODELS (BA, Team Lead, QA)
+# ═════════════════════════════════════════════════════════════════════════════
+section "STEP 7 — Claude orchestrator models (BA · Team Lead · QA)..."
 
 T1_BA="claude-haiku-4-5-20251001"
 T2_BA="copilot: Gemini 3.5 Flash"
@@ -176,235 +323,147 @@ T2_QA="copilot: GPT-5-mini"
 T3_QA="free: Nemotron 3 Super Free"
 
 echo ""
-echo "  Who writes the code?"
-echo ""
-echo "    [1] claude (recommended)"
-echo "        Fully automatic — Claude subagents handle everything end-to-end."
-echo "        BA → planning → coding → QA → PR with zero manual steps."
-echo "    [2] opencode"
-echo "        Claude handles BA, planning, QA, review."
-echo "        You run opencode in your terminal for coding phases."
-echo ""
-ask "  Choice [1]: "; read -r ENG_CHOICE
-
-case "${ENG_CHOICE:-1}" in
-  2)
-    IMPL_ENGINE="opencode"
-    echo ""
-    echo "  Common GitHub Copilot models (run: opencode model list — to see all):"
-    echo ""
-    echo "    github-copilot/gpt-4o           — best all-round (default)"
-    echo "    github-copilot/gpt-3.5-codex    — fast and cheap"
-    echo "    github-copilot/claude-3.5-sonnet — strong reasoning + code quality"
-    echo ""
-    echo "  Configure one model per developer role."
-    echo "  Press Enter to use the default (github-copilot/gpt-4o) for each."
-    echo ""
-    ask "  Frontend dev model (Angular/React/Vue) [$IMPL_MODEL_FE]: "; read -r v; [ -n "$v" ] && IMPL_MODEL_FE="$v"
-    ask "  Backend dev model (.NET/Node/Python)   [$IMPL_MODEL_BE]: "; read -r v; [ -n "$v" ] && IMPL_MODEL_BE="$v"
-    ask "  DB dev model (migrations/SQL)          [$IMPL_MODEL_DB]: "; read -r v; [ -n "$v" ] && IMPL_MODEL_DB="$v"
-    ask "  Integration dev model (messaging)      [$IMPL_MODEL_INT]: "; read -r v; [ -n "$v" ] && IMPL_MODEL_INT="$v"
-    echo ""
-    info "opencode models configured:"
-    info "  Frontend:    $IMPL_MODEL_FE"
-    info "  Backend:     $IMPL_MODEL_BE"
-    info "  DB:          $IMPL_MODEL_DB"
-    info "  Integration: $IMPL_MODEL_INT"
-    ;;
-  *)
-    IMPL_ENGINE="claude"
-    IMPL_MODEL_FE=""
-    IMPL_MODEL_BE=""
-    IMPL_MODEL_DB=""
-    IMPL_MODEL_INT=""
-    info "Engine set to: claude (fully automatic — no manual steps)"
-    ;;
-esac
-
-echo ""
-echo "  Claude model routing (BA, Team Lead, QA only — coding is handled by opencode):"
-echo ""
-echo "  Defaults:"
-echo "    BA:        claude-haiku-4-5-20251001   (lightweight, fast)"
-echo "    Team Lead: claude-sonnet-4-6           (planning + code review)"
-echo "    QA:        claude-haiku-4-5-20251001   (lightweight, fast)"
-echo ""
+echo "  Defaults:  BA → haiku-4-5   Lead → sonnet-4-6   QA → haiku-4-5"
 ask "  Use defaults? [Y/n]: "; read -r ACCEPT_MODELS
 
-if [[ "$ACCEPT_MODELS" =~ ^[Nn] ]]; then
-  echo "  Press Enter to keep the default for any field."
-  echo ""
-  ask "  BA — Tier 1 [$T1_BA]: ";         read -r v; [ -n "$v" ] && T1_BA="$v"
-  ask "  Team Lead — Tier 1 [$T1_LEAD]: "; read -r v; [ -n "$v" ] && T1_LEAD="$v"
-  ask "  QA — Tier 1 [$T1_QA]: ";         read -r v; [ -n "$v" ] && T1_QA="$v"
+if [[ "${ACCEPT_MODELS:-Y}" =~ ^[Nn] ]]; then
+  echo "  Press Enter to keep the default."
+  ask "  BA Tier 1 [$T1_BA]: ";         read -r v; [ -n "$v" ] && T1_BA="$v"
+  ask "  Team Lead Tier 1 [$T1_LEAD]: "; read -r v; [ -n "$v" ] && T1_LEAD="$v"
+  ask "  QA Tier 1 [$T1_QA]: ";         read -r v; [ -n "$v" ] && T1_QA="$v"
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════
-# STEP 4b — COMMAND RUNNER (which AI CLI runs /ceo from terminal)
+# STEP 8 — PROJECT IDENTITY
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 4b — Command runner config..."
-
-RUNNER_CLI="claude"
-RUNNER_MODEL=""
-
-echo ""
-echo "  Run /ceo commands from terminal with any AI:"
-echo ""
-echo "    [1] Claude Code CLI (claude)         — default, works inside Claude Code"
-echo "    [2] opencode                         — run with GitHub Copilot models"
-echo "    [3] custom                           — any CLI that reads prompt via stdin"
-echo ""
-ask "  Choice [1]: "; read -r RUNNER_CHOICE
-
-case "${RUNNER_CHOICE:-1}" in
-  2)
-    RUNNER_CLI="opencode"
-    echo ""
-    echo "  Common GitHub Copilot models:"
-    echo "    github-copilot/gpt-5.3-codex    — strong code generation"
-    echo "    github-copilot/gpt-4o           — best all-round"
-    echo "    github-copilot/gemini-2.5-pro   — Google alternative"
-    echo ""
-    ask "  opencode model [github-copilot/gpt-5.3-codex]: "; read -r v
-    RUNNER_MODEL="${v:-github-copilot/gpt-5.3-codex}"
-    info "Runner: opencode ($RUNNER_MODEL)"
-    ;;
-  3)
-    ask "  Custom CLI command (e.g. aider --model gpt-4o): "; read -r v
-    RUNNER_CLI="${v:-claude}"
-    info "Runner: $RUNNER_CLI"
-    ;;
-  *)
-    RUNNER_CLI="claude"
-    info "Runner: claude (Claude Code CLI)"
-    ;;
-esac
-
-# ═════════════════════════════════════════════════════════════════════════════
-# STEP 5 — PROJECT IDENTITY
-# ═════════════════════════════════════════════════════════════════════════════
-section "STEP 5 — Project identity..."
+section "STEP 8 — Project identity..."
 
 DEFAULT_NAME=$(basename "$PROJECT_ROOT")
-ask "  Project name [$DEFAULT_NAME]: "; read -r PROJECT_NAME
-[ -z "$PROJECT_NAME" ] && PROJECT_NAME="$DEFAULT_NAME"
-
-ask "  Jira ticket prefix (e.g. MSK, APP): "; read -r TICKET_PREFIX
-[ -z "$TICKET_PREFIX" ] && TICKET_PREFIX="KEY"
-
-ask "  Base branch [main]: "; read -r BASE_BRANCH
-[ -z "$BASE_BRANCH" ] && BASE_BRANCH="main"
+ask "  Project name [$DEFAULT_NAME]: ";    read -r PROJECT_NAME;   [ -z "$PROJECT_NAME" ]   && PROJECT_NAME="$DEFAULT_NAME"
+ask "  Jira prefix (e.g. MSK, APP): ";     read -r TICKET_PREFIX;  [ -z "$TICKET_PREFIX" ]  && TICKET_PREFIX="KEY"
+ask "  Base branch [main]: ";              read -r BASE_BRANCH;    [ -z "$BASE_BRANCH" ]    && BASE_BRANCH="main"
 
 # ═════════════════════════════════════════════════════════════════════════════
-# STEP 6 — DOWNLOAD FILES
+# STEP 9 — DOWNLOAD / COPY FILES
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 6 — Downloading dev process files..."
+section "STEP 9 — Installing devpilot files..."
 
-mkdir -p .devpilot/{prompts/team,templates/team,checklists,impact-maps,skills,config}
+# Create directory structure
+mkdir -p .devpilot/{prompts/team,templates/team,checklists,skills,config}
+mkdir -p .claude/commands .claude/agents
+mkdir -p .opencode
 mkdir -p scripts
 mkdir -p .github/ISSUE_TEMPLATE
-mkdir -p .claude/commands .claude/agents
-mkdir -p docs/{requirements,plans,qa,reviews,adrs,domain-models,fallback,implementation,team}
+mkdir -p docs/{requirements,plans,qa,reviews,adrs,domain-models,fallback,implementation,tasks}
 
-# Core .aidev files
-info "Downloading .aidev files..."
-for f in README.md rules.md config.sh; do
-  curl -fsSL "$REPO/.devpilot/$f" -o ".devpilot/$f" 2>/dev/null || warn "$f not found — skipping"
+# .devpilot — shared rules, prompts, templates, skills
+info "Installing .devpilot/..."
+for f in rules.md config.sh; do
+  fetch ".devpilot/$f" ".devpilot/$f"
 done
 
-for f in 0-start-work.md 1-triage.md 2-investigate.md \
-          4-implement-feature.md 4-implement-bugfix.md 4-implement-refactor.md \
-          5-self-review.md 6-env-diff.md 6-generate-tests.md 7-pr-description.md; do
-  curl -fsSL "$REPO/.devpilot/prompts/$f" -o ".devpilot/prompts/$f" 2>/dev/null || warn "prompts/$f not found — skipping"
+for f in 6-env-diff.md 6-generate-tests.md; do
+  fetch ".devpilot/prompts/$f" ".devpilot/prompts/$f"
 done
 
 for f in ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md qa-agent.md; do
-  curl -fsSL "$REPO/.devpilot/prompts/team/$f" -o ".devpilot/prompts/team/$f" 2>/dev/null || warn "team/$f not found — skipping"
-done
-
-for f in impact-map.md pr-description.md ticket.md changelog-entry.md; do
-  curl -fsSL "$REPO/.devpilot/templates/$f" -o ".devpilot/templates/$f" 2>/dev/null || warn "templates/$f not found — skipping"
+  fetch ".devpilot/prompts/team/$f" ".devpilot/prompts/team/$f"
 done
 
 for f in requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md; do
-  curl -fsSL "$REPO/.devpilot/templates/team/$f" -o ".devpilot/templates/team/$f" 2>/dev/null || warn "templates/team/$f not found — skipping"
+  fetch ".devpilot/templates/team/$f" ".devpilot/templates/team/$f"
+done
+
+for f in changelog-entry.md ticket.md; do
+  fetch ".devpilot/templates/$f" ".devpilot/templates/$f"
 done
 
 for f in feature.md bugfix.md hotfix.md; do
-  curl -fsSL "$REPO/.devpilot/checklists/$f" -o ".devpilot/checklists/$f" 2>/dev/null || warn "checklists/$f not found — skipping"
+  fetch ".devpilot/checklists/$f" ".devpilot/checklists/$f"
 done
 
-# Skills
-info "Downloading skills..."
 for f in get-shit-done.md spec-first.md security-scan.md performance-review.md architecture-guard.md self-heal.md definition-of-done.md; do
-  curl -fsSL "$REPO/.devpilot/skills/$f" -o ".devpilot/skills/$f" 2>/dev/null || warn "skills/$f not found — skipping"
+  fetch ".devpilot/skills/$f" ".devpilot/skills/$f"
 done
 
-# Scripts
-info "Downloading scripts..."
-for f in git-flow.sh new-feature.sh \
+fetch ".devpilot/config/models.md" ".devpilot/config/models.md"
+
+# .claude/ — Claude Code commands + agent definitions
+info "Installing .claude/..."
+for f in ceo.md ceo-plan.md ceo-run.md ceo-fix.md ceo-fe.md ceo-be.md ceo-db.md ceo-int.md \
+         binaa.md binaa-sit.md binaa-uat.md binaa-prd.md binaa-hotfix.md \
+         binaa-reconfig.md binaa-models.md binaa-index.md \
+         team-task.md team-ba.md team-lead.md team-frontend.md team-dotnet.md team-qa.md; do
+  fetch ".claude/commands/$f" ".claude/commands/$f"
+done
+
+for f in team-lead.md team-ba.md team-frontend.md team-dotnet.md team-qa.md; do
+  fetch ".claude/agents/$f" ".claude/agents/$f"
+done
+
+# .opencode/ — opencode project config
+info "Installing .opencode/..."
+fetch ".opencode/config.json" ".opencode/config.json"
+fetch ".opencode/README.md"   ".opencode/README.md"
+
+# AGENTS.md — project context for opencode + antigravity
+if [ ! -f "AGENTS.md" ]; then
+  fetch "AGENTS.md" "AGENTS.md"
+  info "AGENTS.md created"
+else
+  info "AGENTS.md already exists — skipping (edit manually if needed)"
+fi
+
+# CLAUDE.md — project context for Claude Code
+if [ ! -f "CLAUDE.md" ]; then
+  fetch "CLAUDE.md" "CLAUDE.md"
+  info "CLAUDE.md created"
+fi
+
+# scripts/
+info "Installing scripts/..."
+for f in git-flow.sh new-feature.sh run-command.sh \
           deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh \
           create-jira-ticket.sh create-jira-epic.sh \
           update-jira-status.sh update-jira-description.sh \
-          add-jira-comment.sh generate-project-index.sh; do
-  curl -fsSL "$REPO/scripts/$f" -o "scripts/$f" 2>/dev/null || warn "scripts/$f not found — skipping"
+          add-jira-comment.sh generate-project-index.sh \
+          ceo.sh ceo-fix.sh ceo-plan.sh ceo-run.sh \
+          ceo-fe.sh ceo-be.sh ceo-db.sh ceo-int.sh; do
+  fetch "scripts/$f" "scripts/$f"
   chmod +x "scripts/$f" 2>/dev/null || true
 done
 
-# Claude Code commands
-info "Downloading Claude Code commands..."
-for f in ceo.md binaa.md binaa-dev.md binaa-sit.md binaa-uat.md binaa-prd.md binaa-hotfix.md \
-          binaa-reconfig.md binaa-models.md binaa-index.md \
-          team-task.md team-ba.md team-lead.md team-frontend.md team-dotnet.md team-qa.md; do
-  curl -fsSL "$REPO/.claude/commands/$f" -o ".claude/commands/$f" 2>/dev/null || warn "commands/$f not found — skipping"
-done
-
-# Claude Code agent definitions
-info "Downloading agent definitions..."
-for f in team-lead.md team-ba.md team-frontend.md team-dotnet.md team-qa.md; do
-  curl -fsSL "$REPO/.claude/agents/$f" -o ".claude/agents/$f" 2>/dev/null || warn "agents/$f not found — skipping"
-done
-
-# GitHub templates (no CI/CD workflows — devpilot does not ship app workflows)
-info "Downloading GitHub templates..."
+# .github/
 for f in BRANCH_NAMING.md COMMIT_CONVENTION.md pull_request_template.md; do
-  curl -fsSL "$REPO/.github/$f" -o ".github/$f" 2>/dev/null || true
+  fetch ".github/$f" ".github/$f"
 done
 for f in bug_report.md feature_request.md; do
-  curl -fsSL "$REPO/.github/ISSUE_TEMPLATE/$f" -o ".github/ISSUE_TEMPLATE/$f" 2>/dev/null || true
+  fetch ".github/ISSUE_TEMPLATE/$f" ".github/ISSUE_TEMPLATE/$f"
 done
 
 # Misc
-[ ! -f ".env.example" ] && curl -fsSL "$REPO/.env.example" -o ".env.example" 2>/dev/null || true
-[ ! -f ".commitlintrc.json" ] && curl -fsSL "$REPO/.commitlintrc.json" -o ".commitlintrc.json" 2>/dev/null || true
-curl -fsSL "$REPO/docs/team/README.md" -o "docs/team/README.md" 2>/dev/null || true
-curl -fsSL "$REPO/.devpilot/config/models.md" -o ".devpilot/config/models.md" 2>/dev/null || true
+[ ! -f ".commitlintrc.json" ] && fetch ".commitlintrc.json" ".commitlintrc.json"
+[ ! -f ".env.example" ]       && fetch ".env.example"       ".env.example"
 
-for d in requirements plans qa reviews adrs domain-models fallback implementation; do
+for d in requirements plans qa reviews adrs domain-models fallback implementation tasks; do
   touch "docs/$d/.gitkeep"
 done
-touch .devpilot/impact-maps/.gitkeep
-
-# CLAUDE.md
-if [ ! -f "CLAUDE.md" ]; then
-  curl -fsSL "$REPO/CLAUDE.md" -o "CLAUDE.md" 2>/dev/null || true
-fi
 
 # .gitignore additions
 if [ -f ".gitignore" ]; then
-  for entry in ".devpilot/config.sh" ".env" ".env.local" ".env.*.local" "docs/fallback/"; do
+  for entry in ".devpilot/config.sh" ".env" ".env.local" "docs/fallback/"; do
     grep -qF "$entry" .gitignore || echo "$entry" >> .gitignore
   done
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════
-# STEP 7 — WRITE project.config.md
+# STEP 10 — WRITE project.config.md
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 7 — Writing project.config.md..."
+section "STEP 10 — Writing project.config.md..."
 
 cat > project.config.md << CONFIGEOF
 # Project Configuration
-# Generated by install.sh — re-run with: /binaa reconfig
+# Generated by devpilot install.sh — edit with /binaa reconfig
 
 ## Project Identity
 
@@ -422,8 +481,6 @@ stack:
   integration: $DETECT_INTEGRATION
 
 ## Active Agents
-# BA, Team Lead, and QA always enabled.
-# Disable frontend/backend/db/integration if that layer is not in your project.
 
 agents:
   ba:           { enabled: true }
@@ -434,29 +491,37 @@ agents:
   integration:  { enabled: $AGENT_INTEGRATION }
   qa:           { enabled: true }
 
-## Implementation Engine
+## Engines
 #
-# Who writes the code?
-#   opencode — Claude handles BA/planning/QA/review; you run opencode CLI for coding
-#   claude   — Claude subagents handle everything (use when opencode is unavailable)
-#
-# opencode model: exact model ID passed to \`opencode --model "..."\`
-# Run: opencode model list — to see available models
+# orchestrator — always Claude (BA · planning · QA · review)
+# coding       — who writes implementation code: claude | opencode | antigravity
+# runner       — which AI CLI runs /ceo from bash scripts
+# fallback     — coding engine fallback when primary hits limits
 
-implementation:
-  engine: $IMPL_ENGINE
-  model_frontend:    "$IMPL_MODEL_FE"    # Angular / React / Vue
-  model_backend:     "$IMPL_MODEL_BE"    # .NET / Node / Python
-  model_db:          "$IMPL_MODEL_DB"    # DB migrations and SQL
-  model_integration: "$IMPL_MODEL_INT"   # Messaging / Services
+engines:
+  orchestrator: claude
+  coding: $CODING_ENGINE
+  runner: $RUNNER_CLI
+  fallback: $FALLBACK_ENGINE
 
-## Model Routing — Claude (non-coding phases only)
-#
-# Tier 1: Claude Pro (primary)
-# Tier 2: GitHub Copilot via opencode (fallback when Claude hits limits)
-# Tier 3: OpenCode Zen Free (last resort)
-#
-# Coding agents (frontend, backend, db, integration) use opencode above — not Claude.
+## Coding Engine Models
+# Run: opencode model list   or   antigravity model list   (to see available)
+# Edit these anytime with: /binaa-models
+
+coding_models:
+  opencode:
+    frontend:    "$OC_MODEL_FE"
+    backend:     "$OC_MODEL_BE"
+    db:          "$OC_MODEL_DB"
+    integration: "$OC_MODEL_INT"
+
+  antigravity:
+    frontend:    "$AG_MODEL_FE"
+    backend:     "$AG_MODEL_BE"
+    db:          "$AG_MODEL_DB"
+    integration: "$AG_MODEL_INT"
+
+## Model Routing — Claude (orchestration phases: BA · Team Lead · QA)
 
 models:
   ba:
@@ -480,55 +545,50 @@ fallback:
   auto_on_limit: true
   save_path: docs/fallback
   resume_command: "/ceo resume"
-
-## Command Runner
-# Run /ceo commands from any terminal: bash scripts/ceo.sh "description"
-# Inside Claude Code: use slash commands directly (/ceo, /ceo-fix, etc.)
-
-runner:
-  cli:   $RUNNER_CLI
-  model: "$RUNNER_MODEL"
 CONFIGEOF
 
 info "project.config.md written"
 
 # ═════════════════════════════════════════════════════════════════════════════
-# STEP 8 — SYNC AGENT FRONTMATTER MODELS
+# STEP 11 — UPDATE OPENCODE CONFIG (model default)
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 8 — Syncing agent model frontmatter..."
-
-sync_agent_model() {
-  local file="$1"
-  local model="$2"
-  if [ -f "$file" ]; then
-    # Replace model: line in frontmatter
-    if command -v sed &>/dev/null; then
-      sed -i.bak "s/^model: .*/model: $model/" "$file" && rm -f "$file.bak"
-      info "$(basename $file) → $model"
-    fi
+if [ -f ".opencode/config.json" ] && command -v jq &>/dev/null; then
+  DEFAULT_OC_MODEL="$OC_MODEL_BE"
+  if [ "$CODING_ENGINE" = "opencode" ] && [ -n "$DEFAULT_OC_MODEL" ]; then
+    jq --arg m "$DEFAULT_OC_MODEL" '.model = $m' .opencode/config.json > .opencode/config.json.tmp \
+      && mv .opencode/config.json.tmp .opencode/config.json
+    info ".opencode/config.json → model: $DEFAULT_OC_MODEL"
   fi
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════
+# STEP 12 — SYNC AGENT FRONTMATTER
+# ═════════════════════════════════════════════════════════════════════════════
+section "STEP 12 — Syncing Claude agent models..."
+
+sync_model() {
+  local file="$1" model="$2"
+  [ -f "$file" ] && sed -i.bak "s/^model: .*/model: $model/" "$file" && rm -f "$file.bak" && info "$(basename $file) → $model"
 }
 
-sync_agent_model ".claude/agents/team-lead.md" "$T1_LEAD"
-sync_agent_model ".claude/agents/team-ba.md"   "$T1_BA"
-sync_agent_model ".claude/agents/team-qa.md"   "$T1_QA"
-# Note: team-frontend.md and team-dotnet.md are only used when engine=claude.
-# Their model frontmatter is informational — opencode is the default coding engine.
+sync_model ".claude/agents/team-lead.md" "$T1_LEAD"
+sync_model ".claude/agents/team-ba.md"   "$T1_BA"
+sync_model ".claude/agents/team-qa.md"   "$T1_QA"
 
 # ═════════════════════════════════════════════════════════════════════════════
-# STEP 9 — GIT BRANCH SETUP
+# STEP 13 — GIT BRANCH SETUP
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 9 — Git branch setup..."
+section "STEP 13 — Git branch setup..."
 
 if git rev-parse --git-dir > /dev/null 2>&1; then
   CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "main")
   if [ "$BASE_BRANCH" = "develop" ] && ! git show-ref --verify --quiet refs/heads/develop; then
-    info "Creating develop branch from $CURRENT_BRANCH..."
+    info "Creating develop branch..."
     git checkout -b develop
     git push -u origin develop 2>/dev/null || warn "Could not push develop — run: git push -u origin develop"
     git checkout "$CURRENT_BRANCH"
   else
-    info "Branch setup: using $BASE_BRANCH ✅"
+    info "Branch: $BASE_BRANCH ✅"
   fi
 fi
 
@@ -537,12 +597,23 @@ fi
 # ═════════════════════════════════════════════════════════════════════════════
 echo ""
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
-echo -e "${BOLD}  ✅  devpilot installed${RESET}"
+echo -e "${BOLD}  ✅  devpilot v${DEVPILOT_VERSION} installed${RESET}"
 echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
 echo ""
-echo "  Project:   $PROJECT_NAME ($DETECTED_TYPE)"
-echo "  Branch:    $BASE_BRANCH"
-echo "  Agents:    BA, Team Lead$([ "$AGENT_FRONTEND" = "true" ] && echo ", Frontend")$([ "$AGENT_BACKEND" = "true" ] && echo ", Backend")$([ "$AGENT_DB" = "true" ] && echo ", DB")$([ "$AGENT_INTEGRATION" = "true" ] && echo ", Integration"), QA"
+echo "  Project:        $PROJECT_NAME ($DETECTED_TYPE)"
+echo "  Base branch:    $BASE_BRANCH"
+echo "  Coding engine:  $CODING_ENGINE  (fallback: $FALLBACK_ENGINE)"
+echo "  Runner:         $RUNNER_CLI"
+echo ""
+echo "  Installed:"
+echo "    .claude/commands/    — slash commands for Claude Code"
+echo "    .claude/agents/      — agent definitions"
+echo "    .opencode/           — opencode project config"
+echo "    AGENTS.md            — project context (opencode / antigravity)"
+echo "    CLAUDE.md            — project context (Claude Code)"
+echo "    .devpilot/           — rules, templates, skills"
+echo "    scripts/             — git-flow, Jira, deploy helpers"
+echo "    project.config.md    — engine + model config"
 echo ""
 echo "  ── Required setup ──────────────────────────────────────"
 echo ""
@@ -551,21 +622,32 @@ echo "     → JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN"
 echo "     → GITHUB_ORG, GITHUB_REPO"
 echo "     → DEV/SIT/UAT/PRD environment URLs"
 echo ""
-echo "  2. Add GitHub Secrets (repo Settings → Secrets → Actions):"
-echo "     DEPLOY_HOOK_DEV, DEPLOY_HOOK_SIT, DEPLOY_HOOK_UAT, DEPLOY_HOOK_PRD"
-echo ""
-echo "  3. Create GitHub Environments: dev, sit, uat, prd"
-echo ""
 echo "  ── Start working ───────────────────────────────────────"
 echo ""
-echo "   /ceo your feature or bug description   ← single entry point"
+
+if [ "$HAS_CLAUDE" = true ]; then
+echo "  From Claude Code:"
+echo "    /ceo your feature or bug description"
 echo ""
-echo "  ── Change model config anytime ─────────────────────────"
+fi
+
+if [ "$RUNNER_CLI" = "opencode" ] || [ "$HAS_OPENCODE" = true ]; then
+echo "  From opencode terminal:"
+echo "    bash scripts/ceo.sh \"your feature or bug description\""
+echo "    opencode < .claude/commands/ceo.md      (pipe command directly)"
 echo ""
-echo "   /binaa reconfig                         ← re-run model wizard"
+fi
+
+if [ "$RUNNER_CLI" = "antigravity" ] || [ "$HAS_ANTIGRAVITY" = true ]; then
+echo "  From antigravity terminal:"
+echo "    bash scripts/ceo.sh \"your feature or bug description\""
+echo "    antigravity < .claude/commands/ceo.md   (pipe command directly)"
 echo ""
-echo "  ── If Claude hits limits during work ───────────────────"
+fi
+
+echo "  ── Change config anytime ───────────────────────────────"
 echo ""
-echo "   The agent will output an opencode command to run."
-echo "   After opencode finishes, run: /ceo resume"
+echo "    /binaa reconfig         — re-run engine + model wizard"
+echo "    /binaa-models engine opencode   — switch coding engine"
+echo "    Edit project.config.md directly"
 echo ""

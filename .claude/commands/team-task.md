@@ -11,14 +11,16 @@ Never skip a phase. Follow `.devpilot/rules.md` throughout.
 
 1. Read `project.config.md` — extract and announce:
    ```
-   Project:               <project_name>
-   Base branch:           <base_branch>
-   Implementation engine: <implementation.engine>
-   Coding models:
-     Frontend:    <implementation.model_frontend>
-     Backend:     <implementation.model_backend>
-     DB:          <implementation.model_db>
-     Integration: <implementation.model_integration>
+   Project:        <project_name>
+   Base branch:    <base_branch>
+   Coding engine:  <engines.coding>
+   Runner:         <engines.runner>
+   Fallback:       <engines.fallback>
+   Coding models (<engines.coding>):
+     Frontend:    <coding_models.<engine>.frontend>
+     Backend:     <coding_models.<engine>.backend>
+     DB:          <coding_models.<engine>.db>
+     Integration: <coding_models.<engine>.integration>
    Active agents: <list>
    ```
    **If project_name is missing or this looks like the wrong project, stop and tell the user to open the correct project in Claude Code.**
@@ -33,14 +35,21 @@ Never skip a phase. Follow `.devpilot/rules.md` throughout.
    BASE_BRANCH=$(grep 'base_branch' project.config.md | head -1 | sed 's/.*base_branch:[[:space:]]*//')
    ```
 
-4. Set `IMPL_ENGINE` from `project.config.md → implementation.engine`.
-
-5. Set per-agent models:
+4. Set engine variables from `project.config.md → engines`:
    ```bash
-   IMPL_MODEL_FE=$(grep 'model_frontend:'    project.config.md | head -1 | sed 's/.*model_frontend:[[:space:]]*//'    | tr -d '"')
-   IMPL_MODEL_BE=$(grep 'model_backend:'     project.config.md | head -1 | sed 's/.*model_backend:[[:space:]]*//'     | tr -d '"')
-   IMPL_MODEL_DB=$(grep 'model_db:'          project.config.md | head -1 | sed 's/.*model_db:[[:space:]]*//'          | tr -d '"')
-   IMPL_MODEL_INT=$(grep 'model_integration:' project.config.md | head -1 | sed 's/.*model_integration:[[:space:]]*//' | tr -d '"')
+   IMPL_ENGINE=$(grep -A 5 '^engines:' project.config.md | grep 'coding:' | head -1 | sed 's/.*coding:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
+   FALLBACK_ENGINE=$(grep -A 5 '^engines:' project.config.md | grep 'fallback:' | head -1 | sed 's/.*fallback:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
+   [ -z "$IMPL_ENGINE" ] && IMPL_ENGINE="claude"
+   ```
+
+5. Set per-agent models — read from `coding_models.<IMPL_ENGINE>` section:
+   ```bash
+   # Reads the block under coding_models: → <engine>:
+   _model() { grep -A 20 "^  ${IMPL_ENGINE}:" project.config.md | grep "    ${1}:" | head -1 | sed "s/.*${1}:[[:space:]]*//" | tr -d '"'; }
+   IMPL_MODEL_FE=$(_model frontend)
+   IMPL_MODEL_BE=$(_model backend)
+   IMPL_MODEL_DB=$(_model db)
+   IMPL_MODEL_INT=$(_model integration)
    ```
 
 6. Read `.devpilot/skills/get-shit-done.md`, `.devpilot/skills/architecture-guard.md`, `.devpilot/skills/self-heal.md`
@@ -180,7 +189,7 @@ ACs: $AC_COUNT"
 
 ## Phase 3 — Implementation
 
-Read `project.config.md → implementation.engine`.
+Read `project.config.md → engines.coding`. IMPL_ENGINE determines who writes the code.
 
 ---
 
@@ -230,7 +239,7 @@ Agents: <list of agents that ran>"
 
 ---
 
-### Engine: `opencode`
+### Engine: `opencode` or `antigravity`
 
 Write one implementation brief per agent at `docs/implementation/<slug>-<agent>.md`:
 
@@ -265,11 +274,11 @@ Read .devpilot/rules.md before writing any code.
 - [ ] Committed with: <feat|fix>(<slug>): <description>
 ```
 
-Then output exactly:
+Then output exactly (substituting `$IMPL_ENGINE` and models):
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⏸  IMPLEMENTATION HANDOFF — opencode
+⏸  IMPLEMENTATION HANDOFF — <IMPL_ENGINE>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 Branch: <feature branch>
@@ -277,16 +286,16 @@ Branch: <feature branch>
 Run each command below in your terminal:
 
   # Frontend  (model: <IMPL_MODEL_FE>)
-  opencode --model "<IMPL_MODEL_FE>" < docs/implementation/<slug>-frontend.md
+  <IMPL_ENGINE> --model "<IMPL_MODEL_FE>" < docs/implementation/<slug>-frontend.md
 
   # Backend   (model: <IMPL_MODEL_BE>)
-  opencode --model "<IMPL_MODEL_BE>" < docs/implementation/<slug>-backend.md
+  <IMPL_ENGINE> --model "<IMPL_MODEL_BE>" < docs/implementation/<slug>-backend.md
 
   # DB (if applicable)
-  opencode --model "<IMPL_MODEL_DB>" < docs/implementation/<slug>-db.md
+  <IMPL_ENGINE> --model "<IMPL_MODEL_DB>" < docs/implementation/<slug>-db.md
 
   # Integration (if applicable)
-  opencode --model "<IMPL_MODEL_INT>" < docs/implementation/<slug>-integration.md
+  <IMPL_ENGINE> --model "<IMPL_MODEL_INT>" < docs/implementation/<slug>-integration.md
 
 Run them one at a time. Wait for each to finish before starting the next.
 

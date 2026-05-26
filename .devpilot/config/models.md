@@ -4,18 +4,21 @@ Agent model assignments are stored in `project.config.md` (per-project)
 and synced to `.claude/agents/<name>.md` frontmatter by the install/reconfig wizard.
 
 Run `/binaa reconfig` anytime to change model assignments.
+Run `/binaa-models engine <name>` to switch coding engine instantly.
 
 ---
 
-## Your Setup: Claude Pro + GitHub Copilot via opencode
+## Coding Engines
 
-### 3-Tier Model Stack
+Three engines are supported for implementation code. Set in `project.config.md → engines.coding`.
 
-```
-Tier 1 — Claude Pro (primary, in-process)
-Tier 2 — GitHub Copilot via opencode CLI (fallback when Claude hits limits)
-Tier 3 — OpenCode Zen Free (last resort, zero cost)
-```
+| Engine | How to use | When to use |
+|--------|-----------|-------------|
+| `claude` | Fully automatic — Claude subagents write all code | Default, no external CLI needed |
+| `opencode` | You run `opencode < brief.md` in terminal | GitHub Copilot models, external quota |
+| `antigravity` | You run `antigravity < brief.md` in terminal | Antigravity models |
+
+Claude always handles: BA, planning, QA, code review, PR.
 
 ---
 
@@ -36,7 +39,7 @@ planning, and review well. Opus burns daily limits fast on routine work.
 
 ---
 
-## Available Models in opencode (GitHub Copilot)
+## Available Models — opencode (GitHub Copilot)
 
 | Model | Best for |
 |-------|---------|
@@ -53,6 +56,13 @@ planning, and review well. Opus burns daily limits fast on routine work.
 | Claude Sonnet 4.5 | Slightly older, reliable fallback |
 | Claude Haiku 4.5 | Fast lightweight via Copilot quota |
 
+## Available Models — antigravity
+
+Run `antigravity model list` in your terminal to see the current list.
+Add model IDs to `project.config.md → coding_models.antigravity`.
+
+---
+
 ## Available Models (OpenCode Zen Free)
 
 | Model | Best for |
@@ -68,12 +78,12 @@ When Claude hits a rate/context limit during an agent phase:
 
 1. `self-heal.md` detects the limit signal
 2. Saves full task context to `docs/fallback/<slug>-<phase>.md`
-3. Reports to user with exact opencode command:
+3. Reports to user with exact fallback engine command (from `engines.fallback`):
    ```
    ⚠️  Claude limit hit — Backend Dev phase
-   Fallback: GPT-5.4 via opencode
+   Fallback: <engines.fallback> engine
 
-   Run: opencode --model "GPT-5.4" < docs/fallback/user-export-backend.md
+   Run: <fallback-engine> --model "<model>" < docs/fallback/user-export-backend.md
 
    Then: /ceo resume
    ```
@@ -83,11 +93,7 @@ When Claude hits a rate/context limit during an agent phase:
 
 ## Changing Models
 
-Edit `project.config.md` → `models` section, then run:
+Edit `project.config.md` → `coding_models` or `models` section, then run `/binaa-models`
+to confirm changes are applied.
 
-```bash
-bash scripts/sync-model-config.sh
-```
-
-This updates `.claude/agents/<name>.md` frontmatter to match `project.config.md`.
 Or re-run the full wizard: `/binaa reconfig`

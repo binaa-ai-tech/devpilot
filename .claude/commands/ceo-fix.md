@@ -9,16 +9,29 @@ Implement → commit → PR. Done.
 
 ## Step 0 — Load config
 
-Read `project.config.md`. Extract `base_branch`, `implementation.engine`, active agents.
+Read `project.config.md`. Extract engine settings and per-agent models.
 
 ```bash
 START_TIME=$(date '+%Y-%m-%d %H:%M:%S')
-BASE_BRANCH=$(grep 'base_branch' project.config.md | head -1 | sed 's/.*base_branch:[[:space:]]*//')
-IMPL_ENGINE=$(grep 'engine:' project.config.md | head -1 | sed 's/.*engine:[[:space:]]*//' | tr -d '"')
-IMPL_MODEL_BE=$(grep 'model_backend:'     project.config.md | head -1 | sed 's/.*model_backend:[[:space:]]*//'  | tr -d '"')
-IMPL_MODEL_FE=$(grep 'model_frontend:'    project.config.md | head -1 | sed 's/.*model_frontend:[[:space:]]*//' | tr -d '"')
-IMPL_MODEL_DB=$(grep 'model_db:'          project.config.md | head -1 | sed 's/.*model_db:[[:space:]]*//'       | tr -d '"')
+
+BASE_BRANCH=$(grep '^base_branch:' project.config.md | head -1 | sed 's/base_branch:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
+
+# Read engines block (lines under "engines:")
+IMPL_ENGINE=$(grep -A 10 '^engines:' project.config.md | grep '^\s*coding:' | head -1 | sed 's/.*coding:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
+[ -z "$IMPL_ENGINE" ] && IMPL_ENGINE="claude"
+
+# Read per-agent models from the active coding engine's section
+_model() {
+  grep -A 20 "^  ${IMPL_ENGINE}:" project.config.md 2>/dev/null \
+    | grep "    ${1}:" | head -1 \
+    | sed "s/.*${1}:[[:space:]]*//" | tr -d '"' | awk '{print $1}'
+}
+IMPL_MODEL_FE=$(_model frontend)
+IMPL_MODEL_BE=$(_model backend)
+IMPL_MODEL_DB=$(_model db)
 ```
+
+Validate: if `project.config.md` is missing or `base_branch` is empty, stop and tell the user to run `bash install.sh` first.
 
 ---
 

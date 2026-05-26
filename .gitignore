@@ -3,3 +3,5 @@
 .env.local
 .env.*.local
 docs/fallback/
+.opencode/node_modules/
+.opencode/package-lock.json

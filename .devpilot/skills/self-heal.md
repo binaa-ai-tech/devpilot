@@ -1,7 +1,7 @@
 # Skill: Self-Healing (Error Recovery + Model Fallback)
 
 Apply this skill in every agent. It covers two scenarios:
-build/lint/test failures and Claude limit fallback to opencode.
+build/lint/test failures and Claude limit fallback to the configured fallback engine.
 
 ---
 
@@ -55,7 +55,7 @@ Needs human input to resolve.
 
 ---
 
-## Part 2 — Claude Limit Fallback (model exhaustion recovery)
+## Part 2 — Limit Fallback & Cross-Tool Resumability
 
 ### Trigger Signals
 
@@ -71,74 +71,98 @@ You have hit a limit when you observe any of:
 When a limit signal is detected during an **implementation phase** (Frontend, Backend, DB, Integration):
 
 **Step 1 — Read the fallback config**
-```
-Read project.config.md → models.<agent>.tier2 and fallback.save_path
+```bash
+FALLBACK_ENGINE=$(grep -A 10 '^engines:' project.config.md | grep '^\s*fallback:' | head -1 \
+  | sed 's/.*fallback:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
+FALLBACK_MODEL=$(grep -A 20 "^  ${FALLBACK_ENGINE}:" project.config.md 2>/dev/null \
+  | grep "    <agent-role>:" | head -1 | sed 's/.*:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
+# e.g. for backend agent: grep '    backend:' under the fallback engine's section
 ```
 
-**Step 2 — Save full task state**
+**Step 2 — Write checkpoint (structured state)**
+
+```bash
+bash scripts/checkpoint.sh write \
+  --key "$KEY" \
+  --slug "$SLUG" \
+  --branch "$BRANCH" \
+  --base-branch "$BASE_BRANCH" \
+  --command "$COMMAND" \
+  --task "$TASK" \
+  --runner "claude" \
+  --coding-engine "$IMPL_ENGINE" \
+  --phase-completed "<last completed phase>" \
+  --next-phase "<phase to resume>" \
+  --agents-completed "<comma-separated list of done agents>" \
+  --agents-remaining "<comma-separated list of remaining agents>" \
+  --pause-reason "limit_hit"
+```
+
+The checkpoint JSON at `docs/tasks/<KEY>-checkpoint.json` stores all fields needed by any runner (Claude, opencode, antigravity) to resume without re-deriving context.
+
+**Step 3 — Write the engine-aware fallback prompt**
+
+The fallback prompt must NOT contain Claude-Code-specific instructions (no "spawn subagent_type", no "use Agent tool"). Write a self-contained brief the fallback engine can execute directly:
 
 Write `docs/fallback/<slug>-<phase>-prompt.md`:
 ```markdown
-# Fallback Prompt — <Phase> — <slug>
+# Implementation Brief — <Phase> — <slug>
+# Runnable by: <FALLBACK_ENGINE> (no subagents, no Claude-specific tools)
 
-## Context
-Task: <original task description>
-Branch: <current branch>
-Requirements: docs/requirements/<slug>.md
-Plan: docs/plans/<slug>.md
+## What you are
+You are a coding assistant running in <FALLBACK_ENGINE> mode.
+Execute every step below using your bash tool and file editing tools.
+Do NOT spawn subagents. Do NOT use the Agent tool. You are the implementation agent.
 
-## Work Completed So Far
-<list files already created/modified>
-<list what was done>
+## Task
+<original task description>
 
-## Remaining Work
-<exact implementation steps not yet done>
-<specific files to create/modify>
-<acceptance criteria not yet met>
+## Branch
+<feature branch> — check it out first:
+git checkout <branch>
+
+## What was already done
+<list files already committed — use: git log <base_branch>..HEAD --oneline>
+
+## Remaining work for <Phase>
+<exact steps still needed from the plan>
+<specific files to create or modify>
+<acceptance criteria not yet passing>
 
 ## Rules
-Follow .devpilot/rules.md.
-Commit when done: <conventional commit message>.
-Run: <lint/build/test command for this stack>
+Read .devpilot/rules.md before writing any code.
+
+## When done
+Run: <lint/build/test command>
+Commit with: <feat|fix>(<slug>): <description>
+Then: /ceo resume    (or: bash scripts/run-command.sh ceo resume)
 ```
 
-Write `docs/fallback/<slug>-state.md`:
-```markdown
-# Resume State — <slug>
+**Step 4 — Report to user**
 
-phase_completed_up_to: <last completed phase>
-next_phase: <phase to resume at>
-branch: <feature branch name>
-requirements: docs/requirements/<slug>.md
-plan: docs/plans/<slug>.md
-```
-
-**Step 3 — Report to user**
-
-Output exactly:
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️  CLAUDE LIMIT REACHED — <Phase Name>
+⚠️  LIMIT REACHED — <Phase Name>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-Fallback model: <tier2 model from project.config.md>
+Checkpoint saved: docs/tasks/<KEY>-checkpoint.json
+Fallback engine:  <FALLBACK_ENGINE>
+Fallback model:   <FALLBACK_MODEL>
 
 Run this now:
-  opencode --model "<model name>" < docs/fallback/<slug>-<phase>-prompt.md
+  <FALLBACK_ENGINE> --model "<FALLBACK_MODEL>" < docs/fallback/<slug>-<phase>-prompt.md
 
-When opencode finishes → run: /ceo resume
+When done → run:
+  /ceo resume                           (from Claude Code)
+  bash scripts/run-command.sh ceo resume (from any terminal)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
 
 Then stop. Do not attempt to continue the current phase.
 
-### Tier 3 Free Fallback
-
-If Tier 2 (Copilot) is also unavailable, use `project.config.md → models.<agent>.tier3`.
-Output the same block with the free model name.
-
 ### What NOT to do
 
+- Never write Claude-Code-specific instructions (subagent spawning) into fallback prompts — the fallback engine cannot execute them
 - Never silently skip implementation steps to work around a limit
 - Never pretend work is done if it was cut short
-- Never open a PR if any phase fell back to opencode and `/ceo resume` hasn't run
+- Never open a PR if any phase fell back to an external engine and `/ceo resume` hasn't run

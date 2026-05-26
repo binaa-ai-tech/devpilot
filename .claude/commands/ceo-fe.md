@@ -13,12 +13,18 @@ Read `project.config.md`.
 
 ```bash
 START_TIME=$(date '+%Y-%m-%d %H:%M:%S')
-BASE_BRANCH=$(grep 'base_branch' project.config.md | head -1 | sed 's/.*base_branch:[[:space:]]*//')
-IMPL_ENGINE=$(grep 'engine:' project.config.md | head -1 | sed 's/.*engine:[[:space:]]*//' | tr -d '"')
-IMPL_MODEL_FE=$(grep 'model_frontend:' project.config.md | head -1 | sed 's/.*model_frontend:[[:space:]]*//' | tr -d '"')
+
+BASE_BRANCH=$(grep '^base_branch:' project.config.md | head -1 | sed 's/base_branch:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
+
+IMPL_ENGINE=$(grep -A 10 '^engines:' project.config.md | grep '^\s*coding:' | head -1 | sed 's/.*coding:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
+[ -z "$IMPL_ENGINE" ] && IMPL_ENGINE="claude"
+
+IMPL_MODEL_FE=$(grep -A 20 "^  ${IMPL_ENGINE}:" project.config.md 2>/dev/null \
+  | grep '    frontend:' | head -1 | sed 's/.*frontend:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
 ```
 
 If `agents.frontend.enabled` is false in project.config.md, stop and tell the user.
+If `project.config.md` is missing, stop and tell the user to run `bash install.sh`.
 
 ---
 

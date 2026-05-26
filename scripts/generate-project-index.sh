@@ -1,7 +1,9 @@
-#!/bin/bash
+#!/usr/bin/env bash
 # Generates docs/project-index.md — a fast-scan map of the codebase.
 # BA agent reads this instead of scanning every file.
 # Run manually or auto-called after each BA phase.
+
+set -euo pipefail
 
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 OUT="$ROOT/docs/project-index.md"
@@ -16,10 +18,45 @@ HAS_FRONTEND=false
 HAS_BACKEND=false
 HAS_DB=false
 
+read_stack_value() {
+  local key="$1"
+  awk -v wanted_key="$key" '
+    BEGIN { in_stack = 0 }
+    /^stack:[[:space:]]*$/ { in_stack = 1; next }
+    in_stack && /^[^[:space:]]/ { in_stack = 0 }
+    in_stack {
+      if (match($0, "^[[:space:]]*" wanted_key ":[[:space:]]*")) {
+        line = $0
+        sub("^[[:space:]]*" wanted_key ":[[:space:]]*", "", line)
+        sub(/[[:space:]]+#.*/, "", line)
+        gsub(/"/, "", line)
+        gsub(/^[[:space:]]+|[[:space:]]+$/, "", line)
+        print line
+        exit
+      }
+    }
+  ' "$CONFIG"
+}
+
 if [ -f "$CONFIG" ]; then
-  grep -q 'frontend:.*true\|frontend:.*angular\|frontend:.*react\|frontend:.*vue\|frontend:.*nextjs' "$CONFIG" 2>/dev/null && HAS_FRONTEND=true
-  grep -q 'backend:.*true\|backend:.*dotnet\|backend:.*node\|backend:.*python' "$CONFIG" 2>/dev/null && HAS_BACKEND=true
-  grep -q 'database:.*true\|database:.*sql\|database:.*postgres\|database:.*mysql' "$CONFIG" 2>/dev/null && HAS_DB=true
+  FRONTEND_STACK=$(read_stack_value "frontend" || true)
+  BACKEND_STACK=$(read_stack_value "backend" || true)
+  DB_STACK=$(read_stack_value "database" || true)
+
+  case "${FRONTEND_STACK:-none}" in
+    none|false|"") ;;
+    *) HAS_FRONTEND=true ;;
+  esac
+
+  case "${BACKEND_STACK:-none}" in
+    none|false|"") ;;
+    *) HAS_BACKEND=true ;;
+  esac
+
+  case "${DB_STACK:-none}" in
+    none|false|"") ;;
+    *) HAS_DB=true ;;
+  esac
 fi
 
 # ---------------------------------------------------------------------------
@@ -162,30 +199,43 @@ scan "src"  "*Dto.cs"
 
 # ── Entry Points / Config ─────────────────────────────────────────────────────
 section "Entry Points / Key Config"
-for f in \
-  "apps/api/Program.cs" \
-  "apps/api/appsettings.json" \
-  "apps/mobile/src/main.ts" \
-  "apps/web/src/main.ts" \
-  "apps/admin/src/main.ts" \
-  "src/main.ts" \
-  "package.json" \
-  "nx.json"; do
+# Detect entry points dynamically — no hardcoded project paths
+for pattern in "Program.cs" "main.ts" "main.py" "main.go" "index.ts" "app.py"; do
+  while IFS= read -r f; do
+    [ -f "$f" ] || continue
+    rel="${f#$ROOT/}"
+    printf '  %s\n' "$rel" >> "$OUT"
+  done < <(find "$ROOT" -name "$pattern" \
+    ! -path "*/.git/*" ! -path "*/node_modules/*" \
+    ! -path "*/obj/*" ! -path "*/bin/*" ! -path "*/__pycache__/*" \
+    -type f 2>/dev/null | sort | head -5)
+done
+# Common config files
+for f in "package.json" "nx.json" "angular.json" "go.mod" "pyproject.toml" \
+         "requirements.txt" ".env.example"; do
   [ -f "$ROOT/$f" ] && printf '  %s\n' "$f" >> "$OUT"
 done
+# appsettings.json anywhere in the tree
+while IFS= read -r f; do
+  [ -f "$f" ] || continue
+  rel="${f#$ROOT/}"
+  printf '  %s\n' "$rel" >> "$OUT"
+done < <(find "$ROOT" -name "appsettings*.json" \
+  ! -path "*/obj/*" ! -path "*/bin/*" -type f 2>/dev/null | sort)
 
 # ── Existing docs ─────────────────────────────────────────────────────────────
 section "Project Docs (read for domain context)"
-for f in \
-  "docs/02-claude-context.md" \
-  "docs/05-roadmap.md" \
-  "CLAUDE.md" \
-  "README.md"; do
+for f in "CLAUDE.md" "AGENTS.md" "README.md"; do
   [ -f "$ROOT/$f" ] && printf '  %s\n' "$f" >> "$OUT"
+done
+# Any markdown files in docs/ root
+find "$ROOT/docs" -maxdepth 1 -name "*.md" 2>/dev/null | sort | while IFS= read -r f; do
+  rel="${f#$ROOT/}"
+  printf '  %s\n' "$rel" >> "$OUT"
 done
 
 # ── Summary ──────────────────────────────────────────────────────────────────
-COUNT=$(grep -c '^\s\+' "$OUT" 2>/dev/null || echo 0)
+COUNT=$(grep -c '^[[:space:]][[:space:]]*' "$OUT" 2>/dev/null || echo 0)
 echo "" >> "$OUT"
 echo "---" >> "$OUT"
 echo "_$COUNT files indexed_" >> "$OUT"

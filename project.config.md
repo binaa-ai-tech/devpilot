@@ -29,42 +29,66 @@ agents:
   integration:  { enabled: false }  # set false if stack.integration = none
   qa:           { enabled: true }
 
-## Implementation Engine
+## Engines
 #
-# Who writes the code?
-#   opencode — Claude handles BA/planning/QA/review; opencode CLI runs the coding
-#   claude   — Claude subagents handle everything (use when opencode is unavailable)
+# orchestrator — who runs BA / planning / QA / review. Always Claude. Do not change.
 #
-# Per-agent opencode models — configure each developer role separately.
-# All default to gpt-4o. Change individual agents if you want different models.
-# Run: opencode model list   (to see all available models)
+# coding — who writes implementation code:
+#   claude       — Claude subagents handle everything (fully automatic)
+#   opencode     — opencode CLI handles coding; Claude handles everything else
+#   antigravity  — antigravity CLI handles coding; Claude handles everything else
 #
-# Common GitHub Copilot models:
+# runner — what AI CLI executes /ceo commands when run from terminal:
+#   claude       — Claude Code CLI  (default, slash commands work natively)
+#   opencode     — opencode CLI
+#   antigravity  — antigravity CLI
+#   custom       — any CLI that accepts a prompt via stdin (set to the full command)
+#
+# fallback — coding engine to use when primary coding engine hits limits:
+#   opencode     — fallback to opencode
+#   antigravity  — fallback to antigravity
+#   none         — disable auto-fallback
+
+engines:
+  orchestrator: claude
+  coding: claude                 # claude | opencode | antigravity
+  runner: claude                 # claude | opencode | antigravity | custom
+  fallback: opencode             # opencode | antigravity | none
+
+## Coding Engine Models
+#
+# Per-agent model IDs for whichever coding engine is active.
+# Run: opencode model list   or   antigravity model list   (to see available models)
+#
+# Common opencode / GitHub Copilot models:
 #   github-copilot/gpt-4o           — best all-round
 #   github-copilot/gpt-3.5-codex    — fast and cheap
 #   github-copilot/claude-3.5-sonnet — strong reasoning + code quality
+#
+# antigravity models: use exact model name from `antigravity model list`
 
-implementation:
-  engine: claude
-  model_frontend:    "github-copilot/gpt-4o"    # Angular / React / Vue
-  model_backend:     "github-copilot/gpt-4o"    # .NET / Node / Python
-  model_db:          "github-copilot/gpt-4o"    # DB migrations and SQL
-  model_integration: "github-copilot/gpt-4o"    # Messaging / Services
+coding_models:
+  # opencode models (used when engines.coding = opencode, or as fallback)
+  opencode:
+    frontend:    "github-copilot/gpt-4o"    # Angular / React / Vue
+    backend:     "github-copilot/gpt-4o"    # .NET / Node / Python
+    db:          "github-copilot/gpt-4o"    # DB migrations and SQL
+    integration: "github-copilot/gpt-4o"    # Messaging / Services
 
-## Model Routing — Claude (non-coding phases only)
+  # antigravity models (used when engines.coding = antigravity, or as fallback)
+  antigravity:
+    frontend:    ""                          # set model from: antigravity model list
+    backend:     ""
+    db:          ""
+    integration: ""
+
+## Model Routing — Claude (orchestration phases only)
 #
 # Tier 1: Claude Pro (primary)
 # Tier 2: GitHub Copilot via opencode (fallback when Claude hits limits)
 # Tier 3: OpenCode Zen Free (last resort)
-#
-# opencode model IDs: use exact name shown in opencode model list
-# Tier 2 prefix: "copilot:" — triggers opencode CLI handoff
-# Tier 3 prefix: "free:"   — triggers opencode CLI with free model
 
 models:
-  # Coding agents (frontend, backend, db, integration) are handled by opencode.
-  # Only BA, Team Lead, and QA use Claude models.
-
   ba:
     tier1: claude-haiku-4-5-20251001
     tier2: "copilot: Gemini 3.5 Flash"
@@ -80,28 +104,9 @@ models:
     tier2: "copilot: GPT-5-mini"
     tier3: "free: Nemotron 3 Super Free"
 
-## Command Runner
-#
-# Which AI CLI executes /ceo commands when run from terminal.
-# Inside Claude Code: slash commands work natively (/ceo, /ceo-fix, etc.)
-# From any terminal:  bash scripts/ceo.sh "description"
-#
-# cli options:
-#   claude   — Claude Code CLI  (default)
-#   opencode — opencode CLI     (set model below for GitHub Copilot models)
-#   custom   — any CLI that accepts a prompt via stdin (set cli to the command)
-#
-# Example: switch to opencode with GPT-5.3-Codex
-#   cli:   opencode
-#   model: github-copilot/gpt-5.3-codex
-
-runner:
-  cli:   claude                              # claude | opencode | custom
-  model: ""                                  # e.g. github-copilot/gpt-5.3-codex
-
 ## Fallback Behavior
 
 fallback:
-  auto_on_limit: true           # true = auto-save prompt + show opencode command
+  auto_on_limit: true           # true = auto-save prompt + show fallback command
   save_path: docs/fallback      # where to save fallback prompts
-  resume_command: "/ceo resume" # command to continue after opencode finishes
+  resume_command: "/ceo resume" # command to continue after fallback engine finishes

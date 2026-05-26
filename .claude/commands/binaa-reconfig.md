@@ -9,12 +9,21 @@ Re-configure this project without reinstalling everything.
 Read `project.config.md` and display:
 
 ```
-Implementation engine: <implementation.engine>
-Coding models (opencode — per developer role):
-  Frontend:    <implementation.model_frontend>
-  Backend:     <implementation.model_backend>
-  DB:          <implementation.model_db>
-  Integration: <implementation.model_integration>
+Coding engine:  <engines.coding>
+Runner:         <engines.runner>
+Fallback:       <engines.fallback>
+
+Coding models — opencode:
+  Frontend:    <coding_models.opencode.frontend>
+  Backend:     <coding_models.opencode.backend>
+  DB:          <coding_models.opencode.db>
+  Integration: <coding_models.opencode.integration>
+
+Coding models — antigravity:
+  Frontend:    <coding_models.antigravity.frontend>
+  Backend:     <coding_models.antigravity.backend>
+  DB:          <coding_models.antigravity.db>
+  Integration: <coding_models.antigravity.integration>
 
 Claude model routing (non-coding phases):
   BA:        <models.ba.tier1> → <tier2> → <tier3>
@@ -29,24 +38,41 @@ Ask: "What would you like to change? [engine / models / claude-models / agents /
 
 ---
 
-## Step 2 — Implementation engine + opencode model wizard (if engine or models or all)
+## Step 2 — Coding engine wizard (if engine or all)
 
 ```
 Who writes the code?
 
-  Current: <implementation.engine>
+  Current: <engines.coding>
 
-  [1] opencode (recommended)
+  [1] claude (subagents)
+      All phases run inside Claude. No external CLI needed.
+
+  [2] opencode
       Claude handles BA, planning, QA, review.
       You run opencode in your terminal for all coding.
 
-  [2] claude (subagents)
-      All phases run inside Claude. No opencode needed.
+  [3] antigravity
+      Claude handles BA, planning, QA, review.
+      You run antigravity in your terminal for all coding.
 
-  [3] keep current engine
+  [4] keep current engine
 ```
 
-If [1] opencode is selected or current engine is opencode:
+Also ask:
+```
+Terminal runner (runs /ceo commands from bash scripts/ceo.sh)?
+  Current: <engines.runner>
+  [1] claude  [2] opencode  [3] antigravity  [4] keep current
+```
+
+```
+Fallback when coding engine hits limits?
+  Current: <engines.fallback>
+  [1] opencode  [2] antigravity  [3] none  [4] keep current
+```
+
+If opencode is selected for coding or runner:
 
 ```
 Configure opencode model per developer role:
@@ -65,7 +91,21 @@ Press Enter to keep current value for each.
   Integration dev (messaging):      [<current>] →
 ```
 
-Update `project.config.md → implementation.engine`, `model_frontend`, `model_backend`, `model_db`, `model_integration`.
+If antigravity is selected for coding or runner:
+
+```
+Configure antigravity model per developer role:
+(run: antigravity model list — to see all available)
+
+Press Enter to keep current value for each.
+
+  Frontend dev (Angular/React/Vue): [<current>] →
+  Backend dev (.NET/Node/Python):   [<current>] →
+  DB dev (migrations/SQL):          [<current>] →
+  Integration dev (messaging):      [<current>] →
+```
+
+Update `project.config.md → engines`, `coding_models.opencode`, `coding_models.antigravity` as needed.
 
 ---
 
@@ -119,12 +159,18 @@ Display the updated config and confirm:
 ```
 ✅ Config updated.
 
-Implementation: <engine> — model: <implementation.model>
+Engines:
+  Coding:   <engines.coding>
+  Runner:   <engines.runner>
+  Fallback: <engines.fallback>
 
 Claude routing (non-coding phases):
   BA:        <tier1>
   Team Lead: <tier1>
   QA:        <tier1>
+
+Coding models (opencode):  frontend · backend · db · integration
+Coding models (antigravity): frontend · backend · db · integration
 
 Agent files synced: .claude/agents/team-ba.md, team-lead.md, team-qa.md
 Config saved: project.config.md

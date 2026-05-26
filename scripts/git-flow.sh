@@ -109,14 +109,43 @@ release_start() {
   info "Creating branch: $branch"
   git checkout -b "$branch"
 
-  info "Bumping version in package.json to $version..."
+  info "Bumping version to $version..."
+  BUMPED=false
+
+  # npm / Node
   if command -v npm &>/dev/null && [[ -f package.json ]]; then
-    npm version "$version" --no-git-tag-version --allow-same-version 2>/dev/null || \
-      warn "npm version bump failed — update package.json manually."
+    npm version "$version" --no-git-tag-version --allow-same-version 2>/dev/null && BUMPED=true \
+      || warn "npm version bump failed — update package.json manually."
     git add package.json package-lock.json 2>/dev/null || true
-    git commit -m "chore(git): bump version to $version" || true
+
+  # .NET — update <Version> in all .csproj files
+  elif find . -maxdepth 4 -name "*.csproj" ! -path "*/obj/*" ! -path "*/bin/*" 2>/dev/null | grep -q .; then
+    while IFS= read -r csproj; do
+      if grep -q '<Version>' "$csproj" 2>/dev/null; then
+        sed -i.bak "s|<Version>.*</Version>|<Version>${version}</Version>|" "$csproj" && rm -f "${csproj}.bak"
+        git add "$csproj"
+        BUMPED=true
+        info "Bumped version in $csproj"
+      fi
+    done < <(find . -maxdepth 4 -name "*.csproj" ! -path "*/obj/*" ! -path "*/bin/*" 2>/dev/null)
+
+  # Python — update pyproject.toml
+  elif [[ -f pyproject.toml ]]; then
+    sed -i.bak "s/^version = .*/version = \"${version}\"/" pyproject.toml && rm -f pyproject.toml.bak
+    git add pyproject.toml
+    BUMPED=true
+
+  # VERSION file fallback
+  elif [[ -f VERSION ]]; then
+    echo "$version" > VERSION
+    git add VERSION
+    BUMPED=true
+  fi
+
+  if $BUMPED; then
+    git commit -m "chore(release): bump version to $version" || true
   else
-    warn "package.json not found — skip version bump."
+    warn "No version file found (package.json / .csproj / pyproject.toml / VERSION) — skip version bump."
   fi
 
   git push -u origin "$branch"

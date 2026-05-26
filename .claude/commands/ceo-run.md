@@ -9,17 +9,57 @@ implements, runs QA, opens and merges PR.
 
 ## Step 0 — Load config
 
-Read `project.config.md`. Extract `base_branch`, `implementation.engine`, per-agent models, active agents.
+Read `project.config.md`. Extract engine, models, and active agents.
 
 ```bash
 START_TIME=$(date '+%Y-%m-%d %H:%M:%S')
 KEY="$ARGUMENTS"   # e.g. MSK-22
-BASE_BRANCH=$(grep 'base_branch' project.config.md | head -1 | sed 's/.*base_branch:[[:space:]]*//')
-IMPL_ENGINE=$(grep 'engine:' project.config.md | head -1 | sed 's/.*engine:[[:space:]]*//' | tr -d '"')
-IMPL_MODEL_BE=$(grep 'model_backend:'     project.config.md | head -1 | sed 's/.*model_backend:[[:space:]]*//'  | tr -d '"')
-IMPL_MODEL_FE=$(grep 'model_frontend:'    project.config.md | head -1 | sed 's/.*model_frontend:[[:space:]]*//' | tr -d '"')
-IMPL_MODEL_DB=$(grep 'model_db:'          project.config.md | head -1 | sed 's/.*model_db:[[:space:]]*//'       | tr -d '"')
-IMPL_MODEL_INT=$(grep 'model_integration:' project.config.md | head -1 | sed 's/.*model_integration:[[:space:]]*//' | tr -d '"')
+
+BASE_BRANCH=$(grep '^base_branch:' project.config.md | head -1 | sed 's/base_branch:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
+
+IMPL_ENGINE=$(grep -A 10 '^engines:' project.config.md | grep '^\s*coding:' | head -1 | sed 's/.*coding:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
+[ -z "$IMPL_ENGINE" ] && IMPL_ENGINE="claude"
+
+# Load per-agent models from the active engine's section in coding_models:
+_model() {
+  grep -A 20 "^  ${IMPL_ENGINE}:" project.config.md 2>/dev/null \
+    | grep "    ${1}:" | head -1 \
+    | sed "s/.*${1}:[[:space:]]*//" | tr -d '"' | awk '{print $1}'
+}
+IMPL_MODEL_FE=$(_model frontend)
+IMPL_MODEL_BE=$(_model backend)
+IMPL_MODEL_DB=$(_model db)
+IMPL_MODEL_INT=$(_model integration)
+```
+
+Also load and validate the checkpoint if one exists for KEY:
+```bash
+CHECKPOINT="docs/tasks/${KEY}-checkpoint.json"
+if [ -f "$CHECKPOINT" ]; then
+  echo "🔍 Loading and validating checkpoint state via scripts/checkpoint.sh..."
+  
+  # Validate and extract slug with safety fallback
+  if ! SLUG=$(bash scripts/checkpoint.sh read "$KEY" "slug" 2>/dev/null) || [ -z "$SLUG" ]; then
+    echo "⚠️  WARNING: Checkpoint state is corrupted or missing schema keys! Attempting recovery from plan..."
+    PLAN_FILE="docs/tasks/${KEY}-plan.md"
+    if [ -f "$PLAN_FILE" ]; then
+      SLUG=$(grep -E '^slug:[[:space:]]*' "$PLAN_FILE" | head -1 | sed 's/slug:[[:space:]]*//' | tr -d '"'\'' ' || echo "")
+    fi
+    if [ -z "$SLUG" ]; then
+      echo "❌ CRITICAL: State recovery failed. Could not load valid SLUG."
+      exit 1
+    fi
+    BRANCH=""
+    PHASE_COMPLETED=""
+    NEXT_PHASE=""
+    echo "♻️ Recovered SLUG from plan file: $SLUG"
+  else
+    BRANCH=$(bash scripts/checkpoint.sh read "$KEY" "branch" 2>/dev/null || echo "")
+    PHASE_COMPLETED=$(bash scripts/checkpoint.sh read "$KEY" "phase_completed" 2>/dev/null || echo "")
+    NEXT_PHASE=$(bash scripts/checkpoint.sh read "$KEY" "next_phase" 2>/dev/null || echo "")
+    echo "✅ Checkpoint successfully validated: phase_completed=$PHASE_COMPLETED, next=$NEXT_PHASE"
+  fi
+fi
 ```
 
 ---
@@ -85,7 +125,7 @@ Plan: docs/plans/<SLUG>.md"
 
 ## Step 4 — Implementation
 
-Read `project.config.md → implementation.engine` and follow the matching section.
+Use `IMPL_ENGINE` from Step 0 (already loaded from `project.config.md → engines.coding`).
 
 ### Engine: `claude`
 
@@ -154,7 +194,7 @@ If BLOCKED: fix and re-run QA.
 4. Capture final state:
    ```bash
    END_TIME=$(date '+%Y-%m-%d %H:%M:%S')
-   COMMIT_HASHES=$(git log ${BASE_BRANCH}..HEAD --oneline 2>/dev/null | awk '{print $1}' | head-10 | tr '\n' ' ')
+    COMMIT_HASHES=$(git log ${BASE_BRANCH}..HEAD --oneline 2>/dev/null | awk '{print $1}' | head -10 | tr '\n' ' ')
    ```
 5. Final Jira comment:
    ```bash

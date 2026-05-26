@@ -1,6 +1,10 @@
 # Code Rules — Single Source of Truth
 
 > Every AI prompt in this repo must respect these rules. Update here, not in individual prompts.
+>
+> **Stack-specific sections** (Angular, SQL Server, etc.) apply ONLY if that technology
+> is detected in `project.config.md → stack`. Read the stack section for your project only.
+> An agent working on a Python/React project must ignore the Angular and SQL Server sections.
 
 ---
 
@@ -17,6 +21,8 @@
 ---
 
 ## Angular (21+)
+> **APPLIES ONLY IF:** `project.config.md → stack.frontend = angular`
+> Skip this entire section if the project uses React, Vue, Next.js, or no frontend.
 
 ### Subscriptions
 
@@ -70,6 +76,8 @@ ngOnInit() {
 ---
 
 ## SQL Server
+> **APPLIES ONLY IF:** `project.config.md → stack.database = sqlserver`
+> Skip this entire section if the project uses PostgreSQL, MySQL, or no database.
 
 ### Stored procedures
 

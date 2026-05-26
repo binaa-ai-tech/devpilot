@@ -1,0 +1,8 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "model": "",
+  "instructions": [
+    "AGENTS.md",
+    ".devpilot/rules.md"
+  ]
+}
