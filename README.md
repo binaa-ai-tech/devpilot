@@ -1,4 +1,4 @@
-# devpilot
+# devpilot `v1.1.0`
 
 > One person. Full AI dev team. One command delivers the merged PR.
 
