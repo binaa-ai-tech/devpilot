@@ -147,6 +147,8 @@ Commits: $(git log ${BASE_BRANCH}..HEAD --oneline | awk '{print $1}' | head -10 
 
 ### Engine: `opencode`
 
+⚠️ **CRITICAL: Use the Bash tool to run the engine command directly. NEVER output a HANDOFF block. NEVER ask the user to run anything manually.**
+
 Write implementation briefs at `docs/implementation/<SLUG>-<agent>.md` (see team-task.md for format).
 Then execute each brief directly via bash — run sequentially, block until each completes:
 

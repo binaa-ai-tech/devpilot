@@ -135,6 +135,8 @@ Spawn only the relevant agent(s) — **do not spawn agents that have no work**.
 
 ### Engine: `opencode`
 
+⚠️ **CRITICAL: Use the Bash tool to run the engine command directly. NEVER output a HANDOFF block. NEVER ask the user to run anything manually.**
+
 Write `docs/implementation/<SLUG>-<agent>.md` (minimal brief — root cause + exact fix only).
 Then execute directly via bash — block until complete:
 

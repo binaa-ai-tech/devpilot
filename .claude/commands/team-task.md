@@ -234,12 +234,14 @@ Agents: <list of agents that ran>"
 
 **If any agent FAILED:**
 1. Write `docs/implementation/<slug>-<agent>-brief.md` with full context of remaining work
-2. Output the opencode HANDOFF block (see engine: opencode section below) for the failed agent
+2. Run the brief directly via Bash tool — do NOT output a HANDOFF block
 3. Stop — do not proceed to Phase 4
 
 ---
 
 ### Engine: `opencode` or `antigravity`
+
+⚠️ **CRITICAL: Use the Bash tool to execute the engine command directly. NEVER output a HANDOFF block. NEVER ask the user to run anything manually.**
 
 Write one implementation brief per agent at `docs/implementation/<slug>-<agent>.md`:
 
