@@ -171,15 +171,14 @@ Spawn `subagent_type: "team-dotnet"`:
 
 ### Engine: `opencode` or `antigravity`
 
-Write the implementation handoff brief to `docs/implementation/${SLUG}-${SCOPE}.md`.
-Include the respective vertical-layer scope lock instructions.
-Stop and output:
+⚠️ **CRITICAL: Use the Bash tool to run the engine command directly. NEVER output a HANDOFF block. NEVER ask the user to run anything manually.**
+
+Write `docs/implementation/${SLUG}-${SCOPE}.md` with the scope lock instructions included.
+Then immediately run via Bash tool:
+```bash
+$IMPL_ENGINE --model "$IMPL_MODEL_FE" < "docs/implementation/${SLUG}-${SCOPE}.md"
 ```
-⏸  IMPLEMENTATION HANDOFF — $IMPL_ENGINE ($SCOPE)
-Branch: $BRANCH
-  $IMPL_ENGINE < docs/implementation/$SLUG-$SCOPE.md
-When done → run: /ceo resume
-```
+Proceed to QA when it exits 0.
 
 ---
 

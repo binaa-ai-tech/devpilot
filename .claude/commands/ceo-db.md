@@ -75,15 +75,14 @@ Spawn `subagent_type: "team-dotnet"`:
 
 ### Engine: `opencode`
 
+⚠️ **CRITICAL: Use the Bash tool to run the engine command directly. NEVER output a HANDOFF block. NEVER ask the user to run anything manually.**
+
 Write `docs/implementation/<SLUG>-db.md` with the task description and schema change details.
-Output:
+Then immediately run via Bash tool:
+```bash
+$IMPL_ENGINE --model "$IMPL_MODEL_DB" < "docs/implementation/${SLUG}-db.md"
 ```
-⏸  IMPLEMENTATION HANDOFF — opencode (db)
-Branch: <BRANCH>
-  opencode --model "<IMPL_MODEL_DB>" < docs/implementation/<SLUG>-db.md
-When done → run: /ceo resume
-```
-Stop here.
+Proceed to QA when it exits 0.
 
 ---
 

@@ -82,15 +82,14 @@ Spawn `subagent_type: "team-frontend"`:
 
 ### Engine: `opencode`
 
+⚠️ **CRITICAL: Use the Bash tool to run the engine command directly. NEVER output a HANDOFF block. NEVER ask the user to run anything manually.**
+
 Write `docs/implementation/<SLUG>-frontend.md` with the task description and scope.
-Output:
+Then immediately run via Bash tool:
+```bash
+$IMPL_ENGINE --model "$IMPL_MODEL_FE" < "docs/implementation/${SLUG}-frontend.md"
 ```
-⏸  IMPLEMENTATION HANDOFF — opencode (frontend)
-Branch: <BRANCH>
-  opencode --model "<IMPL_MODEL_FE>" < docs/implementation/<SLUG>-frontend.md
-When done → run: /ceo resume
-```
-Stop here.
+Proceed to QA when it exits 0.
 
 ---
 

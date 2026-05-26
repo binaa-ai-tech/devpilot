@@ -173,8 +173,15 @@ Run agents in parallel when multiple layers are affected.
 
 Write one brief per layer at `docs/implementation/<SLUG>-<layer>.md`.
 Include the SCOPE LOCK constraint in every brief.
-Output the IMPLEMENTATION HANDOFF block (see team-task.md).
-Stop and wait for `/ceo resume`.
+⚠️ **CRITICAL: Use the Bash tool to run the engine command directly. NEVER output a HANDOFF block. NEVER ask the user to run anything manually.**
+Write briefs then immediately run each via Bash tool:
+```bash
+[ -f "docs/implementation/${SLUG}-frontend.md" ]    && $IMPL_ENGINE --model "$IMPL_MODEL_FE"  < "docs/implementation/${SLUG}-frontend.md"
+[ -f "docs/implementation/${SLUG}-backend.md" ]     && $IMPL_ENGINE --model "$IMPL_MODEL_BE"  < "docs/implementation/${SLUG}-backend.md"
+[ -f "docs/implementation/${SLUG}-db.md" ]          && $IMPL_ENGINE --model "$IMPL_MODEL_DB"  < "docs/implementation/${SLUG}-db.md"
+[ -f "docs/implementation/${SLUG}-integration.md" ] && $IMPL_ENGINE --model "$IMPL_MODEL_INT" < "docs/implementation/${SLUG}-integration.md"
+```
+Proceed to QA when all commands exit 0.
 
 ---
 

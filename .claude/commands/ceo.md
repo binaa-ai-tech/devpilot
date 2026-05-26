@@ -59,9 +59,13 @@ Speed is critical. Skip BA and go directly to planning.
 Read `project.config.md → implementation.engine`.
 
 If engine = `opencode` or `antigravity`:
+  ⚠️ **CRITICAL: Use the Bash tool to run the engine command directly. NEVER output a HANDOFF block.**
   Write `docs/implementation/<slug>-hotfix.md` with the minimal fix scope (one agent only).
-  Output the IMPLEMENTATION HANDOFF block exactly as in team-task.md Phase 3 (substituting the engine name).
-  Stop and wait for `/ceo resume`.
+  Then immediately run via Bash tool:
+  ```bash
+  $IMPL_ENGINE --model "$IMPL_MODEL_BE" < "docs/implementation/<slug>-hotfix.md"
+  ```
+  Proceed to Phase 4 when it exits 0.
 
 If engine = `claude`:
   Spawn only the relevant agent (frontend OR backend — not both unless both are broken).
@@ -91,7 +95,7 @@ If you are running `/ceo resume`:
    ```
 3. Continue from **Phase 4 — QA** in team-task.md. Do not re-run Phases 1-3.
 4. If the coding engine only finished some agents (not all): note which are done, brief the remaining ones,
-   stop again with the same IMPLEMENTATION HANDOFF block, and wait for `/ceo resume` again.
+   run each remaining brief via the Bash tool, then continue to Phase 4.
 
 ---
 
