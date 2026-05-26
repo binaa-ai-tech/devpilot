@@ -135,39 +135,44 @@ If BLOCKED: fix and re-run QA.
    git add docs/
    git commit -m "docs(<SLUG>): add plan, qa, and review docs"
    ```
-3. Open + merge PR:
+3. Create PR + auto-merge into develop:
    ```bash
    PR_URL=$(gh pr create \
      --base "$BASE_BRANCH" \
      --title "$KEY: <description>" \
      --body "$(cat docs/reviews/<SLUG>.md)" | tail -1)
    PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
-   bash scripts/update-jira-status.sh "$KEY" "In Review"
+
+   # Auto-merge into develop — production (main) requires /binaa-prd with human sign-off
+   if gh pr merge "$PR_NUM" --squash 2>&1; then
+     bash scripts/update-jira-status.sh "$KEY" "Done"
+   else
+     bash scripts/update-jira-status.sh "$KEY" "In Review"
+     echo "⚠️  Auto-merge failed — merge $PR_URL manually, then: bash scripts/update-jira-status.sh $KEY Done"
+   fi
    ```
 4. Capture final state:
    ```bash
    END_TIME=$(date '+%Y-%m-%d %H:%M:%S')
-   COMMIT_HASHES=$(git log ${BASE_BRANCH}..HEAD --oneline 2>/dev/null | awk '{print $1}' | head -10 | tr '\n' ' ')
-   DEV_URL=$(grep 'DEV_FRONTEND_URL\|dev_url' .devpilot/config.sh 2>/dev/null | head -1 | cut -d= -f2 | tr -d '"' || echo "see CI output")
+   COMMIT_HASHES=$(git log ${BASE_BRANCH}..HEAD --oneline 2>/dev/null | awk '{print $1}' | head-10 | tr '\n' ' ')
    ```
 5. Final Jira comment:
    ```bash
-   bash scripts/add-jira-comment.sh "$KEY" "👀 PR open for review [$END_TIME]
+   bash scripts/add-jira-comment.sh "$KEY" "✅ Merged into $BASE_BRANCH [$END_TIME]
 PR: $PR_URL
 QA: PASS · Commits: $COMMIT_HASHES
 Duration: $START_TIME → $END_TIME
-→ After merge: bash scripts/update-jira-status.sh $KEY Done"
+→ Promote: /binaa-sit <version>"
    ```
 6. Update plan file status:
    ```bash
-   sed -i.bak 's/status: planned/status: in-review/' "docs/tasks/${KEY}-plan.md" && rm -f "docs/tasks/${KEY}-plan.md.bak"
+   sed -i.bak 's/status: planned/status: done/' "docs/tasks/${KEY}-plan.md" && rm -f "docs/tasks/${KEY}-plan.md.bak"
    cat >> "docs/tasks/${KEY}-plan.md" << EOF
 
-   ## Result (PR open: $END_TIME)
-   - PR: $PR_URL (awaiting review)
-   - Jira: $KEY → In Review
+   ## Result (merged: $END_TIME)
+   - PR: $PR_URL (merged into $BASE_BRANCH)
+   - Jira: $KEY → Done
    - Commits: $COMMIT_HASHES
-   - After merge: bash scripts/update-jira-status.sh $KEY Done
    EOF
    ```
 
@@ -177,10 +182,10 @@ Duration: $START_TIME → $END_TIME
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅  DONE — Ready for your review
+✅  DONE — Merged into <BASE_BRANCH>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋  Jira:    <KEY> → In Review
-🔀  PR:      <PR URL> (open — awaiting merge)
+📋  Jira:    <KEY> → Done
+🔀  Merged:  <PR URL> → <BASE_BRANCH>
 ⏱  Time:    <START_TIME> → <END_TIME>
 🔖  Commits: <hash1> · <hash2> · <hash3>
 
@@ -189,18 +194,13 @@ Duration: $START_TIME → $END_TIME
     • <bullet 2>
     • <bullet 3>
 
-👀  Review and merge the PR when ready:
-    <PR URL>
-
-    After merging:
-    bash scripts/update-jira-status.sh <KEY> Done
-
-🔗  DEV deploys automatically after merge + CI passes
+🔗  DEV deploys automatically from <BASE_BRANCH> after CI passes
 📁  Task log:  docs/tasks/<KEY>-plan.md
 ──────────────────────────────────────────────────────
-🚀  Promote when ready:
-    1. DEV looks good?   → /binaa-sit <version>
+🚀  Promote to production when ready:
+    1. DEV ready?        → /binaa-sit <version>
     2. SIT passed?       → /binaa-uat
     3. UAT approved?     → /binaa-prd <version>
+         ↑ Production PR opens here — requires your review
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```
