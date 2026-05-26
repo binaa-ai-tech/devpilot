@@ -21,6 +21,9 @@
 # =============================================================================
 set -euo pipefail
 
+# When piped via curl | bash, stdin is the script — redirect interactive input from the real terminal
+[ -t 0 ] || exec < /dev/tty
+
 REPO="https://raw.githubusercontent.com/binaa-ai-tech/devpilot/main"
 PROJECT_ROOT=$(pwd)
 
