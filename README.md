@@ -11,7 +11,7 @@ devpilot is a **portable, zero-config multi-agent orchestration layer** that ins
 Run from the root of your project:
 
 ```bash
-curl -s https://raw.githubusercontent.com/binaa-ai-tech/devpilot/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/binaa-ai-tech/devpilot/main/install.sh -o /tmp/devpilot-install.sh && bash /tmp/devpilot-install.sh
 ```
 
 Or clone and run locally:
