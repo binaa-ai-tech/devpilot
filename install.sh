@@ -21,8 +21,15 @@
 # =============================================================================
 set -euo pipefail
 
-# When piped via curl | bash, stdin is the script — redirect interactive input from the real terminal
-[ -t 0 ] || exec < /dev/tty
+# When piped via curl | bash, stdin IS the script — bash and read() both fight over it.
+# Fix: download a clean copy to a temp file and re-exec from disk so stdin is the terminal.
+if [ ! -t 0 ] && [ -z "${DEVPILOT_REEXEC:-}" ]; then
+  TMPFILE=$(mktemp /tmp/devpilot-install.XXXXXX.sh)
+  curl -fsSL "https://raw.githubusercontent.com/binaa-ai-tech/devpilot/main/install.sh" -o "$TMPFILE"
+  DEVPILOT_REEXEC=1 bash "$TMPFILE" "$@"
+  rm -f "$TMPFILE"
+  exit $?
+fi
 
 REPO="https://raw.githubusercontent.com/binaa-ai-tech/devpilot/main"
 PROJECT_ROOT=$(pwd)
