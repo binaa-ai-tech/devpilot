@@ -7,7 +7,7 @@ Never skip a phase. Follow `.devpilot/rules.md` throughout.
 
 ---
 
-## Step 0 — Load config and skills (before anything else)
+## Step 0 — Load config and capture start time
 
 1. Read `project.config.md` — extract and announce:
    ```
@@ -23,13 +23,19 @@ Never skip a phase. Follow `.devpilot/rules.md` throughout.
    ```
    **If project_name is missing or this looks like the wrong project, stop and tell the user to open the correct project in Claude Code.**
 
-2. Set `BASE_BRANCH` by running:
+2. Capture start time:
    ```bash
-   grep 'base_branch' project.config.md | head -1 | sed 's/.*base_branch:[[:space:]]*//'
+   START_TIME=$(date '+%Y-%m-%d %H:%M:%S')
    ```
 
-3. Set `IMPL_ENGINE` from `project.config.md → implementation.engine` (`opencode` or `claude`).
-4. Set per-agent models from `project.config.md`:
+3. Set `BASE_BRANCH`:
+   ```bash
+   BASE_BRANCH=$(grep 'base_branch' project.config.md | head -1 | sed 's/.*base_branch:[[:space:]]*//')
+   ```
+
+4. Set `IMPL_ENGINE` from `project.config.md → implementation.engine`.
+
+5. Set per-agent models:
    ```bash
    IMPL_MODEL_FE=$(grep 'model_frontend:'    project.config.md | head -1 | sed 's/.*model_frontend:[[:space:]]*//'    | tr -d '"')
    IMPL_MODEL_BE=$(grep 'model_backend:'     project.config.md | head -1 | sed 's/.*model_backend:[[:space:]]*//'     | tr -d '"')
@@ -37,9 +43,7 @@ Never skip a phase. Follow `.devpilot/rules.md` throughout.
    IMPL_MODEL_INT=$(grep 'model_integration:' project.config.md | head -1 | sed 's/.*model_integration:[[:space:]]*//' | tr -d '"')
    ```
 
-5. Read `.devpilot/skills/get-shit-done.md`
-6. Read `.devpilot/skills/architecture-guard.md`
-7. Read `.devpilot/skills/self-heal.md`
+6. Read `.devpilot/skills/get-shit-done.md`, `.devpilot/skills/architecture-guard.md`, `.devpilot/skills/self-heal.md`
 
 Set `ACTIVE_AGENTS` = agents where `enabled: true` in project.config.md.
 
@@ -49,9 +53,8 @@ Set `ACTIVE_AGENTS` = agents where `enabled: true` in project.config.md.
 
 **Adopt the Business Analyst persona.** Read `.devpilot/prompts/team/ba-agent.md`.
 
-**Before anything else — ensure the project index is fresh:**
+**Ensure the project index is fresh:**
 ```bash
-# Skip regeneration if index exists and was updated within the last 2 hours
 if find docs/project-index.md -mmin -120 2>/dev/null | grep -q .; then
   echo "Project index is fresh — skipping regeneration"
 else
@@ -66,23 +69,8 @@ Read `docs/project-index.md`. Use it to scope all file reading (3-8 files max).
    - Document all assumptions made (no clarifying questions — follow rules.md)
    - Include user story, acceptance criteria, scope, data/API changes, edge cases
 4. Write `docs/domain-models/<task-slug>.md` using `.devpilot/templates/team/domain-model.md`
-5. Count the acceptance criteria in the requirements doc. Save this count as `AC_COUNT`.
-6. Output a **JIRA DESCRIPTION** block:
-   ```
-   --- JIRA DESCRIPTION ---
-   As a <role>, I want to <goal> so that <benefit>.
-
-   Scope: <frontend / backend / DB / integration>
-
-   Acceptance Criteria:
-   1. <AC 1>
-   2. <AC 2>
-   ...
-
-   Assumptions: <key assumptions>
-   --- END JIRA DESCRIPTION ---
-   ```
-7. Announce: "✅ BA Phase complete. Requirements at `docs/requirements/<slug>.md`. AC count: <AC_COUNT>"
+5. Count the acceptance criteria. Save as `AC_COUNT`.
+6. Announce: "✅ BA Phase complete. Requirements at `docs/requirements/<slug>.md`. AC count: <AC_COUNT>"
 
 **Do not stop or ask questions.**
 
@@ -98,13 +86,12 @@ Read `docs/project-index.md`. Use it to scope all file reading (3-8 files max).
    - **Simple** (AC_COUNT ≤ 5 AND 1-2 agents): ONE Task ticket
    - **Complex** (AC_COUNT > 5 OR 3+ agents): Epic + one child Task per agent
 
-3. **REQUIRED — Create ticket(s) and move to In Progress:**
+3. **Create ticket(s) and move to In Progress:**
 
    **Simple:**
    ```bash
    KEY=$(bash scripts/create-jira-ticket.sh "<summary>" "<user story, first 200 chars>" "Task")
    bash scripts/update-jira-status.sh "$KEY" "In Progress"
-   bash scripts/add-jira-comment.sh "$KEY" "[Team Lead | claude-sonnet-4-6] Phase 2 started"
    ```
 
    **Complex:**
@@ -113,34 +100,81 @@ Read `docs/project-index.md`. Use it to scope all file reading (3-8 files max).
    bash scripts/update-jira-status.sh "$EPIC_KEY" "In Progress"
    KEY_FE=$(bash scripts/create-jira-epic.sh "[Frontend] <summary>" "<frontend ACs>" "$EPIC_KEY")
    KEY_BE=$(bash scripts/create-jira-epic.sh "[Backend] <summary>" "<backend ACs>" "$EPIC_KEY")
-   # add KEY_DB / KEY_INT if those agents run
    bash scripts/update-jira-status.sh "$KEY_FE" "In Progress"
    bash scripts/update-jira-status.sh "$KEY_BE" "In Progress"
    KEY="$EPIC_KEY"
    ```
 
-4. **REQUIRED — Update Jira description with user story:**
+4. **Log start to Jira (human-readable):**
+   ```bash
+   bash scripts/add-jira-comment.sh "$KEY" "🚀 Task started
+Command: /ceo \"$ARGUMENTS\"
+Branch: feature/$(echo $KEY | tr '[:upper:]' '[:lower:]')-<slug>
+Started: $START_TIME
+Engine: $IMPL_ENGINE
+Agents: <list of active agents>"
+   ```
+
+5. **Update Jira description:**
    ```bash
    USER_STORY=$(grep -A 20 "## User Story" docs/requirements/<slug>.md | head -20)
    bash scripts/update-jira-description.sh "$KEY" "User Story: $USER_STORY | Task: $ARGUMENTS"
    ```
 
-5. **REQUIRED — Create feature branch:**
+6. **Create feature branch:**
    ```bash
    bash scripts/git-flow.sh feature-start <ticket-number> <slug>
+   BRANCH=$(git branch --show-current)
    ```
 
-6. Determine scope: frontend? backend? DB? integration?
+7. Determine scope: frontend? backend? DB? integration?
    Cross-check against `project.config.md → agents`.
 
-7. Write `docs/plans/<slug>.md` using `.devpilot/templates/team/implementation-plan.md`
+8. Write `docs/plans/<slug>.md` using `.devpilot/templates/team/implementation-plan.md`
 
-8. **REQUIRED — Log plan complete:**
+9. **Initialize task log:**
    ```bash
-   bash scripts/add-jira-comment.sh "$KEY" "[Team Lead | claude-sonnet-4-6] Phase 2 complete — plan: docs/plans/<slug>.md | branch: feature/<KEY>-<slug>"
+   mkdir -p docs/tasks
+   cat > "docs/tasks/${KEY}.md" << EOF
+   ---
+   key: $KEY
+   slug: <slug>
+   command: /ceo
+   branch: $BRANCH
+   base_branch: $BASE_BRANCH
+   started: $START_TIME
+   status: in-progress
+   ---
+
+   ## Task
+   $ARGUMENTS
+
+   ## Plan
+   docs/plans/<slug>.md
+
+   ## Timeline
+   | Time | Phase | Notes |
+   |------|-------|-------|
+   | $START_TIME | Started | Ticket: $KEY · Branch: $BRANCH |
+
+   ## Commits
+   (updated at completion)
+
+   ## Result
+   (updated at completion)
+   EOF
    ```
 
-9. Announce: "✅ Planning Phase complete. Plan at `docs/plans/<slug>.md`"
+10. **Log plan complete to Jira:**
+    ```bash
+    PLAN_TIME=$(date '+%Y-%m-%d %H:%M:%S')
+    bash scripts/add-jira-comment.sh "$KEY" "📋 Plan complete [$PLAN_TIME]
+Plan: docs/plans/<slug>.md
+Scope: <frontend / backend / DB / integration>
+ACs: $AC_COUNT"
+    ```
+
+11. Announce: "✅ Planning Phase complete. Plan at `docs/plans/<slug>.md`"
 
 ---
 
@@ -150,13 +184,55 @@ Read `project.config.md → implementation.engine`.
 
 ---
 
-### Engine: `opencode` (default for coding tasks)
+### Engine: `claude`
 
-Write one implementation brief per agent. Then stop and hand off to the user.
+Use the **Agent tool** to spawn developer agents. Run frontend and backend **in parallel** when both needed.
 
-#### Write implementation briefs
+**Frontend Agent** (if `agents.frontend.enabled: true` AND frontend work identified)
 
-For each agent that has work to do, write `docs/implementation/<slug>-<agent>.md`:
+Spawn with `subagent_type: "team-frontend"`:
+
+> Task: `[task description]`. Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `<branch>`. Implement all frontend work per the plan. Read `.devpilot/skills/self-heal.md`. Run lint + build + tests. Commit with conventional commit message. Report what you built in 3 bullets.
+
+**Backend Agent** (if `agents.backend.enabled: true` AND backend work identified)
+
+Spawn with `subagent_type: "team-dotnet"`:
+
+> Task: `[task description]`. Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `<branch>`. Implement all backend work per the plan. Read `.devpilot/skills/self-heal.md`. Run build + tests. Commit with conventional commit message. Report what you built in 3 bullets.
+
+**DB Agent** (if `agents.db.enabled: true` AND DB schema/migration work identified)
+
+Spawn with `subagent_type: "team-dotnet"`:
+
+> Task: DB changes for `[task description]`. Branch: `<branch>`. Implement all migrations per the plan. Run migration tests. Commit.
+
+**Integration Agent** (if `agents.integration.enabled: true` AND integration work identified)
+
+Spawn with `subagent_type: "team-dotnet"`:
+
+> Task: Integration work for `[task description]`. Branch: `<branch>`. Implement all integration work per the plan. Run tests. Commit.
+
+Wait for all agents to complete.
+
+**After implementation:**
+```bash
+IMPL_TIME=$(date '+%Y-%m-%d %H:%M:%S')
+COMMITS=$(git log ${BASE_BRANCH}..HEAD --oneline 2>/dev/null | awk '{print $1}' | head -10 | tr '\n' ' ')
+bash scripts/add-jira-comment.sh "$KEY" "⚙️ Implementation complete [$IMPL_TIME]
+Commits: $COMMITS
+Agents: <list of agents that ran>"
+```
+
+**If any agent FAILED:**
+1. Write `docs/implementation/<slug>-<agent>-brief.md` with full context of remaining work
+2. Output the opencode HANDOFF block (see engine: opencode section below) for the failed agent
+3. Stop — do not proceed to Phase 4
+
+---
+
+### Engine: `opencode`
+
+Write one implementation brief per agent at `docs/implementation/<slug>-<agent>.md`:
 
 ```markdown
 # Implementation Brief — <Agent> — <slug>
@@ -165,7 +241,7 @@ For each agent that has work to do, write `docs/implementation/<slug>-<agent>.md
 <original task description>
 
 ## Branch
-<feature branch name> — already created, check it out first:
+<feature branch> — already created, check it out first:
 git checkout <branch>
 
 ## What to build
@@ -173,35 +249,23 @@ Read the full plan: docs/plans/<slug>.md
 Read the full requirements: docs/requirements/<slug>.md
 
 ## Your scope (<Agent> only)
-<paste the relevant section from docs/plans/<slug>.md for this agent>
+<paste the relevant section from the plan for this agent>
 
 ## Acceptance criteria for this agent
-<paste the ACs that this agent is responsible for from docs/requirements/<slug>.md>
+<paste the ACs this agent owns>
 
 ## Tech stack rules
 Read .devpilot/rules.md before writing any code.
-
-## Stack: <Angular / .NET / SQL Server / etc.>
-<list the specific tech constraints relevant to this agent>
 
 ## Definition of Done
 - [ ] All ACs above are met
 - [ ] Lint passes
 - [ ] Build passes
-- [ ] Tests pass (run: <lint/build/test command>)
+- [ ] Tests pass
 - [ ] Committed with: <feat|fix>(<slug>): <description>
-
-## Do not
-- Write code outside your scope — other agents handle the rest
-- Skip any AC
-- Commit to main or develop — commit only to <branch>
 ```
 
-Write a brief for each agent: frontend, backend, db (if needed), integration (if needed).
-
-#### Hand off to user
-
-Output exactly this block:
+Then output exactly:
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
@@ -218,10 +282,10 @@ Run each command below in your terminal:
   # Backend   (model: <IMPL_MODEL_BE>)
   opencode --model "<IMPL_MODEL_BE>" < docs/implementation/<slug>-backend.md
 
-  # DB (if applicable)  (model: <IMPL_MODEL_DB>)
+  # DB (if applicable)
   opencode --model "<IMPL_MODEL_DB>" < docs/implementation/<slug>-db.md
 
-  # Integration (if applicable)  (model: <IMPL_MODEL_INT>)
+  # Integration (if applicable)
   opencode --model "<IMPL_MODEL_INT>" < docs/implementation/<slug>-integration.md
 
 Run them one at a time. Wait for each to finish before starting the next.
@@ -234,65 +298,20 @@ When ALL are done → run: /ceo resume
 
 ---
 
-### Engine: `claude` (use when opencode is not available)
-
-Use the **Agent tool** to spawn developer agents. Run frontend and backend **in parallel** when both needed.
-
-**Frontend Agent** (if `agents.frontend.enabled: true` AND frontend work identified)
-
-Spawn with `subagent_type: "team-frontend"`:
-
-> Task: `[task description]`. Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `feature/<KEY>-<slug>`. Implement all frontend work per the plan. Read `.devpilot/skills/self-heal.md`. Run lint + build + tests. Commit. Report what you built in 3 bullets.
-
-**Backend Agent** (if `agents.backend.enabled: true` AND backend work identified)
-
-Spawn with `subagent_type: "team-dotnet"`:
-
-> Task: `[task description]`. Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `feature/<KEY>-<slug>`. Implement all backend work per the plan. Read `.devpilot/skills/self-heal.md`. Run build + tests. Commit. Report what you built in 3 bullets.
-
-**DB Agent** (if `agents.db.enabled: true` AND DB schema/migration work identified)
-
-Spawn with `subagent_type: "team-dotnet"`:
-
-> Task: DB changes for `[task description]`. Branch: `feature/<KEY>-<slug>`. Implement all migrations per the plan. Run migration tests. Commit.
-
-**Integration Agent** (if `agents.integration.enabled: true` AND integration work identified)
-
-Spawn with `subagent_type: "team-dotnet"`:
-
-> Task: Integration work for `[task description]`. Branch: `feature/<KEY>-<slug>`. Implement all integration work per the plan. Run tests. Commit.
-
-Wait for all agents to complete.
-
-**If any agent FAILED:**
-1. Write `docs/implementation/<slug>-<agent>-brief.md` with full context of remaining work
-2. Output the IMPLEMENTATION HANDOFF block above (opencode engine format) with the failed agent
-3. Stop — do not proceed to Phase 4
-
-**If all agents SUCCEEDED:**
-```bash
-bash scripts/add-jira-comment.sh "$KEY" "[Frontend Dev | claude-sonnet-4-6] Phase 3 complete — <summary>"
-bash scripts/add-jira-comment.sh "$KEY" "[Backend Dev | claude-sonnet-4-6] Phase 3 complete — <summary>"
-```
-
----
-
 ## Phase 4 — QA: Testing
-
-*(Run this phase after /ceo resume confirms implementation is complete)*
 
 Spawn with `subagent_type: "team-qa"`:
 
-> Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `feature/<KEY>-<slug>`. Verify every acceptance criterion. Apply mutation-mindset testing. Add missing coverage. Write QA report to `docs/qa/<slug>.md`. Report final verdict (PASS / BLOCKED).
+> Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `<branch>`. Verify every acceptance criterion. Apply mutation-mindset testing. Add missing coverage. Write QA report to `docs/qa/<slug>.md`. Report final verdict: PASS or BLOCKED.
 
-Wait for QA agent to complete before Phase 5.
+Wait for QA agent to complete.
 
-**REQUIRED — Log QA verdict:**
 ```bash
+QA_TIME=$(date '+%Y-%m-%d %H:%M:%S')
 # PASS:
-bash scripts/add-jira-comment.sh "$KEY" "[QA Engineer | claude-haiku-4-5] Phase 4 complete — PASS. All ACs verified."
+bash scripts/add-jira-comment.sh "$KEY" "✅ QA passed [$QA_TIME] — All $AC_COUNT ACs verified. Report: docs/qa/<slug>.md"
 # BLOCKED:
-bash scripts/add-jira-comment.sh "$KEY" "[QA Engineer | claude-haiku-4-5] Phase 4 BLOCKED. See docs/qa/<slug>.md"
+bash scripts/add-jira-comment.sh "$KEY" "🚫 QA BLOCKED [$QA_TIME] — See docs/qa/<slug>.md for failures"
 ```
 
 If BLOCKED: fix the issue (spawn the relevant agent again), then re-run QA.
@@ -311,53 +330,89 @@ If BLOCKED: fix the issue (spawn the relevant agent again), then re-run QA.
    git add docs/
    git commit -m "docs(<slug>): add requirements, plan, qa, and review docs"
    ```
-5. **REQUIRED — Open PR, merge it, then close ticket (run in order, do not skip):**
+5. **Open PR, merge, close ticket:**
    ```bash
-   # Step A — Open the PR
    PR_URL=$(gh pr create \
      --base <BASE_BRANCH> \
      --title "<KEY>: <description>" \
      --body "$(cat docs/reviews/<slug>.md)" | tail -1)
    PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
 
-   bash scripts/add-jira-comment.sh "$KEY" "[Team Lead | claude-sonnet-4-6] PR opened: $PR_URL targeting <BASE_BRANCH>"
-
-   # Step B — Merge the PR into <BASE_BRANCH>
    gh pr merge "$PR_NUM" --squash --delete-branch
 
-   # Step C — Confirm merge succeeded before closing ticket
    MERGE_STATE=$(gh pr view "$PR_NUM" --json state --jq '.state')
    if [ "$MERGE_STATE" = "MERGED" ]; then
      bash scripts/update-jira-status.sh "$KEY" "Done"
-     bash scripts/add-jira-comment.sh "$KEY" "[Team Lead | claude-sonnet-4-6] PR #${PR_NUM} merged into <BASE_BRANCH>. Ticket closed. Feature live on DEV after CI."
    else
-     echo "⚠️  Merge failed (branch protection or CI required). Merge manually then run:"
-     echo "   bash scripts/update-jira-status.sh $KEY Done"
-     echo "   bash scripts/add-jira-comment.sh $KEY 'PR merged into <BASE_BRANCH>. Ticket closed.'"
+     echo "⚠️  Merge failed — merge manually then run: bash scripts/update-jira-status.sh $KEY Done"
    fi
    ```
 
-   **Never close the Jira ticket before the PR is merged.**
+6. **Capture final state:**
+   ```bash
+   END_TIME=$(date '+%Y-%m-%d %H:%M:%S')
+   ALL_COMMITS=$(git log ${BASE_BRANCH}..HEAD --oneline 2>/dev/null | head -10)
+   COMMIT_HASHES=$(echo "$ALL_COMMITS" | awk '{print $1}' | tr '\n' ' ')
+   DEV_URL=$(grep 'DEV_FRONTEND_URL\|dev_url' .devpilot/config.sh 2>/dev/null | head -1 | cut -d= -f2 | tr -d '"' || echo "see CI output")
+   ```
 
-6. Announce: "✅ Review complete. PR merged into <BASE_BRANCH>. Ticket closed."
+7. **Log final Jira comment:**
+   ```bash
+   bash scripts/add-jira-comment.sh "$KEY" "🏁 Done [$END_TIME]
+PR: $PR_URL (merged into $BASE_BRANCH)
+Commits: $COMMIT_HASHES
+Started: $START_TIME → Completed: $END_TIME
+Docs: requirements · plan · qa · review saved in docs/"
+   ```
+
+8. **Finalize task log:**
+   ```bash
+   cat >> "docs/tasks/${KEY}.md" << EOF
+
+   ## Result (completed: $END_TIME)
+   - PR: $PR_URL (merged)
+   - Jira: $KEY → Done
+   - Commits: $COMMIT_HASHES
+
+   ### What was built
+   <3-5 bullet summary of what each agent built>
+   EOF
+   ```
 
 ---
 
-## Final Report
+## Final Output — DONE Block
 
-| Artifact | Path / URL |
-|----------|------------|
-| Requirements | `docs/requirements/<slug>.md` |
-| Domain Model | `docs/domain-models/<slug>.md` |
-| Implementation Plan | `docs/plans/<slug>.md` |
-| Implementation Briefs | `docs/implementation/<slug>-*.md` |
-| QA Report | `docs/qa/<slug>.md` |
-| Review Report | `docs/reviews/<slug>.md` |
-| Jira Ticket | `<URL>` |
-| Pull Request | `<URL>` |
+Output this block exactly, filled in with real values:
 
-## Next Steps (after PR merges)
+```
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✅  DONE — Ready for your review
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+📋  Jira:    <KEY> → Done
+🔀  PR:      <PR URL> (merged into <BASE_BRANCH>)
+⏱  Time:    <START_TIME> → <END_TIME>
+🔖  Commits: <hash1> · <hash2> · <hash3>
 
-1. Test on DEV → `/binaa-sit <version>`
-2. SIT passes → `/binaa-uat`
-3. UAT approved → `/binaa-prd <version>`
+📦  What was built:
+    • <bullet 1>
+    • <bullet 2>
+    • <bullet 3>
+
+🔗  Test on DEV:  <DEV_URL>
+    (Live ~5 min after CI passes)
+
+📁  Task log:  docs/tasks/<KEY>.md
+──────────────────────────────────────────────────────
+🚀  Promote when ready:
+    1. DEV looks good?
+       Run: /binaa-sit <version>
+       Tip: git tag --sort=-version:refname | head -1
+            → features: bump MINOR (1.0.0 → 1.1.0)
+            → bug fixes: bump PATCH (1.0.0 → 1.0.1)
+    2. SIT passed QA?
+       Run: /binaa-uat
+    3. UAT signed off?
+       Run: /binaa-prd <version>
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```
