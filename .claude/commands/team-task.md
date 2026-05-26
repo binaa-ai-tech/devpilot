@@ -51,7 +51,12 @@ Set `ACTIVE_AGENTS` = agents where `enabled: true` in project.config.md.
 
 **Before anything else — ensure the project index is fresh:**
 ```bash
-bash scripts/generate-project-index.sh
+# Skip regeneration if index exists and was updated within the last 2 hours
+if find docs/project-index.md -mmin -120 2>/dev/null | grep -q .; then
+  echo "Project index is fresh — skipping regeneration"
+else
+  bash scripts/generate-project-index.sh
+fi
 ```
 Read `docs/project-index.md`. Use it to scope all file reading (3-8 files max).
 
