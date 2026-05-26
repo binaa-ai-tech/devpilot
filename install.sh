@@ -382,7 +382,7 @@ for f in feature.md bugfix.md hotfix.md; do
   fetch ".devpilot/checklists/$f" ".devpilot/checklists/$f"
 done
 
-for f in get-shit-done.md spec-first.md security-scan.md performance-review.md architecture-guard.md self-heal.md definition-of-done.md; do
+for f in get-shit-done.md spec-first.md security-scan.md performance-review.md architecture-guard.md self-heal.md definition-of-done.md compact-context.md; do
   fetch ".devpilot/skills/$f" ".devpilot/skills/$f"
 done
 
@@ -391,6 +391,7 @@ fetch ".devpilot/config/models.md" ".devpilot/config/models.md"
 # .claude/ — Claude Code commands + agent definitions
 info "Installing .claude/..."
 for f in ceo.md ceo-plan.md ceo-run.md ceo-fix.md ceo-fe.md ceo-be.md ceo-db.md ceo-int.md \
+         ceo-issue.md ceo-subdomain.md \
          binaa.md binaa-sit.md binaa-uat.md binaa-prd.md binaa-hotfix.md \
          binaa-reconfig.md binaa-models.md binaa-index.md \
          team-task.md team-ba.md team-lead.md team-frontend.md team-dotnet.md team-qa.md; do
@@ -422,7 +423,7 @@ fi
 
 # scripts/
 info "Installing scripts/..."
-for f in git-flow.sh new-feature.sh run-command.sh \
+for f in git-flow.sh new-feature.sh run-command.sh checkpoint.sh devpilot-config.sh \
           deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh \
           create-jira-ticket.sh create-jira-epic.sh \
           update-jira-status.sh update-jira-description.sh \
