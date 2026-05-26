@@ -136,14 +136,15 @@ Spawn only the relevant agent(s) — **do not spawn agents that have no work**.
 ### Engine: `opencode`
 
 Write `docs/implementation/<SLUG>-<agent>.md` (minimal brief — root cause + exact fix only).
-Output:
+Then execute directly via bash — block until complete:
+
+```bash
+$IMPL_ENGINE --model "$IMPL_MODEL_BE" < "docs/implementation/${SLUG}-backend.md"
+# or frontend if fix is UI-only:
+# $IMPL_ENGINE --model "$IMPL_MODEL_FE" < "docs/implementation/${SLUG}-frontend.md"
 ```
-⏸  IMPLEMENTATION HANDOFF — opencode
-Branch: <BRANCH>
-  opencode --model "<MODEL>" < docs/implementation/<SLUG>-<agent>.md
-When done → run: /ceo resume
-```
-Stop here.
+
+Do NOT output a handoff block. Do NOT stop. Proceed directly to Step 4 once the command exits 0.
 
 ---
 
@@ -198,7 +199,7 @@ Commits: $ALL_COMMITS" | tail -1)
 PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
 
 # Auto-merge into develop — production (main) requires /binaa-prd with human sign-off
-if gh pr merge "$PR_NUM" --squash 2>&1; then
+if gh pr merge "$PR_NUM" --squash --delete-branch 2>&1; then
   bash scripts/update-jira-status.sh "$KEY" "Done"
   bash scripts/add-jira-comment.sh "$KEY" "✅ Merged into $BASE_BRANCH [$END_TIME]
 PR: $PR_URL

@@ -274,36 +274,31 @@ Read .devpilot/rules.md before writing any code.
 - [ ] Committed with: <feat|fix>(<slug>): <description>
 ```
 
-Then output exactly (substituting `$IMPL_ENGINE` and models):
+Then execute each brief directly via bash — run sequentially, block until each completes:
 
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⏸  IMPLEMENTATION HANDOFF — <IMPL_ENGINE>
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+```bash
+# Frontend (if in scope)
+if [ -f "docs/implementation/<slug>-frontend.md" ]; then
+  $IMPL_ENGINE --model "$IMPL_MODEL_FE" < docs/implementation/<slug>-frontend.md
+fi
 
-Branch: <feature branch>
+# Backend (if in scope)
+if [ -f "docs/implementation/<slug>-backend.md" ]; then
+  $IMPL_ENGINE --model "$IMPL_MODEL_BE" < docs/implementation/<slug>-backend.md
+fi
 
-Run each command below in your terminal:
+# DB (if in scope)
+if [ -f "docs/implementation/<slug>-db.md" ]; then
+  $IMPL_ENGINE --model "$IMPL_MODEL_DB" < docs/implementation/<slug>-db.md
+fi
 
-  # Frontend  (model: <IMPL_MODEL_FE>)
-  <IMPL_ENGINE> --model "<IMPL_MODEL_FE>" < docs/implementation/<slug>-frontend.md
-
-  # Backend   (model: <IMPL_MODEL_BE>)
-  <IMPL_ENGINE> --model "<IMPL_MODEL_BE>" < docs/implementation/<slug>-backend.md
-
-  # DB (if applicable)
-  <IMPL_ENGINE> --model "<IMPL_MODEL_DB>" < docs/implementation/<slug>-db.md
-
-  # Integration (if applicable)
-  <IMPL_ENGINE> --model "<IMPL_MODEL_INT>" < docs/implementation/<slug>-integration.md
-
-Run them one at a time. Wait for each to finish before starting the next.
-
-When ALL are done → run: /ceo resume
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+# Integration (if in scope)
+if [ -f "docs/implementation/<slug>-integration.md" ]; then
+  $IMPL_ENGINE --model "$IMPL_MODEL_INT" < docs/implementation/<slug>-integration.md
+fi
 ```
 
-**Stop here. Do not proceed to Phase 4 until /ceo resume is run.**
+Do NOT output a handoff block. Do NOT stop. Proceed directly to Phase 4 (QA) once all commands exit 0.
 
 ---
 
@@ -348,7 +343,7 @@ If BLOCKED: fix the issue (spawn the relevant agent again), then re-run QA.
    PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
 
    # Auto-merge into develop — production (main) requires /binaa-prd with human sign-off
-   if gh pr merge "$PR_NUM" --squash 2>&1; then
+   if gh pr merge "$PR_NUM" --squash --delete-branch 2>&1; then
      bash scripts/update-jira-status.sh "$KEY" "Done"
    else
      bash scripts/update-jira-status.sh "$KEY" "In Review"

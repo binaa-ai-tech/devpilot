@@ -148,7 +148,17 @@ Commits: $(git log ${BASE_BRANCH}..HEAD --oneline | awk '{print $1}' | head -10 
 ### Engine: `opencode`
 
 Write implementation briefs at `docs/implementation/<SLUG>-<agent>.md` (see team-task.md for format).
-Output IMPLEMENTATION HANDOFF block and stop. Wait for `/ceo resume`.
+Then execute each brief directly via bash — run sequentially, block until each completes:
+
+```bash
+# Run only agents with work in the plan
+[ -f "docs/implementation/${SLUG}-frontend.md" ]    && $IMPL_ENGINE --model "$IMPL_MODEL_FE"  < "docs/implementation/${SLUG}-frontend.md"
+[ -f "docs/implementation/${SLUG}-backend.md" ]     && $IMPL_ENGINE --model "$IMPL_MODEL_BE"  < "docs/implementation/${SLUG}-backend.md"
+[ -f "docs/implementation/${SLUG}-db.md" ]          && $IMPL_ENGINE --model "$IMPL_MODEL_DB"  < "docs/implementation/${SLUG}-db.md"
+[ -f "docs/implementation/${SLUG}-integration.md" ] && $IMPL_ENGINE --model "$IMPL_MODEL_INT" < "docs/implementation/${SLUG}-integration.md"
+```
+
+Do NOT output a handoff block. Do NOT stop. Proceed directly to Step 5 (QA) once all commands exit 0.
 
 ---
 
@@ -184,7 +194,7 @@ If BLOCKED: fix and re-run QA.
    PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
 
    # Auto-merge into develop — production (main) requires /binaa-prd with human sign-off
-   if gh pr merge "$PR_NUM" --squash 2>&1; then
+   if gh pr merge "$PR_NUM" --squash --delete-branch 2>&1; then
      bash scripts/update-jira-status.sh "$KEY" "Done"
    else
      bash scripts/update-jira-status.sh "$KEY" "In Review"
