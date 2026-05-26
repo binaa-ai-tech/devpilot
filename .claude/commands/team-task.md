@@ -330,22 +330,14 @@ If BLOCKED: fix the issue (spawn the relevant agent again), then re-run QA.
    git add docs/
    git commit -m "docs(<slug>): add requirements, plan, qa, and review docs"
    ```
-5. **Open PR, merge, close ticket:**
+5. **Open PR (do NOT merge — human reviews and merges):**
    ```bash
    PR_URL=$(gh pr create \
      --base <BASE_BRANCH> \
      --title "<KEY>: <description>" \
      --body "$(cat docs/reviews/<slug>.md)" | tail -1)
-   PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
 
-   gh pr merge "$PR_NUM" --squash --delete-branch
-
-   MERGE_STATE=$(gh pr view "$PR_NUM" --json state --jq '.state')
-   if [ "$MERGE_STATE" = "MERGED" ]; then
-     bash scripts/update-jira-status.sh "$KEY" "Done"
-   else
-     echo "⚠️  Merge failed — merge manually then run: bash scripts/update-jira-status.sh $KEY Done"
-   fi
+   bash scripts/update-jira-status.sh "$KEY" "In Review"
    ```
 
 6. **Capture final state:**
@@ -358,21 +350,23 @@ If BLOCKED: fix the issue (spawn the relevant agent again), then re-run QA.
 
 7. **Log final Jira comment:**
    ```bash
-   bash scripts/add-jira-comment.sh "$KEY" "🏁 Done [$END_TIME]
-PR: $PR_URL (merged into $BASE_BRANCH)
-Commits: $COMMIT_HASHES
-Started: $START_TIME → Completed: $END_TIME
-Docs: requirements · plan · qa · review saved in docs/"
+   bash scripts/add-jira-comment.sh "$KEY" "👀 PR open for review [$END_TIME]
+PR: $PR_URL
+QA: PASS · Commits: $COMMIT_HASHES
+Started: $START_TIME → PR ready: $END_TIME
+Docs: requirements · plan · qa · review saved in docs/
+→ After merge: bash scripts/update-jira-status.sh $KEY Done"
    ```
 
 8. **Finalize task log:**
    ```bash
    cat >> "docs/tasks/${KEY}.md" << EOF
 
-   ## Result (completed: $END_TIME)
-   - PR: $PR_URL (merged)
-   - Jira: $KEY → Done
+   ## Result (PR open: $END_TIME)
+   - PR: $PR_URL (awaiting review)
+   - Jira: $KEY → In Review
    - Commits: $COMMIT_HASHES
+   - After merge: bash scripts/update-jira-status.sh $KEY Done
 
    ### What was built
    <3-5 bullet summary of what each agent built>
@@ -389,8 +383,8 @@ Output this block exactly, filled in with real values:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ✅  DONE — Ready for your review
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋  Jira:    <KEY> → Done
-🔀  PR:      <PR URL> (merged into <BASE_BRANCH>)
+📋  Jira:    <KEY> → In Review
+🔀  PR:      <PR URL> (open — awaiting merge)
 ⏱  Time:    <START_TIME> → <END_TIME>
 🔖  Commits: <hash1> · <hash2> · <hash3>
 
@@ -399,9 +393,13 @@ Output this block exactly, filled in with real values:
     • <bullet 2>
     • <bullet 3>
 
-🔗  Test on DEV:  <DEV_URL>
-    (Live ~5 min after CI passes)
+👀  Review and merge the PR when ready:
+    <PR URL>
 
+    After merging:
+    bash scripts/update-jira-status.sh <KEY> Done
+
+🔗  DEV deploys automatically after merge + CI passes
 📁  Task log:  docs/tasks/<KEY>.md
 ──────────────────────────────────────────────────────
 🚀  Promote when ready:

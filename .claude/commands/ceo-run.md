@@ -142,12 +142,7 @@ If BLOCKED: fix and re-run QA.
      --title "$KEY: <description>" \
      --body "$(cat docs/reviews/<SLUG>.md)" | tail -1)
    PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
-   gh pr merge "$PR_NUM" --squash --delete-branch
-
-   MERGE_STATE=$(gh pr view "$PR_NUM" --json state --jq '.state')
-   if [ "$MERGE_STATE" = "MERGED" ]; then
-     bash scripts/update-jira-status.sh "$KEY" "Done"
-   fi
+   bash scripts/update-jira-status.sh "$KEY" "In Review"
    ```
 4. Capture final state:
    ```bash
@@ -157,20 +152,22 @@ If BLOCKED: fix and re-run QA.
    ```
 5. Final Jira comment:
    ```bash
-   bash scripts/add-jira-comment.sh "$KEY" "🏁 Done [$END_TIME]
-PR: $PR_URL (merged into $BASE_BRANCH)
-Commits: $COMMIT_HASHES
-Duration: $START_TIME → $END_TIME"
+   bash scripts/add-jira-comment.sh "$KEY" "👀 PR open for review [$END_TIME]
+PR: $PR_URL
+QA: PASS · Commits: $COMMIT_HASHES
+Duration: $START_TIME → $END_TIME
+→ After merge: bash scripts/update-jira-status.sh $KEY Done"
    ```
 6. Update plan file status:
    ```bash
-   sed -i.bak 's/status: planned/status: completed/' "docs/tasks/${KEY}-plan.md" && rm -f "docs/tasks/${KEY}-plan.md.bak"
+   sed -i.bak 's/status: planned/status: in-review/' "docs/tasks/${KEY}-plan.md" && rm -f "docs/tasks/${KEY}-plan.md.bak"
    cat >> "docs/tasks/${KEY}-plan.md" << EOF
 
-   ## Result
-   - Completed: $END_TIME
-   - PR: $PR_URL (merged)
+   ## Result (PR open: $END_TIME)
+   - PR: $PR_URL (awaiting review)
+   - Jira: $KEY → In Review
    - Commits: $COMMIT_HASHES
+   - After merge: bash scripts/update-jira-status.sh $KEY Done
    EOF
    ```
 
@@ -182,8 +179,8 @@ Duration: $START_TIME → $END_TIME"
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ✅  DONE — Ready for your review
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-📋  Jira:    <KEY> → Done
-🔀  PR:      <PR URL> (merged into <BASE_BRANCH>)
+📋  Jira:    <KEY> → In Review
+🔀  PR:      <PR URL> (open — awaiting merge)
 ⏱  Time:    <START_TIME> → <END_TIME>
 🔖  Commits: <hash1> · <hash2> · <hash3>
 
@@ -192,9 +189,13 @@ Duration: $START_TIME → $END_TIME"
     • <bullet 2>
     • <bullet 3>
 
-🔗  Test on DEV:  <DEV_URL>
-    (Live ~5 min after CI passes)
+👀  Review and merge the PR when ready:
+    <PR URL>
 
+    After merging:
+    bash scripts/update-jira-status.sh <KEY> Done
+
+🔗  DEV deploys automatically after merge + CI passes
 📁  Task log:  docs/tasks/<KEY>-plan.md
 ──────────────────────────────────────────────────────
 🚀  Promote when ready:

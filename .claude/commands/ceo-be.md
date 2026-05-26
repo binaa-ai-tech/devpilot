@@ -87,7 +87,22 @@ Stop here.
 
 ---
 
-## Step 3 — PR + close
+## Step 3 — QA
+
+Spawn with `subagent_type: "team-qa"`:
+
+> Backend QA for `$ARGUMENTS`. Branch: `<BRANCH>`. Verify the change works correctly, API behaves as expected, no regressions. Run available tests. Write QA report to `docs/qa/<SLUG>.md`. Verdict: PASS or BLOCKED.
+
+```bash
+QA_TIME=$(date '+%Y-%m-%d %H:%M:%S')
+bash scripts/add-jira-comment.sh "$KEY" "✅ QA passed [$QA_TIME] — docs/qa/<SLUG>.md"
+```
+
+If BLOCKED: fix the issue, then re-run QA.
+
+---
+
+## Step 4 — Open PR (do NOT merge)
 
 ```bash
 END_TIME=$(date '+%Y-%m-%d %H:%M:%S')
@@ -99,25 +114,22 @@ PR_URL=$(gh pr create \
   --title "$KEY: $ARGUMENTS" \
   --body "Backend change: $ARGUMENTS
 
+QA: PASS — docs/qa/<SLUG>.md
 Commits: $COMMITS" | tail -1)
-PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
 
-gh pr merge "$PR_NUM" --squash --delete-branch
-
-MERGE_STATE=$(gh pr view "$PR_NUM" --json state --jq '.state')
-if [ "$MERGE_STATE" = "MERGED" ]; then
-  bash scripts/update-jira-status.sh "$KEY" "Done"
-fi
-
-bash scripts/add-jira-comment.sh "$KEY" "🏁 Done [$END_TIME]
-PR: $PR_URL (merged into $BASE_BRANCH)
-Commits: $COMMITS
-Duration: $START_TIME → $END_TIME"
+bash scripts/update-jira-status.sh "$KEY" "In Review"
+bash scripts/add-jira-comment.sh "$KEY" "👀 PR open [$END_TIME]
+PR: $PR_URL
+QA: PASS · Commits: $COMMITS
+Duration: $START_TIME → $END_TIME
+→ After merge: bash scripts/update-jira-status.sh $KEY Done"
 
 cat >> "docs/tasks/${KEY}.md" << EOF
-## Result (completed: $END_TIME)
-- PR: $PR_URL (merged)
+## Result (PR open: $END_TIME)
+- PR: $PR_URL (awaiting review)
+- Jira: $KEY → In Review
 - Commits: $COMMITS
+- After merge: bash scripts/update-jira-status.sh $KEY Done
 EOF
 ```
 
@@ -138,7 +150,13 @@ EOF
     • <bullet 1>
     • <bullet 2>
 
-🔗  Test on DEV:  <DEV_URL>
+👀  PR open — review and merge when ready:
+    <PR URL>
+
+    After merging:
+    bash scripts/update-jira-status.sh <KEY> Done
+
+🔗  DEV deploys automatically after merge + CI passes
 📁  Task log:  docs/tasks/<KEY>.md
 ──────────────────────────────────────────────────────
 🚀  Promote when ready:

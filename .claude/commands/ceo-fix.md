@@ -134,21 +134,11 @@ Stop here.
 
 ---
 
-## Step 4 — Quick verify
+## Step 4 — Implementation verify + log
 
 After agent completes:
 ```bash
 git log ${BASE_BRANCH}..HEAD --oneline   # confirm commit exists
-```
-
-Run the build/test command relevant to the fix scope:
-- Backend: `dotnet build && dotnet test` (if available)
-- Frontend: `npm run lint && npm run build` (if available)
-
-If build fails: have the same agent fix it before continuing.
-
-Log to Jira:
-```bash
 IMPL_TIME=$(date '+%Y-%m-%d %H:%M:%S')
 COMMITS=$(git log ${BASE_BRANCH}..HEAD --oneline | awk '{print $1}' | tr '\n' ' ')
 bash scripts/add-jira-comment.sh "$KEY" "⚙️ Fix implemented [$IMPL_TIME]
@@ -157,51 +147,61 @@ Commits: $COMMITS"
 
 ---
 
-## Step 5 — PR + close
+## Step 5 — QA
+
+Spawn with `subagent_type: "team-qa"`:
+
+> Bug fix QA for `$ARGUMENTS`. Branch: `<BRANCH>`. Verify the fix works correctly, the broken behavior is resolved, and no regressions introduced. Write QA report to `docs/qa/<SLUG>.md`. Verdict: PASS or BLOCKED.
 
 ```bash
-PR_BODY="## Bug Fix: $ARGUMENTS
+QA_TIME=$(date '+%Y-%m-%d %H:%M:%S')
+# PASS:
+bash scripts/add-jira-comment.sh "$KEY" "✅ QA passed [$QA_TIME] — fix verified. Report: docs/qa/<SLUG>.md"
+# BLOCKED:
+bash scripts/add-jira-comment.sh "$KEY" "🚫 QA BLOCKED [$QA_TIME] — see docs/qa/<SLUG>.md"
+```
 
-**Root cause:** <root cause>
-**Fix:** <what changed>
-**Risk:** <side effects or none>
+If BLOCKED: fix the issue, then re-run QA.
 
-Commits: $COMMITS"
+---
+
+## Step 6 — Open PR (do NOT merge)
+
+```bash
+END_TIME=$(date '+%Y-%m-%d %H:%M:%S')
+ALL_COMMITS=$(git log ${BASE_BRANCH}..HEAD --oneline 2>/dev/null | awk '{print $1}' | head -10 | tr '\n' ' ')
+DEV_URL=$(grep 'DEV_FRONTEND_URL\|dev_url' .devpilot/config.sh 2>/dev/null | head -1 | cut -d= -f2 | tr -d '"' || echo "see CI output")
 
 PR_URL=$(gh pr create \
   --base "$BASE_BRANCH" \
   --title "$KEY: fix: <summary>" \
-  --body "$PR_BODY" | tail -1)
-PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+  --body "## Bug Fix: $ARGUMENTS
 
-gh pr merge "$PR_NUM" --squash --delete-branch
+**Root cause:** <root cause>
+**Fix:** <what changed>
+**Risk:** <side effects or none>
+**QA:** PASS — docs/qa/<SLUG>.md
 
-MERGE_STATE=$(gh pr view "$PR_NUM" --json state --jq '.state')
-if [ "$MERGE_STATE" = "MERGED" ]; then
-  bash scripts/update-jira-status.sh "$KEY" "Done"
-fi
+Commits: $ALL_COMMITS" | tail -1)
 
-END_TIME=$(date '+%Y-%m-%d %H:%M:%S')
-ALL_COMMITS=$(git log ${BASE_BRANCH}..HEAD --oneline 2>/dev/null | awk '{print $1}' | head -10 | tr '\n' ' ')
-DEV_URL=$(grep 'DEV_FRONTEND_URL\|dev_url' .devpilot/config.sh 2>/dev/null | head -1 | cut -d= -f2 | tr -d '"' || echo "see CI output")
-```
-
-Final Jira comment:
-```bash
-bash scripts/add-jira-comment.sh "$KEY" "🏁 Fix shipped [$END_TIME]
-PR: $PR_URL (merged into $BASE_BRANCH)
+bash scripts/update-jira-status.sh "$KEY" "In Review"
+bash scripts/add-jira-comment.sh "$KEY" "👀 PR open for review [$END_TIME]
+PR: $PR_URL
+QA: PASS
 Commits: $ALL_COMMITS
-Duration: $START_TIME → $END_TIME"
+Duration: $START_TIME → $END_TIME
+→ Merge when ready, then: bash scripts/update-jira-status.sh $KEY Done"
 ```
 
 Update task log:
 ```bash
 cat >> "docs/tasks/${KEY}.md" << EOF
 
-## Result (completed: $END_TIME)
-- PR: $PR_URL (merged)
-- Jira: $KEY → Done
+## Result (PR open: $END_TIME)
+- PR: $PR_URL (awaiting review)
+- Jira: $KEY → In Review
 - Commits: $ALL_COMMITS
+- After merge: bash scripts/update-jira-status.sh $KEY Done
 EOF
 ```
 
@@ -221,11 +221,15 @@ EOF
 📦  What was fixed:
     • Root cause: <root cause>
     • Changed: <files/what changed>
-    • Risk: <side effects or none>
+    • QA: PASS
 
-🔗  Test on DEV:  <DEV_URL>
-    (Live ~5 min after CI passes)
+👀  PR open — review and merge when ready:
+    <PR URL>
 
+    After merging:
+    bash scripts/update-jira-status.sh <KEY> Done
+
+🔗  DEV deploys automatically after merge + CI passes (~5 min)
 📁  Task log:  docs/tasks/<KEY>.md
 ──────────────────────────────────────────────────────
 🚀  Promote when ready:
