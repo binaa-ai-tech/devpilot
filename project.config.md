@@ -80,6 +80,25 @@ models:
     tier2: "copilot: GPT-5-mini"
     tier3: "free: Nemotron 3 Super Free"
 
+## Command Runner
+#
+# Which AI CLI executes /ceo commands when run from terminal.
+# Inside Claude Code: slash commands work natively (/ceo, /ceo-fix, etc.)
+# From any terminal:  bash scripts/ceo.sh "description"
+#
+# cli options:
+#   claude   — Claude Code CLI  (default)
+#   opencode — opencode CLI     (set model below for GitHub Copilot models)
+#   custom   — any CLI that accepts a prompt via stdin (set cli to the command)
+#
+# Example: switch to opencode with GPT-5.3-Codex
+#   cli:   opencode
+#   model: github-copilot/gpt-5.3-codex
+
+runner:
+  cli:   claude                              # claude | opencode | custom
+  model: ""                                  # e.g. github-copilot/gpt-5.3-codex
+
 ## Fallback Behavior
 
 fallback:

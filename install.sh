@@ -240,6 +240,47 @@ if [[ "$ACCEPT_MODELS" =~ ^[Nn] ]]; then
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════
+# STEP 4b — COMMAND RUNNER (which AI CLI runs /ceo from terminal)
+# ═════════════════════════════════════════════════════════════════════════════
+section "STEP 4b — Command runner config..."
+
+RUNNER_CLI="claude"
+RUNNER_MODEL=""
+
+echo ""
+echo "  Run /ceo commands from terminal with any AI:"
+echo ""
+echo "    [1] Claude Code CLI (claude)         — default, works inside Claude Code"
+echo "    [2] opencode                         — run with GitHub Copilot models"
+echo "    [3] custom                           — any CLI that reads prompt via stdin"
+echo ""
+ask "  Choice [1]: "; read -r RUNNER_CHOICE
+
+case "${RUNNER_CHOICE:-1}" in
+  2)
+    RUNNER_CLI="opencode"
+    echo ""
+    echo "  Common GitHub Copilot models:"
+    echo "    github-copilot/gpt-5.3-codex    — strong code generation"
+    echo "    github-copilot/gpt-4o           — best all-round"
+    echo "    github-copilot/gemini-2.5-pro   — Google alternative"
+    echo ""
+    ask "  opencode model [github-copilot/gpt-5.3-codex]: "; read -r v
+    RUNNER_MODEL="${v:-github-copilot/gpt-5.3-codex}"
+    info "Runner: opencode ($RUNNER_MODEL)"
+    ;;
+  3)
+    ask "  Custom CLI command (e.g. aider --model gpt-4o): "; read -r v
+    RUNNER_CLI="${v:-claude}"
+    info "Runner: $RUNNER_CLI"
+    ;;
+  *)
+    RUNNER_CLI="claude"
+    info "Runner: claude (Claude Code CLI)"
+    ;;
+esac
+
+# ═════════════════════════════════════════════════════════════════════════════
 # STEP 5 — PROJECT IDENTITY
 # ═════════════════════════════════════════════════════════════════════════════
 section "STEP 5 — Project identity..."
@@ -439,6 +480,14 @@ fallback:
   auto_on_limit: true
   save_path: docs/fallback
   resume_command: "/ceo resume"
+
+## Command Runner
+# Run /ceo commands from any terminal: bash scripts/ceo.sh "description"
+# Inside Claude Code: use slash commands directly (/ceo, /ceo-fix, etc.)
+
+runner:
+  cli:   $RUNNER_CLI
+  model: "$RUNNER_MODEL"
 CONFIGEOF
 
 info "project.config.md written"
