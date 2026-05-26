@@ -45,7 +45,7 @@ agents:
 #   github-copilot/claude-3.5-sonnet — strong reasoning + code quality
 
 implementation:
-  engine: opencode
+  engine: claude
   model_frontend:    "github-copilot/gpt-4o"    # Angular / React / Vue
   model_backend:     "github-copilot/gpt-4o"    # .NET / Node / Python
   model_db:          "github-copilot/gpt-4o"    # DB migrations and SQL

@@ -157,7 +157,7 @@ fi
 section "STEP 4 — Implementation engine + model config..."
 
 # Defaults
-IMPL_ENGINE="opencode"
+IMPL_ENGINE="claude"
 IMPL_MODEL_FE="github-copilot/gpt-4o"
 IMPL_MODEL_BE="github-copilot/gpt-4o"
 IMPL_MODEL_DB="github-copilot/gpt-4o"
@@ -178,25 +178,17 @@ T3_QA="free: Nemotron 3 Super Free"
 echo ""
 echo "  Who writes the code?"
 echo ""
-echo "    [1] opencode (recommended)"
+echo "    [1] claude (recommended)"
+echo "        Fully automatic — Claude subagents handle everything end-to-end."
+echo "        BA → planning → coding → QA → PR with zero manual steps."
+echo "    [2] opencode"
 echo "        Claude handles BA, planning, QA, review."
-echo "        You run opencode in your terminal for all coding."
-echo "    [2] claude (subagents)"
-echo "        All phases run inside Claude. No opencode needed."
-echo "        Use this if you do not have opencode installed."
+echo "        You run opencode in your terminal for coding phases."
 echo ""
 ask "  Choice [1]: "; read -r ENG_CHOICE
 
 case "${ENG_CHOICE:-1}" in
   2)
-    IMPL_ENGINE="claude"
-    IMPL_MODEL_FE=""
-    IMPL_MODEL_BE=""
-    IMPL_MODEL_DB=""
-    IMPL_MODEL_INT=""
-    info "Engine set to: claude (subagents)"
-    ;;
-  *)
     IMPL_ENGINE="opencode"
     echo ""
     echo "  Common GitHub Copilot models (run: opencode model list — to see all):"
@@ -218,6 +210,14 @@ case "${ENG_CHOICE:-1}" in
     info "  Backend:     $IMPL_MODEL_BE"
     info "  DB:          $IMPL_MODEL_DB"
     info "  Integration: $IMPL_MODEL_INT"
+    ;;
+  *)
+    IMPL_ENGINE="claude"
+    IMPL_MODEL_FE=""
+    IMPL_MODEL_BE=""
+    IMPL_MODEL_DB=""
+    IMPL_MODEL_INT=""
+    info "Engine set to: claude (fully automatic — no manual steps)"
     ;;
 esac
 

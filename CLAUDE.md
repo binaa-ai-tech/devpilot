@@ -40,12 +40,11 @@ Report: PR URL + DEV URL + promote commands
 
 ## Implementation Engine
 
-All implementation is done by **Claude subagents**.
-Model per agent is configured in `project.config.md` (3-tier: Claude Pro → Copilot → Free).
+**Default: `engine: claude`** — fully automatic end-to-end. Claude subagents handle every phase with no manual steps.
 
-**opencode is the automatic fallback** — triggered only when Claude Pro hits limits.
-The agent saves state and outputs the exact opencode command.
-After opencode finishes → run `/ceo resume`.
+**Optional: `engine: opencode`** — Claude does BA/planning/QA/review; you run opencode in your terminal for coding phases. Set this in `project.config.md` if you prefer opencode for implementation.
+
+Change anytime with `/binaa reconfig` or `/binaa-models`.
 
 ---
 
