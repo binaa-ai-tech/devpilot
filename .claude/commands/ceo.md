@@ -101,6 +101,22 @@ If you are running `/ceo resume`:
 
 ## CEO Report (output when all work is done)
 
+Post to Jira first, then display:
+
+```bash
+bash scripts/add-jira-comment.sh "$KEY" "✅ DONE — Merged into $BASE_BRANCH [$END_TIME]
+PR: $PR_URL
+Commits: $COMMIT_HASHES
+Duration: $START_TIME → $END_TIME
+
+What was built:
+• <bullet 1>
+• <bullet 2>
+• <bullet 3>
+
+→ Promote to SIT: /binaa-sit <version>"
+```
+
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ✅  DONE — Ready for your review

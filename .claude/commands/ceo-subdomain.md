@@ -214,7 +214,7 @@ QA: PASS — docs/qa/<SLUG>.md
 Commits: $COMMITS" | tail -1)
 PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
 
-if gh pr merge "$PR_NUM" --squash 2>&1; then
+if gh pr merge "$PR_NUM" --squash --delete-branch 2>&1; then
   bash scripts/update-jira-status.sh "$KEY" "Done"
   bash scripts/add-jira-comment.sh "$KEY" "✅ Layer-Locked PR merged into $BASE_BRANCH [$END_TIME]
 PR: $PR_URL
@@ -237,6 +237,21 @@ EOF
 ---
 
 ## Final Output — DONE Block
+
+Post the DONE block to Jira, then display it:
+
+```bash
+bash scripts/add-jira-comment.sh "$KEY" "✅ DONE — Layer-locked merge into $BASE_BRANCH [$END_TIME]
+PR: $PR_URL
+Commits: $COMMITS
+Duration: $START_TIME → $END_TIME
+Scope lock: $SCOPE (no adjacent layers touched)
+
+Task log: docs/tasks/${KEY}.md
+→ Promote to SIT: /binaa-sit <version>"
+```
+
+Then output this block exactly, filled in with real values:
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━

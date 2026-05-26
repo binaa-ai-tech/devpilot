@@ -247,7 +247,7 @@ Commits: $ALL_COMMITS" | tail -1)
 
 PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
 
-if gh pr merge "$PR_NUM" --squash 2>&1; then
+if gh pr merge "$PR_NUM" --squash --delete-branch 2>&1; then
   bash scripts/update-jira-status.sh "$EPIC_KEY" "Done"
   bash scripts/add-jira-comment.sh "$EPIC_KEY" "✅ Merged [$END_TIME]
 PR: $PR_URL
@@ -265,6 +265,25 @@ bash scripts/checkpoint.sh update "$EPIC_KEY" phase_completed "done"
 ---
 
 ## Final Output — DONE Block
+
+Post the DONE block to Jira, then display it:
+
+```bash
+bash scripts/add-jira-comment.sh "$EPIC_KEY" "✅ DONE — Issue resolved, merged into $BASE_BRANCH [$END_TIME]
+PR: $PR_URL
+Commits: $ALL_COMMITS
+Duration: $START_TIME → $END_TIME
+
+What was fixed:
+• Root cause: <confirmed root cause>
+• FE: <what changed>
+• BE: <what changed>
+
+Task log: docs/tasks/${EPIC_KEY}.md
+→ Promote to SIT: /binaa-sit <version>"
+```
+
+Then output this block exactly, filled in with real values:
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
