@@ -232,6 +232,25 @@ Duration: $START_TIME → $END_TIME
 
 ## Final Output — DONE Block
 
+Post the DONE block to Jira, then display it:
+
+```bash
+bash scripts/add-jira-comment.sh "$KEY" "✅ DONE — Merged into $BASE_BRANCH [$END_TIME]
+PR: $PR_URL
+Commits: $COMMIT_HASHES
+Duration: $START_TIME → $END_TIME
+
+What was built:
+• <bullet 1>
+• <bullet 2>
+• <bullet 3>
+
+Task log: docs/tasks/${KEY}-plan.md
+→ Promote to SIT: /binaa-sit <version>"
+```
+
+Then output this block exactly, filled in with real values:
+
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ✅  DONE — Merged into <BASE_BRANCH>

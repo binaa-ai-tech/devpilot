@@ -388,7 +388,24 @@ Docs: requirements · plan · qa · review saved in docs/
 
 ## Final Output — DONE Block
 
-Output this block exactly, filled in with real values:
+Post the DONE block to Jira, then display it:
+
+```bash
+bash scripts/add-jira-comment.sh "$KEY" "✅ DONE — Merged into $BASE_BRANCH [$END_TIME]
+PR: $PR_URL
+Commits: $COMMIT_HASHES
+Duration: $START_TIME → $END_TIME
+
+What was built:
+• <bullet 1>
+• <bullet 2>
+• <bullet 3>
+
+Task log: docs/tasks/${KEY}.md
+→ Promote to SIT: /binaa-sit <version>"
+```
+
+Then output this block exactly, filled in with real values:
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
