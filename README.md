@@ -1,8 +1,8 @@
-# devpilot `v1.1.0`
+# devpilot `v2.0.0`
 
-> One person. Full AI dev team. One command delivers the merged PR.
+> One command. AI team delivers the feature to develop. You review only for production.
 
-Install devpilot on any project and run any feature, bug fix, or production emergency with a single `/ceo` command. An AI team of BA, Team Lead, and QA handles requirements, planning, testing, and review — while **opencode** with your preferred coding model writes the actual code.
+Install devpilot on any project and run any feature, bug fix, or schema change with a single `/ceo` command. An AI team of BA, Team Lead, developers, and QA handles everything — requirements, planning, code, testing, and PR — then auto-merges into your development branch. You only review when promoting to production via `/binaa-prd`.
 
 ---
 
@@ -12,45 +12,45 @@ Install devpilot on any project and run any feature, bug fix, or production emer
 /ceo "add rental agreement PDF export"
          │
          ▼
-  ── Phase 1: BA (Claude Haiku) ──────────────────────────────
-  Generates project index (docs/project-index.md)
+  ── Phase 1: BA ──────────────────────────────────────────
+  Project index freshness check (skip if < 2 hours old)
   Reads 3-8 relevant files — not the whole codebase
-  Writes requirements + domain model
-  Creates Jira ticket (Task, or Epic + child Tasks for big features)
+  Writes requirements + domain model (docs/requirements/)
+  No clarifying questions — makes smart assumptions
          │
          ▼
-  ── Phase 2: Team Lead (Claude Sonnet) ──────────────────────
+  ── Phase 2: Team Lead ───────────────────────────────────
+  Creates Jira ticket (Task or Epic + child Tasks)
   Creates feature branch from base_branch
   Writes implementation plan (docs/plans/<slug>.md)
-  Updates Jira ticket with full user story and ACs
+  Logs start time, branch, engine to Jira
          │
          ▼
-  ── Phase 3: IMPLEMENTATION HANDOFF ─────────────────────────
-  Claude writes one brief per coding agent:
-    docs/implementation/<slug>-frontend.md
-    docs/implementation/<slug>-backend.md
-
-  You run each command in your terminal:
-    opencode --model "github-copilot/gpt-4o" < docs/implementation/<slug>-frontend.md
-    opencode --model "github-copilot/gpt-4o" < docs/implementation/<slug>-backend.md
-
-  When done → /ceo resume
+  ── Phase 3: Parallel Implementation ─────────────────────
+  [Claude subagents — fully automatic, no manual step]
+  Frontend agent   (if frontend work identified)
+  Backend agent    (if backend work identified)
+  DB agent         (if migrations needed)
+  Integration agent (if messaging/services involved)
+  Each agent: reads plan → builds → runs tests → commits
          │
          ▼
-  ── Phase 4: QA (Claude Haiku) ──────────────────────────────
+  ── Phase 4: QA ──────────────────────────────────────────
   Verifies every acceptance criterion
   Writes QA report (docs/qa/<slug>.md) — PASS or BLOCKED
+  If BLOCKED: fixes issue, re-runs QA
          │
          ▼
-  ── Phase 5: Team Lead (Claude Sonnet) ──────────────────────
-  Code review → opens PR → merges into base branch
-  Jira ticket closed ONLY after PR is confirmed merged
+  ── Phase 5: Team Lead ───────────────────────────────────
+  Code review → writes review report (docs/reviews/)
+  Opens PR → auto-merges into base_branch (develop)
+  Jira ticket → Done
          │
          ▼
-  ✅ DONE — PR merged + Jira closed + DEV link + promote commands
+  ✅ DONE — Merged into develop + Jira Done + promote commands
 ```
 
-No clarifying questions. No stopping except the opencode handoff. The team reads your codebase, makes smart assumptions, and delivers.
+**No stopping. No manual steps. No questions.** Auto-merges into develop — you review only for production via `/binaa-prd`.
 
 ---
 
@@ -73,11 +73,11 @@ The installer will:
 1. **Scan your system** — detect Claude Code, opencode, GitHub CLI, git, jq
 2. **Scan your project stack** — detect Angular, React, .NET, Python, SQL migrations, etc.
 3. **Recommend an agent team** — only enables agents relevant to your stack
-4. **Ask for implementation engine** — opencode (recommended) or Claude subagents
-5. **Configure Claude models** — BA, Team Lead, QA only (coding is handled by opencode)
-6. **Download all files** — commands, agents, skills, scripts, templates
-7. **Write `project.config.md`** — your per-project config, committed to git
-8. **Sync agent models** — updates agent frontmatter to your chosen Claude models
+4. **Choose implementation engine** — Claude (default, fully automatic) or opencode (manual terminal step)
+5. **Configure Claude models** — BA, Team Lead, QA, and coding agents
+6. **Choose command runner** — Claude Code CLI, opencode, or custom
+7. **Download all files** — commands, agents, skills, scripts, templates
+8. **Write `project.config.md`** — your per-project config, committed to git
 
 Setup time: ~5 minutes.
 
@@ -87,11 +87,11 @@ Setup time: ~5 minutes.
 
 | Tool | Required | Purpose |
 |------|----------|---------|
-| [Claude Code](https://claude.ai/code) | Yes | BA, planning, QA, code review |
-| [opencode](https://opencode.ai) | Yes (if `engine: opencode`) | Writes all implementation code |
-| [GitHub CLI (`gh`)](https://cli.github.com) | Yes | PR creation, merge, branch management |
+| [Claude Code](https://claude.ai/code) | Yes | All AI phases — BA, planning, code, QA, review |
+| [GitHub CLI (`gh`)](https://cli.github.com) | Yes | PR creation, auto-merge, branch management |
 | `git` | Yes | Branch management |
 | `jq` | Yes | JSON building in Jira scripts |
+| [opencode](https://opencode.ai) | Optional | Only if `engine: opencode` is set |
 
 ---
 
@@ -122,7 +122,7 @@ PRD_FRONTEND_URL="https://your-app.com"
 
 Go to: repo → Settings → Secrets and variables → Actions
 
-Add secrets for each environment you want to deploy to:
+Add secrets for each environment:
 - `DEPLOY_HOOK_DEV`, `DEPLOY_HOOK_SIT`, `DEPLOY_HOOK_UAT`, `DEPLOY_HOOK_PRD`
 
 ### 3. Create GitHub Environments
@@ -147,37 +147,83 @@ Create: `dev`, `sit`, `uat`, `prd`
 /ceo <description>
 ```
 
-Examples:
+Full pipeline: BA → planning → implementation → QA → PR → auto-merge into develop.
+
 ```
 /ceo add a dark mode toggle
 /ceo fix the login redirect bug after password reset
 /ceo production is down — users can't check out   ← triggers hotfix mode
-/ceo resume                                        ← continue after opencode handoff
 ```
 
-### Individual Agents (fine-grained control)
+### Command Taxonomy — 8 Commands for Every Scenario
 
-| Command | What it does |
-|---------|-------------|
-| `/team-task <description>` | Full 5-phase team workflow (same as `/ceo` for features/bugs) |
-| `/team-ba <description>` | BA phase only — write requirements and domain model |
-| `/team-lead <context>` | Planning or review phase only |
-| `/team-qa <context>` | QA phase only — verify ACs and write report |
+| Command | Phases | Use when |
+|---------|--------|----------|
+| `/ceo <description>` | BA → Plan → Implement → QA → PR → Merge | Any feature, bug, or task |
+| `/ceo-plan <description>` | BA → Jira "To Do" → save plan | Analyze first, implement later |
+| `/ceo-run <KEY>` | Load plan → Implement → QA → PR → Merge | Execute a saved `/ceo-plan` |
+| `/ceo-fix <bug>` | Team Lead scope → Implement → QA → PR → Merge | Fast bug fix, no BA needed |
+| `/ceo-fe <description>` | Frontend only → QA → PR → Merge | Frontend-only change |
+| `/ceo-be <description>` | Backend only → QA → PR → Merge | Backend-only change |
+| `/ceo-db <description>` | DB/migration only → QA → PR → Merge | Schema or migration change |
+| `/ceo-int <description>` | Integration only → QA → PR → Merge | Messaging, APIs, services |
+
+**Decision guide:**
+
+```
+Is it a bug?
+  → /ceo-fix "description"    (fast, no BA, scoped by Team Lead)
+
+Is it a known scope (frontend/backend/db)?
+  → /ceo-fe / /ceo-be / /ceo-db / /ceo-int
+
+Do you want to analyze first, implement later?
+  → /ceo-plan   (saves plan to docs/tasks/<KEY>-plan.md)
+  → /ceo-run <KEY>   (runs the saved plan)
+
+Everything else:
+  → /ceo   (full pipeline, handles all cases)
+```
+
+All 8 commands run QA before creating the PR. No command skips QA.
+
+### Branching Model
+
+```
+feature/KEY-slug
+    │
+    └─→ base_branch (develop)   ← auto-merge after QA (fully automatic)
+              │
+              └─→ main          ← /binaa-prd only, requires your review
+```
+
+You only review PRs when promoting to production. Everything else is automatic.
 
 ### Deploy Pipeline
 
-After the PR merges and CI deploys to DEV, promote through environments:
+After CI deploys to DEV, promote through environments:
 
 | Command | Stage | When to run |
 |---------|-------|-------------|
 | `/binaa-sit <version>` | SIT | DEV testing passed |
 | `/binaa-uat` | UAT | SIT QA passed |
-| `/binaa-prd <version>` | PRD | UAT signed off |
+| `/binaa-prd <version>` | PRD | UAT signed off — **opens PR, requires your review** |
 | `/binaa-hotfix <n> <slug> <ver>` | Emergency | Production incident |
 
 Version convention: features → bump MINOR (`1.0.0 → 1.1.0`), bug fixes → bump PATCH (`1.0.0 → 1.0.1`).
 
-### Change any agent's model
+### Individual Agents
+
+| Command | What it does |
+|---------|-------------|
+| `/team-task <description>` | Full pipeline with detailed control |
+| `/team-ba <description>` | BA phase only — write requirements |
+| `/team-lead <context>` | Planning or review phase only |
+| `/team-qa <context>` | QA phase only — verify ACs |
+| `/team-frontend <context>` | Frontend agent standalone |
+| `/team-dotnet <context>` | Backend/DB agent standalone |
+
+### Change Models
 
 ```
 /binaa-models backend github-copilot/gpt-5.3-codex   ← set one agent directly
@@ -187,7 +233,13 @@ Version convention: features → bump MINOR (`1.0.0 → 1.1.0`), bug fixes → b
 
 Agent names: `ba` · `lead` · `qa` · `frontend` · `backend` · `db` · `integration`
 
-The command reads `project.config.md`, updates the relevant field, and syncs agent frontmatter for Claude agents. Changes take effect on the next `/ceo` run.
+### Full Reconfiguration
+
+```
+/binaa reconfig
+```
+
+Change implementation engine, agent enable/disable, base branch, runner CLI, or all model settings.
 
 ### Index the Project
 
@@ -195,75 +247,89 @@ The command reads `project.config.md`, updates the relevant field, and syncs age
 /binaa-index
 ```
 
-Regenerate `docs/project-index.md` — run this after major refactoring, after adding new modules, or before starting work on an unfamiliar area of the codebase. The BA agent generates the index automatically on every task, but you can also refresh it manually anytime.
-
-### Full reconfiguration wizard
-
-```
-/binaa reconfig
-```
-
-Change implementation engine, agent enable/disable, base branch, or all model settings at once.
+Regenerate `docs/project-index.md`. Run after major refactoring or before starting work on an unfamiliar area. The BA agent checks freshness automatically (skips if < 2 hours old) and regenerates only when needed.
 
 ---
 
-## Model Architecture
+## Implementation Engine
 
-devpilot cleanly separates concerns between Claude and opencode:
+Set in `project.config.md → implementation.engine`:
 
-| Phase | Engine | Default Model |
-|-------|--------|--------------|
-| BA (requirements, domain model) | Claude | `claude-haiku-4-5` |
-| Planning + Jira + branch | Claude | `claude-sonnet-4-6` |
-| **All coding (frontend, backend, DB)** | **opencode** | your configured model |
-| QA (test verification) | Claude | `claude-haiku-4-5` |
-| Review + PR + merge | Claude | `claude-sonnet-4-6` |
+| Engine | How it works | When to use |
+|--------|-------------|-------------|
+| `claude` (default) | Claude subagents write all code — fully automatic, no manual step | Default — everything works end-to-end |
+| `opencode` | Claude does BA/planning/QA; you run opencode in terminal for coding | If you prefer a specific opencode model for coding |
 
-**Why this split?** Claude excels at understanding codebases, writing precise requirements, and verifying acceptance criteria. opencode with GitHub Copilot models generates large amounts of correct code quickly across multiple files. Each tool does what it does best.
+Change anytime: `/binaa reconfig`
 
-### Configuring Coding Models (per agent)
+### Claude Engine (Default)
 
-Each developer role can use a different opencode model. Set in `project.config.md`:
+Spawn parallel subagents for all in-scope work:
+- `team-frontend` for Angular/React
+- `team-dotnet` for .NET backend/DB/integration
 
-```yaml
-implementation:
-  engine: opencode                                # opencode | claude
-  model_frontend:    "github-copilot/gpt-4o"     # Angular / React / Vue
-  model_backend:     "github-copilot/gpt-4o"     # .NET / Node / Python
-  model_db:          "github-copilot/gpt-4o"     # DB migrations and SQL
-  model_integration: "github-copilot/gpt-4o"     # Messaging / Services
+No manual steps. Claude handles the full pipeline.
+
+### opencode Engine (Optional)
+
+When `engine: opencode`, Claude writes implementation briefs then outputs:
+
+```
+⏸  IMPLEMENTATION HANDOFF — opencode
+Branch: feature/MSK-42-pdf-export
+
+  opencode --model "github-copilot/gpt-5.3-codex" < docs/implementation/pdf-export-frontend.md
+  opencode --model "github-copilot/gpt-5.3-codex" < docs/implementation/pdf-export-backend.md
+
+When ALL done → run: /ceo resume
 ```
 
-Run `opencode model list` to see all available models. Common choices:
-- `github-copilot/gpt-4o` — best all-round
-- `github-copilot/gpt-3.5-codex` — fast and cheap
-- `github-copilot/claude-3.5-sonnet` — strong reasoning + code quality
+Run each command in your terminal, then `/ceo resume` to continue with QA and PR.
 
-Run `/binaa reconfig` → choose "models" to change any agent's model anytime.
+---
+
+## Running Commands from Any AI Tool
+
+Every command can be run from opencode, Claude CLI, or any AI tool via shell scripts:
+
+```bash
+bash scripts/ceo.sh "add dark mode toggle"
+bash scripts/ceo-fix.sh "login redirect broken after password reset"
+bash scripts/ceo-fe.sh "fix mobile nav overflow"
+bash scripts/ceo-be.sh "add rate limiting to auth endpoints"
+bash scripts/ceo-db.sh "add index on rentals.created_at"
+bash scripts/ceo-int.sh "connect to SendGrid for email notifications"
+```
+
+Configure the runner in `project.config.md`:
+
+```yaml
+runner:
+  cli:   claude          # claude | opencode | custom
+  model: ""              # e.g. github-copilot/gpt-5.3-codex (for opencode runner)
+```
 
 ---
 
 ## Jira Integration
 
-devpilot tracks every task end-to-end in Jira:
+devpilot tracks every task end-to-end in Jira with human-readable comments:
 
-| When | What happens |
+| When | Jira action |
 |------|-------------|
-| Phase 1 (BA) | Ticket created (Task, or Epic + child Tasks for big features) |
-| Phase 2 (Planning) | Ticket description updated with full user story + ACs; moved to **In Progress** |
-| Phase 2 (Planning) | Jira comment: branch created, plan written |
-| Phase 3 (Code) | Jira comment: implementation handoff or agent completion |
-| Phase 4 (QA) | Jira comment: PASS or BLOCKED verdict |
-| Phase 5 (PR merge) | PR merged → ticket moved to **Done** + merge confirmation |
+| Task starts | Ticket created → **In Progress** |
+| Planning done | Comment: branch, plan path, scope, AC count |
+| Implementation done | Comment: commit hashes, agent list |
+| QA done | Comment: PASS/BLOCKED verdict, report path |
+| PR merged | Comment: merged branch, PR URL, duration · Ticket → **Done** |
+
+Task log also written to `docs/tasks/<KEY>.md` — permanent record of what was built.
 
 **Ticket sizing rule:**
 - ≤5 acceptance criteria AND 1-2 agents → single **Task** ticket
-- \>5 ACs OR 3+ agents → one **Epic** + one child **Task** per agent (Frontend, Backend, DB, Integration)
+- >5 ACs OR 3+ agents → one **Epic** + one child **Task** per agent
 
-**Critical invariant:** The Jira ticket is **never closed before the PR is merged.** Phase 5 verifies the PR state is `MERGED` before calling the close script.
-
-### Supported Jira issue types
-devpilot uses only: `Task`, `Epic`. No `Story` or `Bug` types (these are not available in all Jira Cloud projects).
+**Supported Jira issue types:** `Task`, `Epic` only (available in all Jira Cloud projects).
 
 ---
 
@@ -275,7 +341,7 @@ devpilot uses only: `Task`, `Epic`. No `Story` or `Bug` types (these are not ava
 project_name: "my-app"
 project_type: fullstack
 ticket_prefix: "APP"
-base_branch: develop          # branch all PRs target
+base_branch: develop          # feature PRs auto-merge here; production PR is separate
 
 stack:
   frontend: angular
@@ -293,33 +359,37 @@ agents:
   qa:          { enabled: true }
 
 implementation:
-  engine: opencode             # opencode | claude
-  model_frontend:    "github-copilot/gpt-4o"
-  model_backend:     "github-copilot/gpt-4o"
-  model_db:          "github-copilot/gpt-4o"
-  model_integration: "github-copilot/gpt-4o"
+  engine: claude                                # claude (default) | opencode
+  model_frontend:    "claude-sonnet-4-6"
+  model_backend:     "claude-sonnet-4-6"
+  model_db:          "claude-sonnet-4-6"
+  model_integration: "claude-sonnet-4-6"
 
 models:
   ba:         { tier1: claude-haiku-4-5-20251001 }
   team_lead:  { tier1: claude-sonnet-4-6 }
   qa:         { tier1: claude-haiku-4-5-20251001 }
-```
 
-Edit directly or run `/binaa reconfig` for the interactive wizard.
+runner:
+  cli:   claude                                 # claude | opencode | custom
+  model: ""                                     # e.g. github-copilot/gpt-5.3-codex
+```
 
 ---
 
 ## Token Efficiency — Project Index
 
-On every task, the BA agent generates a **project index** before reading any code:
+On every task, the BA agent checks for a fresh project index before doing anything:
 
 ```bash
-bash scripts/generate-project-index.sh
+if find docs/project-index.md -mmin -120 2>/dev/null | grep -q .; then
+  echo "Project index is fresh — skipping regeneration"
+else
+  bash scripts/generate-project-index.sh
+fi
 ```
 
-This produces `docs/project-index.md` — a map of every significant file in the project with a one-line label. The BA reads this index first, then reads only the 3-8 most relevant files for the task. This reduces token usage by ~80% compared to scanning the whole codebase.
-
-The index is committed to git and updated automatically at the start of every BA phase.
+`docs/project-index.md` is a map of every significant file with a one-line label. The BA reads this first, then reads only the 3-8 most relevant files for the task. This reduces token usage by ~80% compared to scanning the whole codebase.
 
 ---
 
@@ -327,14 +397,16 @@ The index is committed to git and updated automatically at the start of every BA
 
 | Artifact | Location |
 |----------|---------|
+| Task log (permanent record) | `docs/tasks/<KEY>.md` |
 | Project index | `docs/project-index.md` |
 | Requirements | `docs/requirements/<slug>.md` |
 | Domain model | `docs/domain-models/<slug>.md` |
 | Implementation plan | `docs/plans/<slug>.md` |
-| Implementation briefs (for opencode) | `docs/implementation/<slug>-frontend.md`, `<slug>-backend.md`, etc. |
+| Implementation briefs (opencode engine) | `docs/implementation/<slug>-frontend.md`, etc. |
 | QA report | `docs/qa/<slug>.md` |
 | Architecture Decision Records | `docs/adrs/ADR-<N>-<slug>.md` |
 | Code review report | `docs/reviews/<slug>.md` |
+| Saved plans (ceo-plan) | `docs/tasks/<KEY>-plan.md` |
 
 ---
 
@@ -380,27 +452,40 @@ devpilot/
 │   │   ├── team-dotnet.md
 │   │   └── team-qa.md
 │   └── commands/                      ← slash commands
-│       ├── ceo.md                     ← /ceo — primary entry point
-│       ├── team-task.md               ← /team-task — full 5-phase workflow
+│       ├── ceo.md                     ← /ceo — primary entry point (full pipeline)
+│       ├── ceo-plan.md                ← /ceo-plan — analyze + save plan, no code yet
+│       ├── ceo-run.md                 ← /ceo-run <KEY> — execute a saved plan
+│       ├── ceo-fix.md                 ← /ceo-fix — fast bug fix (no BA)
+│       ├── ceo-fe.md                  ← /ceo-fe — frontend agent only
+│       ├── ceo-be.md                  ← /ceo-be — backend agent only
+│       ├── ceo-db.md                  ← /ceo-db — DB/migration agent only
+│       ├── ceo-int.md                 ← /ceo-int — integration agent only
+│       ├── team-task.md               ← /team-task — full pipeline (detailed control)
 │       ├── team-ba.md                 ← /team-ba — BA agent standalone
 │       ├── team-lead.md               ← /team-lead — Team Lead standalone
 │       ├── team-qa.md                 ← /team-qa — QA agent standalone
+│       ├── binaa.md                   ← /binaa — command router + decision guide
 │       ├── binaa-models.md            ← /binaa-models — set any agent's model
 │       ├── binaa-index.md             ← /binaa-index — refresh project index
+│       ├── binaa-reconfig.md          ← /binaa reconfig — full config wizard
 │       ├── binaa-sit.md               ← /binaa-sit — promote to SIT
 │       ├── binaa-uat.md               ← /binaa-uat — promote to UAT
-│       ├── binaa-prd.md               ← /binaa-prd — promote to PRD
-│       ├── binaa-hotfix.md            ← /binaa-hotfix — emergency deploy
-│       └── binaa-reconfig.md          ← /binaa reconfig — model config wizard
+│       ├── binaa-prd.md               ← /binaa-prd — promote to PRD (human review)
+│       └── binaa-hotfix.md            ← /binaa-hotfix — emergency deploy
 │
 ├── scripts/
+│   ├── ceo.sh                         ← bash scripts/ceo.sh "task" (runs /ceo from any AI)
+│   ├── ceo-fix.sh                     ← bash scripts/ceo-fix.sh "bug"
+│   ├── ceo-fe.sh / ceo-be.sh          ← single-agent runners
+│   ├── ceo-db.sh / ceo-int.sh
+│   ├── ceo-plan.sh / ceo-run.sh
+│   ├── run-command.sh                 ← generic AI runner (reads command .md, pipes to CLI)
 │   ├── git-flow.sh                    ← feature/hotfix/release branch helpers
-│   ├── new-feature.sh                 ← legacy feature branch helper
 │   ├── generate-project-index.sh      ← build docs/project-index.md (token savings)
 │   ├── create-jira-ticket.sh          ← create a Task ticket
 │   ├── create-jira-epic.sh            ← create Epic + child Tasks for big features
-│   ├── update-jira-status.sh          ← move ticket through workflow (In Progress → Done)
-│   ├── update-jira-description.sh     ← update ticket body with user story
+│   ├── update-jira-status.sh          ← move ticket through workflow
+│   ├── update-jira-description.sh     ← update ticket body
 │   ├── add-jira-comment.sh            ← log agent activity to Jira
 │   ├── deploy-dev.sh                  ← trigger DEV deploy
 │   ├── deploy-sit.sh                  ← trigger SIT deploy
@@ -409,13 +494,14 @@ devpilot/
 │
 └── docs/                              ← task artifacts (committed to git)
     ├── project-index.md               ← generated codebase map (auto-updated)
-    ├── requirements/                  ← BA requirements docs per task
-    ├── domain-models/                 ← domain model diagrams per task
-    ├── plans/                         ← implementation plans per task
-    ├── implementation/                ← opencode briefs per agent per task
-    ├── qa/                            ← QA reports per task
+    ├── tasks/                         ← permanent task logs (<KEY>.md per task)
+    ├── requirements/                  ← BA requirements docs
+    ├── domain-models/                 ← domain model diagrams
+    ├── plans/                         ← implementation plans
+    ├── implementation/                ← opencode briefs per agent (opencode engine only)
+    ├── qa/                            ← QA reports
     ├── adrs/                          ← Architecture Decision Records
-    ├── reviews/                       ← code review reports per task
+    ├── reviews/                       ← code review reports
     └── fallback/                      ← model limit fallback prompts (gitignored)
 ```
 
@@ -425,30 +511,32 @@ devpilot/
 
 When a production incident is detected, `/ceo "production is down — ..."` triggers expedited mode:
 
-1. **Phase 1 (BA)** — skipped (no requirements doc needed for hotfixes)
-2. **Phase 2 (Team Lead)** — branches from latest production tag, writes a minimal plan
-3. **Phase 3 (Code)** — implementation brief for the affected layer only (frontend OR backend)
-4. **Phase 4 (QA)** — smoke test of the specific broken behavior + regression around it
-5. **Phase 5 (Review + PR)** — PR targets base branch; after merge, cherry-picks back to develop
+1. **Phase 1 (BA)** — skipped
+2. **Phase 2 (Team Lead)** — branches from latest production tag, writes minimal plan
+3. **Phase 3 (Code)** — affected layer only (frontend OR backend)
+4. **Phase 4 (QA)** — smoke test of broken behavior + regression check
+5. **Phase 5 (Review + PR)** — PR targets base branch; after merge, cherry-picks to develop
+
+Or run directly: `/binaa-hotfix <ticket-num> <slug> <version>`
 
 ---
 
 ## Troubleshooting
 
+### Auto-merge failed
+If `gh pr merge` fails, the command prints `⚠️ Auto-merge failed` and leaves the PR open in "In Review". This usually means GitHub branch protection rules require CI checks to pass first. The PR will auto-merge once CI passes, or merge it manually.
+
 ### "Specify a valid issue type" error from Jira
 Your Jira project may not have the `Story` type enabled. devpilot always uses `Task` and `Epic` — check that both exist in your project settings.
 
 ### opencode handoff not appearing
-Check `project.config.md → implementation.engine`. If it reads `claude` instead of `opencode`, run `/binaa reconfig` to switch.
+Check `project.config.md → implementation.engine`. If it reads `claude`, all implementation is handled by Claude subagents automatically. Set it to `opencode` if you want the manual terminal handoff.
 
 ### Feature branch created from wrong branch
 Check `project.config.md → base_branch`. The `git-flow.sh feature-start` script reads this value. If missing, it falls back to `develop`.
 
-### Jira ticket closed before PR merged
-This should not happen — Phase 5 verifies `gh pr view <number> --json state` is `MERGED` before calling `update-jira-status.sh`. If it does happen, it means `gh pr merge` failed silently; check GitHub branch protection rules.
-
-### Project index not found
-Run: `bash scripts/generate-project-index.sh` — this creates `docs/project-index.md`. The BA agent does this automatically, but you can also run it manually anytime.
+### Project index is stale
+Run: `bash scripts/generate-project-index.sh` — regenerates `docs/project-index.md`. Or run `/binaa-index` in Claude Code.
 
 ---
 
