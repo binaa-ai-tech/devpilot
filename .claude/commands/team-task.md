@@ -422,6 +422,8 @@ If BLOCKED: fix the issue (spawn the relevant agent again), then re-run QA.
    and review it against `.devpilot/skills/code-review.md` and `.devpilot/skills/security-scan.md`
    (and `.devpilot/rules.md`):
    - Tag findings 🔴 BLOCKER / 🟡 SHOULD / 🟢 NIT.
+   - Run the dependency audit: `bash scripts/audit.sh` — treat new high/critical
+     vulnerabilities as 🔴.
    - **Any 🔴 → fix it (re-spawn the owning agent), then re-review.** Never open a PR
      with an open 🔴 or a BLOCKED QA verdict.
    - Record the verdict (APPROVED / CHANGES REQUESTED) in the review report.

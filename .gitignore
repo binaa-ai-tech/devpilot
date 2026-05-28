@@ -1,4 +1,5 @@
 .devpilot/config.sh
+.devpilot/.scope-lock
 .env
 .env.local
 .env.*.local

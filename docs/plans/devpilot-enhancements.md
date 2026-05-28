@@ -264,6 +264,25 @@ working alias so existing installs keep functioning.
 Note on #6: `max` mode remains sequential branch-isolation (correct; a `git worktree`
 parallel variant is a possible future optimization, not required for correctness).
 
+## Follow-up enhancements (round 3) — ✅ done
+
+| Item | Artifacts |
+|------|-----------|
+| Pre-flight health check | `scripts/doctor.sh` + `/binaa-doctor` |
+| Task dashboard | `scripts/status.sh` + `/binaa-status` |
+| Dependency audit gate | `scripts/audit.sh` (npm/pip/dotnet/go) wired into team-task Phase 5; `/binaa-metrics` via `scripts/metrics.sh` |
+| PR review-response loop | `.claude/commands/ceo-review-fix.md` |
+| Real-time scope enforcement | `scripts/scope-hook.sh` (PreToolUse) + `.claude/settings.json`; `ceo-subdomain` arms/releases `.devpilot/.scope-lock` |
+| Changelog automation | `scripts/changelog.sh` wired into `/binaa-prd` |
+| Rollback | `scripts/rollback.sh` + `/binaa-rollback` |
+| Metrics report | `scripts/metrics.sh` + `/binaa-metrics` |
+| Docs language | `language:` in config + installer; BA writes docs in it |
+| Commit-hook wiring | `scripts/install-git-hooks.sh` (Conventional Commits), run by installer |
+| Monorepo awareness | `generate-project-index.sh` emits a Workspace Packages section |
+
+Tests: `tests/run.sh` now has 22 assertions (all pass), covering the new
+`scope-hook`, `doctor`, `status`, `metrics`, `audit`, and `changelog` scripts.
+
 ---
 
 ## Risks / notes

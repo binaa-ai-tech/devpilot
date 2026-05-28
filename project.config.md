@@ -23,6 +23,12 @@ tracker:
 
 merge_policy: auto               # auto | pr-only
 
+## Docs Language
+# Human language for BA requirements, QA, and review docs. Code, identifiers,
+# commit messages, and branch names stay in English regardless.
+
+language: en                     # en | ar | fr | es | de | …
+
 ## Tech Stack
 
 stack:

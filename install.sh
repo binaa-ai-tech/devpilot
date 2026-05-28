@@ -80,9 +80,9 @@ run_update() {
   TEMPLATE_TEAM="requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md"
   SKILLS="get-shit-done.md spec-first.md security-scan.md performance-review.md architecture-guard.md self-heal.md definition-of-done.md compact-context.md core-rules.md code-review.md test-strategy.md debug-method.md estimation-and-slicing.md tech-debt.md observability.md release-discipline.md status-reporting.md README.md"
   CHECKLISTS="feature.md bugfix.md hotfix.md"
-  CMDS="ceo.md ceo-plan.md ceo-run.md ceo-fix.md ceo-fe.md ceo-be.md ceo-db.md ceo-int.md ceo-issue.md ceo-subdomain.md binaa.md binaa-sit.md binaa-uat.md binaa-prd.md binaa-hotfix.md binaa-reconfig.md binaa-models.md binaa-index.md team-task.md team-ba.md team-lead.md team-frontend.md team-dotnet.md team-backend.md team-qa.md"
+  CMDS="ceo.md ceo-plan.md ceo-run.md ceo-fix.md ceo-fe.md ceo-be.md ceo-db.md ceo-int.md ceo-issue.md ceo-subdomain.md ceo-review-fix.md binaa.md binaa-sit.md binaa-uat.md binaa-prd.md binaa-hotfix.md binaa-reconfig.md binaa-models.md binaa-index.md binaa-doctor.md binaa-status.md binaa-metrics.md binaa-rollback.md team-task.md team-ba.md team-lead.md team-frontend.md team-dotnet.md team-backend.md team-qa.md"
   AGENTS_LIST="team-lead.md team-ba.md team-frontend.md team-dotnet.md team-backend.md team-qa.md"
-  SCRIPTS="git-flow.sh new-feature.sh run-command.sh checkpoint.sh devpilot-config.sh run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh session-start.sh deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh create-jira-ticket.sh create-jira-epic.sh update-jira-status.sh update-jira-description.sh add-jira-comment.sh generate-project-index.sh ceo.sh ceo-fix.sh ceo-plan.sh ceo-run.sh ceo-fe.sh ceo-be.sh ceo-db.sh ceo-int.sh"
+  SCRIPTS="git-flow.sh new-feature.sh run-command.sh checkpoint.sh devpilot-config.sh run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh create-jira-ticket.sh create-jira-epic.sh update-jira-status.sh update-jira-description.sh add-jira-comment.sh generate-project-index.sh ceo.sh ceo-fix.sh ceo-plan.sh ceo-run.sh ceo-fe.sh ceo-be.sh ceo-db.sh ceo-int.sh"
 
   info "Refreshing .devpilot/rules..."
   fetch ".devpilot/rules.md" ".devpilot/rules.md"
@@ -437,6 +437,11 @@ case "${MP_CHOICE:-1}" in
 esac
 info "Merge policy: $MERGE_POLICY"
 
+echo ""
+DOC_LANGUAGE="en"
+ask "  Docs language (en, ar, fr, …) [en]: "; read -r LANG_IN; [ -n "$LANG_IN" ] && DOC_LANGUAGE="$LANG_IN"
+info "Docs language: $DOC_LANGUAGE  (code stays English)"
+
 # ═════════════════════════════════════════════════════════════════════════════
 # STEP 9 — DOWNLOAD / COPY FILES
 # ═════════════════════════════════════════════════════════════════════════════
@@ -492,9 +497,10 @@ fetch ".devpilot/config/models.md" ".devpilot/config/models.md"
 # .claude/ — Claude Code commands + agent definitions
 info "Installing .claude/..."
 for f in ceo.md ceo-plan.md ceo-run.md ceo-fix.md ceo-fe.md ceo-be.md ceo-db.md ceo-int.md \
-         ceo-issue.md ceo-subdomain.md \
+         ceo-issue.md ceo-subdomain.md ceo-review-fix.md \
          binaa.md binaa-sit.md binaa-uat.md binaa-prd.md binaa-hotfix.md \
          binaa-reconfig.md binaa-models.md binaa-index.md \
+         binaa-doctor.md binaa-status.md binaa-metrics.md binaa-rollback.md \
          team-task.md team-ba.md team-lead.md team-frontend.md team-dotnet.md team-backend.md team-qa.md; do
   fetch ".claude/commands/$f" ".claude/commands/$f"
 done
@@ -534,6 +540,7 @@ fi
 info "Installing scripts/..."
 for f in git-flow.sh new-feature.sh run-command.sh checkpoint.sh devpilot-config.sh \
           run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh session-start.sh \
+          doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh \
           deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh \
           create-jira-ticket.sh create-jira-epic.sh \
           update-jira-status.sh update-jira-description.sh \
@@ -562,7 +569,7 @@ done
 
 # .gitignore additions
 if [ -f ".gitignore" ]; then
-  for entry in ".devpilot/config.sh" ".env" ".env.local" "docs/fallback/"; do
+  for entry in ".devpilot/config.sh" ".devpilot/.scope-lock" ".env" ".env.local" "docs/fallback/"; do
     grep -qF "$entry" .gitignore || echo "$entry" >> .gitignore
   done
 fi
@@ -594,6 +601,11 @@ tracker:
 # pr-only — devpilot opens the PR and stops; a human merges it
 
 merge_policy: $MERGE_POLICY
+
+## Docs Language
+# Human language for BA/QA/review docs. Code & commits stay English.
+
+language: $DOC_LANGUAGE
 
 ## Tech Stack
 
@@ -713,6 +725,9 @@ if git rev-parse --git-dir > /dev/null 2>&1; then
   else
     info "Branch: $BASE_BRANCH ✅"
   fi
+
+  # Install the Conventional-Commits commit-msg hook.
+  bash scripts/install-git-hooks.sh 2>/dev/null || warn "Could not install git hooks — run: bash scripts/install-git-hooks.sh"
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════

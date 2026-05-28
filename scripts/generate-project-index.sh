@@ -224,6 +224,18 @@ while IFS= read -r f; do
 done < <(find "$ROOT" -name "appsettings*.json" \
   ! -path "*/obj/*" ! -path "*/bin/*" -type f 2>/dev/null | sort)
 
+# ── Workspace packages (monorepo awareness) ───────────────────────────────────
+section "Workspace Packages (package roots — scope work to one)"
+{
+  find "$ROOT" \( -name "package.json" -o -name "go.mod" -o -name "pyproject.toml" -o -name "*.csproj" \) \
+    ! -path "*/node_modules/*" ! -path "*/.git/*" ! -path "*/dist/*" \
+    ! -path "*/obj/*" ! -path "*/bin/*" ! -path "*/.angular/*" -type f 2>/dev/null
+} | sort | while IFS= read -r f; do
+  rel="${f#$ROOT/}"
+  dir=$(dirname "$rel"); [ "$dir" = "." ] && dir="(root)"
+  printf '  %-50s — %s\n' "$dir" "$(basename "$f")" >> "$OUT"
+done
+
 # ── Existing docs ─────────────────────────────────────────────────────────────
 section "Project Docs (read for domain context)"
 for f in "CLAUDE.md" "AGENTS.md" "README.md"; do

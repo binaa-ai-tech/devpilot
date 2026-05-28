@@ -60,10 +60,12 @@ Change anytime with `/binaa reconfig` or `/binaa-models`.
 
 | Command | When to use |
 |---------|-------------|
-| `/ceo <description>` | Primary entry point — any task |
+| `/ceo <description>` | Primary entry point — any task (`--claude`/`--opencode`/`--max`) |
 | `/ceo resume` | After opencode fallback completes |
+| `/ceo-review-fix <PR>` | Address PR review comments → push |
 | `/team-task <description>` | Full team flow with more control |
-| `/team-ba` / `/team-lead` / `/team-frontend` / `/team-dotnet` / `/team-qa` | Individual agent |
+| `/team-ba` / `/team-lead` / `/team-frontend` / `/team-backend` / `/team-qa` | Individual agent |
+| `/binaa-doctor` / `/binaa-status` / `/binaa-metrics` | Health check / task dashboard / metrics |
 | `/binaa reconfig` | Re-run model configuration wizard |
 
 ## Deploy Pipeline
@@ -72,8 +74,9 @@ Change anytime with `/binaa reconfig` or `/binaa-models`.
 |---------|-------|------|
 | `/binaa-sit <version>` | SIT | After DEV testing passes |
 | `/binaa-uat` | UAT | After SIT QA passes |
-| `/binaa-prd <version>` | PRD | After UAT sign-off |
+| `/binaa-prd <version>` | PRD | After UAT sign-off (assembles CHANGELOG) |
 | `/binaa-hotfix <n> <slug> <version>` | Emergency | Production issue |
+| `/binaa-rollback [version]` | Rollback | Revert to a previous release tag |
 
 ---
 

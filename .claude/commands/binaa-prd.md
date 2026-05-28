@@ -11,7 +11,14 @@ _(e.g. `/binaa-prd 1.1.0`)_
 
 1. **Confirm UAT is signed off** — ask user to confirm UAT testing is complete before proceeding
 
-2. **Finish the release**:
+2. **Assemble the changelog** for this version (conventional commits since the last tag):
+
+   ```bash
+   bash scripts/changelog.sh $ARGUMENTS
+   git add CHANGELOG.md && git commit -m "docs(changelog): v$ARGUMENTS" || true
+   ```
+
+3. **Finish the release**:
 
    ```bash
    bash scripts/git-flow.sh release-finish $ARGUMENTS
@@ -24,15 +31,15 @@ _(e.g. `/binaa-prd 1.1.0`)_
    - Push `main`, `develop`, and `v$ARGUMENTS` tag
    - Delete the release branch
 
-3. **CI triggers automatically** on the `main` push:
+4. **CI triggers automatically** on the `main` push:
    - lint → test → build → ✅ **prd-ready** (marks commit safe, does NOT deploy)
 
-4. **Manually trigger the PRD deploy** (separate workflow, zero auto-deploy risk):
+5. **Manually trigger the PRD deploy** (separate workflow, zero auto-deploy risk):
    - Open: https://github.com/<org>/<repo>/actions/workflows/deploy-prd.yml
    - Click **"Run workflow"** → select branch `main`
    - Type `deploy` in the confirmation box → click **"Run workflow"**
 
-5. **Close Jira ticket**:
+6. **Close Jira ticket**:
    ```bash
    ./scripts/update-jira-status.sh <KEY> "Done"
    ```

@@ -1,4 +1,4 @@
-# devpilot `v2.2.0`
+# devpilot `v2.3.0`
 
 > One command. An AI team delivers the full feature — from BA breakdown to merged PR. Compatible with Claude Code, OpenCode, and Antigravity.
 
@@ -186,6 +186,7 @@ The agent receives an explicit `SCOPE LOCK` constraint. Any file outside the dec
 | `/ceo-issue <bug>` | Issue triage → per-layer locked fix |
 | `/ceo-subdomain <scope> <task>` | Layer-locked change (`frontend`/`backend`/`db`/`security`) |
 | `/ceo-fe` · `/ceo-be` · `/ceo-db` · `/ceo-int` | Single-agent implementation |
+| `/ceo-review-fix <PR>` | Read PR review comments → apply fixes → push |
 
 **Individual agents**
 
@@ -200,7 +201,8 @@ The agent receives an explicit `SCOPE LOCK` constraint. Any file outside the dec
 |---------|---------|
 | `/binaa reconfig` · `/binaa-models` | Re-run the wizard / set per-agent models |
 | `/binaa-index` | Refresh the project index |
-| `/binaa-sit` · `/binaa-uat` · `/binaa-prd` · `/binaa-hotfix` | Promote DEV→SIT→UAT→PRD / emergency hotfix |
+| `/binaa-doctor` · `/binaa-status` · `/binaa-metrics` | Pre-flight health check · task dashboard · throughput metrics |
+| `/binaa-sit` · `/binaa-uat` · `/binaa-prd` · `/binaa-hotfix` · `/binaa-rollback` | Promote DEV→SIT→UAT→PRD · hotfix · roll back a release |
 | `bash install.sh --update` | Refresh devpilot itself (config preserved) |
 
 ---
@@ -235,10 +237,13 @@ Nothing merges until it passes:
 
 - **Definition of Done** — per-role checklist (`.devpilot/skills/definition-of-done.md`).
 - **Code-review gate** — Team Lead reviews the diff with severity tags (🔴/🟡/🟢); an open 🔴 blocks the PR.
-- **Security scan** — checklist over the diff; zero 🔴 CRITICAL to pass.
+- **Security scan + dependency audit** — checklist over the diff plus `scripts/audit.sh` (npm/pip/dotnet/go); new high/critical CVEs block the PR.
 - **QA verdict** — every acceptance criterion has a test; PASS or BLOCKED.
-- **Scope guard** — `scripts/scope-guard.sh` enforces layer locks in `/ceo-subdomain`.
+- **Scope guard** — `scripts/scope-guard.sh` (post-check) **and** a real-time `PreToolUse` hook (`scripts/scope-hook.sh`) that blocks out-of-layer writes during `/ceo-subdomain`.
+- **Conventional commits** — a `commit-msg` git hook enforces the format locally.
 - **Merge policy** — `auto` (squash-merge) or `pr-only` (a human merges); production always needs human sign-off.
+
+Run `/binaa-doctor` before starting to catch setup problems early.
 
 ---
 
@@ -282,6 +287,7 @@ tracker:
   type: local          # local | github | jira  — local = zero setup, logs to docs/tasks/
 
 merge_policy: auto      # auto = devpilot squash-merges the PR | pr-only = a human merges
+language: en            # human language for BA/QA/review docs (code stays English)
 
 stack:
   frontend: angular    # angular | react | vue | nextjs | none
@@ -483,8 +489,15 @@ scripts/
   track.sh           # Issue-tracker abstraction (local | github | jira)
   open-pr.sh         # Create/merge PR via gh, or print compare URL / use GitHub MCP
   scope.sh           # Rank task-relevant files from the index (retrieve, don't scan)
-  scope-guard.sh     # Enforce layer locks in /ceo-subdomain
+  scope-guard.sh     # Enforce layer locks in /ceo-subdomain (post-check)
+  scope-hook.sh      # PreToolUse hook — block out-of-layer writes in real time
   session-start.sh   # SessionStart warm-up (chmod scripts + refresh index)
+  doctor.sh          # Pre-flight health check
+  status.sh / metrics.sh   # Task dashboard / throughput metrics
+  audit.sh           # Stack-aware dependency vulnerability scan
+  changelog.sh       # Assemble CHANGELOG.md from conventional commits
+  rollback.sh        # Prepare a safe rollback to a previous release tag
+  install-git-hooks.sh     # Install the Conventional-Commits commit-msg hook
   run-command.sh     # Generic AI command runner — routes to claude | opencode | antigravity
   checkpoint.sh      # Task state persistence engine
   devpilot-config.sh # Credential management + Jira validation CLI

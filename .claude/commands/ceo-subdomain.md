@@ -118,6 +118,12 @@ bash scripts/checkpoint.sh write \
 
 ## Step 2 — Layer-Locked Implementation
 
+**Arm the real-time lock first** so the PreToolUse hook (`scripts/scope-hook.sh`)
+blocks any out-of-layer write while the agent runs:
+```bash
+mkdir -p .devpilot && echo "$SCOPE" > .devpilot/.scope-lock
+```
+
 Spawn the target agent. The agent is **forcefully lock-down restricted** with zero privileges to touch files outside its specific domain scope.
 
 ### Scope Locks Definition
@@ -187,6 +193,10 @@ Proceed to QA when it exits 0.
 After the agent finishes, verify it stayed inside the layer:
 ```bash
 STRICT=1 bash scripts/scope-guard.sh "$SCOPE" "$BASE_BRANCH"
+```
+Then release the real-time lock now that implementation is done:
+```bash
+rm -f .devpilot/.scope-lock
 ```
 If it reports out-of-scope files, the lock was violated — revert those files (or
 re-brief the agent to undo them) before continuing. Only proceed to QA once the
