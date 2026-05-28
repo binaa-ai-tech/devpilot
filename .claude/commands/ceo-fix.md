@@ -37,7 +37,7 @@ Validate: if `project.config.md` is missing or `base_branch` is empty, stop and 
 
 ## Step 1 — Team Lead: Scope the fix
 
-**Adopt Team Lead persona.** Read `.devpilot/prompts/team/lead-plan.md`.
+**Adopt Team Lead persona.** Read `.devpilot/prompts/team/lead-plan.md` and `.devpilot/skills/debug-method.md` (reproduce → localize → root cause before changing code).
 
 1. Ensure project index is fresh:
    ```bash

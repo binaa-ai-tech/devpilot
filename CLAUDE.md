@@ -92,9 +92,14 @@ Change anytime: `/binaa reconfig`
 ## Tech Stack
 
 - **Frontend:** Angular 21+ / React
-- **Backend:** .NET (C#), SQL Server
-- **Rules:** `.devpilot/rules.md`
-- **Skills:** `.devpilot/skills/` (get-shit-done, security-scan, performance-review, architecture-guard, self-heal, definition-of-done)
+- **Backend:** .NET (C#), SQL Server (stack-aware — adapts to node/python/go/java)
+- **Rules:** `.devpilot/rules.md` (router) + `.devpilot/rules/<stack>.md` snippets
+- **Skills:** `.devpilot/skills/` — the team's operating manual. Index: `.devpilot/skills/README.md`.
+  Execution: get-shit-done, self-heal, compact-context, core-rules.
+  Planning: spec-first, estimation-and-slicing.
+  Build: architecture-guard, test-strategy, observability, performance-review.
+  Quality/ship: code-review, security-scan, definition-of-done, release-discipline.
+  Cross-cutting: debug-method, tech-debt, status-reporting.
 
 ---
 

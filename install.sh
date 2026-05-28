@@ -416,7 +416,8 @@ for f in feature.md bugfix.md hotfix.md; do
   fetch ".devpilot/checklists/$f" ".devpilot/checklists/$f"
 done
 
-for f in get-shit-done.md spec-first.md security-scan.md performance-review.md architecture-guard.md self-heal.md definition-of-done.md compact-context.md core-rules.md; do
+for f in get-shit-done.md spec-first.md security-scan.md performance-review.md architecture-guard.md self-heal.md definition-of-done.md compact-context.md core-rules.md \
+         code-review.md test-strategy.md debug-method.md estimation-and-slicing.md tech-debt.md observability.md release-discipline.md status-reporting.md README.md; do
   fetch ".devpilot/skills/$f" ".devpilot/skills/$f"
 done
 
