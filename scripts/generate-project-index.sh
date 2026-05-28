@@ -79,9 +79,10 @@ scan() {
   while IFS= read -r f; do
     [ -f "$f" ] || continue
     local rel="${f#$ROOT/}"
-    # Extract a short class/function name from the file
+    # Extract up to 3 declared symbols (multi-language) for a richer scan signal.
     local decl
-    decl=$(grep -m1 -oE '(class|interface|enum|function|const) [A-Za-z][A-Za-z0-9_]+' "$f" 2>/dev/null | head -1 || true)
+    decl=$(grep -m3 -oE '(export class|export function|export const|public class|class|interface|enum|function|const|def|func|type) [A-Za-z][A-Za-z0-9_]+' "$f" 2>/dev/null \
+      | awk '{print $NF}' | sort -u | head -3 | paste -sd, - || true)
     if [ -z "$decl" ]; then
       decl=$(basename "$f" | sed 's/\.[^.]*$//')
     fi
@@ -222,6 +223,18 @@ while IFS= read -r f; do
   printf '  %s\n' "$rel" >> "$OUT"
 done < <(find "$ROOT" -name "appsettings*.json" \
   ! -path "*/obj/*" ! -path "*/bin/*" -type f 2>/dev/null | sort)
+
+# ── Workspace packages (monorepo awareness) ───────────────────────────────────
+section "Workspace Packages (package roots — scope work to one)"
+{
+  find "$ROOT" \( -name "package.json" -o -name "go.mod" -o -name "pyproject.toml" -o -name "*.csproj" \) \
+    ! -path "*/node_modules/*" ! -path "*/.git/*" ! -path "*/dist/*" \
+    ! -path "*/obj/*" ! -path "*/bin/*" ! -path "*/.angular/*" -type f 2>/dev/null
+} | sort | while IFS= read -r f; do
+  rel="${f#$ROOT/}"
+  dir=$(dirname "$rel"); [ "$dir" = "." ] && dir="(root)"
+  printf '  %-50s — %s\n' "$dir" "$(basename "$f")" >> "$OUT"
+done
 
 # ── Existing docs ─────────────────────────────────────────────────────────────
 section "Project Docs (read for domain context)"

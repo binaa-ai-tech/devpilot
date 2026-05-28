@@ -37,7 +37,7 @@ Validate: if `project.config.md` is missing or `base_branch` is empty, stop and 
 
 ## Step 1 — Team Lead: Scope the fix
 
-**Adopt Team Lead persona.** Read `.devpilot/prompts/team/lead-plan.md`.
+**Adopt Team Lead persona.** Read `.devpilot/prompts/team/lead-plan.md` and `.devpilot/skills/debug-method.md` (reproduce → localize → root cause before changing code).
 
 1. Ensure project index is fresh:
    ```bash
@@ -124,13 +124,13 @@ Spawn only the relevant agent(s) — **do not spawn agents that have no work**.
 
 ### Engine: `claude`
 
-**Backend fix** → spawn `subagent_type: "team-dotnet"`:
+**Backend fix** → spawn `subagent_type: "team-backend"`:
 > Bug fix: `<$ARGUMENTS>`. Branch: `<BRANCH>`. Root cause: `<root cause>`. Fix: `<exact change>`. Read `.devpilot/skills/self-heal.md` and `.devpilot/rules.md`. Make only the minimal required change. Run build + tests. Commit with `fix(<scope>): <description>`. Report the commit hash and what changed.
 
 **Frontend fix** → spawn `subagent_type: "team-frontend"`:
 > Bug fix: `<$ARGUMENTS>`. Branch: `<BRANCH>`. Root cause: `<root cause>`. Fix: `<exact change>`. Read `.devpilot/skills/self-heal.md` and `.devpilot/rules.md`. Make only the minimal required change. Run lint + build. Commit with `fix(<scope>): <description>`. Report the commit hash and what changed.
 
-**DB fix** → spawn `subagent_type: "team-dotnet"`:
+**DB fix** → spawn `subagent_type: "team-backend"`:
 > DB bug fix: `<$ARGUMENTS>`. Branch: `<BRANCH>`. Fix: `<exact migration or query change>`. Minimal change only. Commit. Report hash.
 
 ### Engine: `opencode`
@@ -187,21 +187,20 @@ If BLOCKED: fix the issue, then re-run QA.
 END_TIME=$(date '+%Y-%m-%d %H:%M:%S')
 ALL_COMMITS=$(git log ${BASE_BRANCH}..HEAD --oneline 2>/dev/null | awk '{print $1}' | head -10 | tr '\n' ' ')
 
-PR_URL=$(gh pr create \
-  --base "$BASE_BRANCH" \
-  --title "$KEY: fix: <summary>" \
-  --body "## Bug Fix: $ARGUMENTS
+cat > /tmp/devpilot-pr-body-$$.md << EOF
+## Bug Fix: $ARGUMENTS
 
 **Root cause:** <root cause>
 **Fix:** <what changed>
 **Risk:** <side effects or none>
 **QA:** PASS — docs/qa/<SLUG>.md
 
-Commits: $ALL_COMMITS" | tail -1)
-PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+Commits: $ALL_COMMITS
+EOF
 
 # Auto-merge into develop — production (main) requires /binaa-prd with human sign-off
-if gh pr merge "$PR_NUM" --squash --delete-branch 2>&1; then
+PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$KEY: fix: <summary>" /tmp/devpilot-pr-body-$$.md)
+if [ $? -eq 0 ]; then
   bash scripts/update-jira-status.sh "$KEY" "Done"
   bash scripts/add-jira-comment.sh "$KEY" "✅ Merged into $BASE_BRANCH [$END_TIME]
 PR: $PR_URL
@@ -210,7 +209,7 @@ Duration: $START_TIME → $END_TIME
 → Promote: /binaa-sit <version>"
 else
   bash scripts/update-jira-status.sh "$KEY" "In Review"
-  echo "⚠️  Auto-merge failed — merge $PR_URL manually, then: bash scripts/update-jira-status.sh $KEY Done"
+  echo "⚠️  Merge not completed automatically — finish it at: $PR_URL"
 fi
 ```
 

@@ -6,7 +6,28 @@
 project_name: "my-project"
 project_type: fullstack          # frontend | backend | fullstack | db | integration | all
 ticket_prefix: "KEY"             # e.g. MSK, APP, PRJ — matches Jira project key (lowercase in branches)
-base_branch: main                # main | develop
+base_branch: develop             # branch PRs target & DEV deploys from. Use `develop` for the
+                                  # DEV→SIT→UAT→PRD pipeline; `main` only for trunk-based projects.
+
+## Issue Tracker
+# local  — no external service; tasks logged to docs/tasks/<KEY>.md  (zero setup — default)
+# github — GitHub Issues via the gh CLI (falls back to local if gh is unavailable)
+# jira   — Jira Cloud (set credentials in .devpilot/config.sh)
+
+tracker:
+  type: local                    # local | github | jira
+
+## Merge Policy
+# auto    — devpilot squash-merges the PR into base_branch automatically (default)
+# pr-only — devpilot opens the PR and stops; a human merges it
+
+merge_policy: auto               # auto | pr-only
+
+## Docs Language
+# Human language for BA requirements, QA, and review docs. Code, identifiers,
+# commit messages, and branch names stay in English regardless.
+
+language: en                     # en | ar | fr | es | de | …
 
 ## Tech Stack
 

@@ -10,6 +10,14 @@ One command. AI team delivers the full feature or bug fix from requirement to PR
 /ceo <description of feature, bug, or production issue>
 ```
 
+**Engine modes** (optional leading flag — defaults to `engines.coding` in `project.config.md`):
+
+```
+/ceo --claude   <description>   # all phases + coding on Claude subagents
+/ceo --opencode <description>   # Claude orchestrates; opencode writes all code
+/ceo --max      <description>   # race BOTH engines, judge, merge the winner
+```
+
 ---
 
 ## How It Works
@@ -52,10 +60,12 @@ Change anytime with `/binaa reconfig` or `/binaa-models`.
 
 | Command | When to use |
 |---------|-------------|
-| `/ceo <description>` | Primary entry point — any task |
+| `/ceo <description>` | Primary entry point — any task (`--claude`/`--opencode`/`--max`) |
 | `/ceo resume` | After opencode fallback completes |
+| `/ceo-review-fix <PR>` | Address PR review comments → push |
 | `/team-task <description>` | Full team flow with more control |
-| `/team-ba` / `/team-lead` / `/team-frontend` / `/team-dotnet` / `/team-qa` | Individual agent |
+| `/team-ba` / `/team-lead` / `/team-frontend` / `/team-backend` / `/team-qa` | Individual agent |
+| `/binaa-doctor` / `/binaa-status` / `/binaa-metrics` | Health check / task dashboard / metrics |
 | `/binaa reconfig` | Re-run model configuration wizard |
 
 ## Deploy Pipeline
@@ -64,8 +74,9 @@ Change anytime with `/binaa reconfig` or `/binaa-models`.
 |---------|-------|------|
 | `/binaa-sit <version>` | SIT | After DEV testing passes |
 | `/binaa-uat` | UAT | After SIT QA passes |
-| `/binaa-prd <version>` | PRD | After UAT sign-off |
+| `/binaa-prd <version>` | PRD | After UAT sign-off (assembles CHANGELOG) |
 | `/binaa-hotfix <n> <slug> <version>` | Emergency | Production issue |
+| `/binaa-rollback [version]` | Rollback | Revert to a previous release tag |
 
 ---
 
@@ -84,9 +95,14 @@ Change anytime: `/binaa reconfig`
 ## Tech Stack
 
 - **Frontend:** Angular 21+ / React
-- **Backend:** .NET (C#), SQL Server
-- **Rules:** `.devpilot/rules.md`
-- **Skills:** `.devpilot/skills/` (get-shit-done, security-scan, performance-review, architecture-guard, self-heal, definition-of-done)
+- **Backend:** .NET (C#), SQL Server (stack-aware — adapts to node/python/go/java)
+- **Rules:** `.devpilot/rules.md` (router) + `.devpilot/rules/<stack>.md` snippets
+- **Skills:** `.devpilot/skills/` — the team's operating manual. Index: `.devpilot/skills/README.md`.
+  Execution: get-shit-done, self-heal, compact-context, core-rules.
+  Planning: spec-first, estimation-and-slicing.
+  Build: architecture-guard, test-strategy, observability, performance-review.
+  Quality/ship: code-review, security-scan, definition-of-done, release-discipline.
+  Cross-cutting: debug-method, tech-debt, status-reporting.
 
 ---
 

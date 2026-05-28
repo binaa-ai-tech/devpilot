@@ -118,6 +118,12 @@ bash scripts/checkpoint.sh write \
 
 ## Step 2 — Layer-Locked Implementation
 
+**Arm the real-time lock first** so the PreToolUse hook (`scripts/scope-hook.sh`)
+blocks any out-of-layer write while the agent runs:
+```bash
+mkdir -p .devpilot && echo "$SCOPE" > .devpilot/.scope-lock
+```
+
 Spawn the target agent. The agent is **forcefully lock-down restricted** with zero privileges to touch files outside its specific domain scope.
 
 ### Scope Locks Definition
@@ -142,7 +148,7 @@ Spawn `subagent_type: "team-frontend"`:
 > Commit: `feat(frontend): <description>`. Report: commits + modified files.
 
 **Backend** (if SCOPE = `backend`):
-Spawn `subagent_type: "team-dotnet"`:
+Spawn `subagent_type: "team-backend"`:
 > Task: `$TASK_DESC`. Jira: `<KEY>`. Branch: `<BRANCH>`.
 > **VERTICAL-LAYER SCOPE LOCK:**
 > - You have write privileges ONLY for backend controllers, models, application configuration, and backend tests.
@@ -152,7 +158,7 @@ Spawn `subagent_type: "team-dotnet"`:
 > Commit: `feat(backend): <description>`. Report: commits + modified files.
 
 **DB** (if SCOPE = `db`):
-Spawn `subagent_type: "team-dotnet"`:
+Spawn `subagent_type: "team-backend"`:
 > Task: `$TASK_DESC`. Jira: `<KEY>`. Branch: `<BRANCH>`.
 > **VERTICAL-LAYER SCOPE LOCK:**
 > - You have write privileges ONLY for SQL schemas, migration scripts, and DB configs.
@@ -161,7 +167,7 @@ Spawn `subagent_type: "team-dotnet"`:
 > Commit: `feat(db): <description>`. Report: commits + migration files.
 
 **Security** (if SCOPE = `security`):
-Spawn `subagent_type: "team-dotnet"`:
+Spawn `subagent_type: "team-backend"`:
 > Task: `$TASK_DESC`. Jira: `<KEY>`. Branch: `<BRANCH>`.
 > **VERTICAL-LAYER SCOPE LOCK:**
 > - You have write privileges ONLY for security middleware, configs, packages, and authorization policies.
@@ -179,6 +185,22 @@ Then immediately run via Bash tool:
 $IMPL_ENGINE --model "$IMPL_MODEL_FE" < "docs/implementation/${SLUG}-${SCOPE}.md"
 ```
 Proceed to QA when it exits 0.
+
+---
+
+## Step 2b — Enforce the scope lock
+
+After the agent finishes, verify it stayed inside the layer:
+```bash
+STRICT=1 bash scripts/scope-guard.sh "$SCOPE" "$BASE_BRANCH"
+```
+Then release the real-time lock now that implementation is done:
+```bash
+rm -f .devpilot/.scope-lock
+```
+If it reports out-of-scope files, the lock was violated — revert those files (or
+re-brief the agent to undo them) before continuing. Only proceed to QA once the
+guard passes.
 
 ---
 
@@ -205,23 +227,22 @@ If BLOCKED: correct the code strictly within the vertical layer and re-run QA.
 END_TIME=$(date '+%Y-%m-%d %H:%M:%S')
 COMMITS=$(git log ${BASE_BRANCH}..HEAD --oneline | awk '{print $1}' | head -10 | tr '\n' ' ')
 
-PR_URL=$(gh pr create \
-  --base "$BASE_BRANCH" \
-  --title "$KEY: [$SCOPE] $TASK_DESC" \
-  --body "Track 3 Layer-Locked Fix ($SCOPE): $TASK_DESC
+cat > /tmp/devpilot-pr-body-$$.md << EOF
+Track 3 Layer-Locked Fix ($SCOPE): $TASK_DESC
 
 QA: PASS — docs/qa/<SLUG>.md
-Commits: $COMMITS" | tail -1)
-PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+Commits: $COMMITS
+EOF
 
-if gh pr merge "$PR_NUM" --squash --delete-branch 2>&1; then
+PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$KEY: [$SCOPE] $TASK_DESC" /tmp/devpilot-pr-body-$$.md)
+if [ $? -eq 0 ]; then
   bash scripts/update-jira-status.sh "$KEY" "Done"
   bash scripts/add-jira-comment.sh "$KEY" "✅ Layer-Locked PR merged into $BASE_BRANCH [$END_TIME]
 PR: $PR_URL
 Commits: $COMMITS"
 else
   bash scripts/update-jira-status.sh "$KEY" "In Review"
-  echo "⚠️ Auto-merge failed. Merge manually."
+  echo "⚠️  Merge not completed automatically — finish it at: $PR_URL"
 fi
 
 bash scripts/checkpoint.sh update "$KEY" phase_completed "done"

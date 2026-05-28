@@ -35,12 +35,23 @@ Never skip a phase. Follow `.devpilot/rules.md` throughout.
    BASE_BRANCH=$(grep 'base_branch' project.config.md | head -1 | sed 's/.*base_branch:[[:space:]]*//')
    ```
 
-4. Set engine variables from `project.config.md → engines`:
+4. Set engine variables from `project.config.md → engines`, then apply the
+   run mode (`$RUN_MODE` from `/ceo` Step 0 — defaults to the config value):
    ```bash
    IMPL_ENGINE=$(grep -A 5 '^engines:' project.config.md | grep 'coding:' | head -1 | sed 's/.*coding:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
    FALLBACK_ENGINE=$(grep -A 5 '^engines:' project.config.md | grep 'fallback:' | head -1 | sed 's/.*fallback:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
    [ -z "$IMPL_ENGINE" ] && IMPL_ENGINE="claude"
+
+   # Run mode overrides the configured coding engine for this task.
+   RUN_MODE="${RUN_MODE:-$IMPL_ENGINE}"
+   case "$RUN_MODE" in
+     claude|opencode|antigravity) IMPL_ENGINE="$RUN_MODE" ;;   # single-engine
+     max)                         IMPL_ENGINE="claude" ;;      # max judges both; Claude is candidate A
+   esac
+   echo "Run mode: $RUN_MODE · coding engine: $IMPL_ENGINE"
    ```
+   When invoked directly (not via `/ceo`), `$RUN_MODE` is unset and falls back
+   to the configured engine — behaviour is unchanged.
 
 5. Set per-agent models — read from `coding_models.<IMPL_ENGINE>` section:
    ```bash
@@ -189,7 +200,17 @@ ACs: $AC_COUNT"
 
 ## Phase 3 — Implementation
 
-Read `project.config.md → engines.coding`. IMPL_ENGINE determines who writes the code.
+`$RUN_MODE` (resolved in Phase 0) determines how the code is written:
+
+| RUN_MODE | Follow |
+|----------|--------|
+| `claude` | **### Engine: `claude`** below |
+| `opencode` / `antigravity` | **### Engine: `opencode` or `antigravity`** below (IMPL_ENGINE is already set) |
+| `max` | **### Mode: `max`** below — race both engines and merge the winner |
+
+> **Token discipline:** brief each agent with a *compact* context (see
+> `.devpilot/skills/compact-context.md`) — the acceptance criteria plus the
+> named files to touch — not raw `docs/requirements` / `docs/plans` file dumps.
 
 ---
 
@@ -205,19 +226,19 @@ Spawn with `subagent_type: "team-frontend"`:
 
 **Backend Agent** (if `agents.backend.enabled: true` AND backend work identified)
 
-Spawn with `subagent_type: "team-dotnet"`:
+Spawn with `subagent_type: "team-backend"`:
 
 > Task: `[task description]`. Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `<branch>`. Implement all backend work per the plan. Read `.devpilot/skills/self-heal.md`. Run build + tests. Commit with conventional commit message. Report what you built in 3 bullets.
 
 **DB Agent** (if `agents.db.enabled: true` AND DB schema/migration work identified)
 
-Spawn with `subagent_type: "team-dotnet"`:
+Spawn with `subagent_type: "team-backend"`:
 
 > Task: DB changes for `[task description]`. Branch: `<branch>`. Implement all migrations per the plan. Run migration tests. Commit.
 
 **Integration Agent** (if `agents.integration.enabled: true` AND integration work identified)
 
-Spawn with `subagent_type: "team-dotnet"`:
+Spawn with `subagent_type: "team-backend"`:
 
 > Task: Integration work for `[task description]`. Branch: `<branch>`. Implement all integration work per the plan. Run tests. Commit.
 
@@ -304,6 +325,75 @@ Do NOT output a handoff block. Do NOT stop. Proceed directly to Phase 4 (QA) onc
 
 ---
 
+### Mode: `max` — dual-engine race (Claude + opencode)
+
+Implement the plan **twice** — once with Claude subagents, once with opencode —
+on isolated branches, then judge and merge the better result.
+
+**Pre-check:** if `command -v opencode` is missing, skip the race, run the
+`### Engine: claude` path on `$BRANCH`, announce
+"⚠️ max mode: opencode not installed — ran claude-only", and continue to Phase 4.
+
+1. **Set a common starting point** — commit the docs so both candidates diverge
+   from the same tree:
+   ```bash
+   git add docs/ && git commit -m "docs(<slug>): requirements + plan (max baseline)" || true
+   CAND_CLAUDE="${BRANCH}-claude"
+   CAND_OC="${BRANCH}-opencode"
+   git branch "$CAND_CLAUDE"
+   git branch "$CAND_OC"
+   ```
+
+2. **Candidate A — Claude:**
+   ```bash
+   git checkout "$CAND_CLAUDE"
+   ```
+   Spawn the developer agents exactly as in **### Engine: `claude`** above.
+   Wait for completion and confirm the work is committed on this branch.
+
+3. **Candidate B — opencode:**
+   ```bash
+   git checkout "$CAND_OC"
+   ```
+   Write the per-agent briefs and run opencode exactly as in
+   **### Engine: `opencode` or `antigravity`** above, using the `opencode`
+   models (`IMPL_MODEL_*`). Confirm the work is committed on this branch.
+
+4. **Judge — pick the winner.** For each candidate, check it out, run the
+   stack-appropriate build + tests, and capture the result:
+   ```bash
+   for C in "$CAND_CLAUDE" "$CAND_OC"; do
+     git checkout "$C"
+     echo "=== $C ==="; git diff "$BRANCH".."$C" --stat
+     # run build + tests for the stack; note PASS/FAIL
+   done
+   ```
+   As **Team Lead**, compare both against the acceptance criteria and
+   `.devpilot/rules.md`, in this priority order:
+   1. **Correctness** — meets every acceptance criterion.
+   2. **Build + tests green** — a failing build/test loses outright.
+   3. **Rule adherence + smaller, cleaner diff** — tiebreaker.
+   Choose `WINNER` (`claude` or `opencode`) and write a one-paragraph rationale.
+
+5. **Merge the winner, discard the loser:**
+   ```bash
+   git checkout "$BRANCH"
+   git merge --squash "${BRANCH}-${WINNER}"
+   git commit -m "feat(<slug>): implement via max mode (winner: ${WINNER})"
+   git branch -D "$CAND_CLAUDE" "$CAND_OC"
+   ```
+
+6. **Log the outcome:**
+   ```bash
+   bash scripts/add-jira-comment.sh "$KEY" "🏁 Max mode — winner: ${WINNER}
+Rationale: <one-line rationale>
+Both candidates built + tested; losing branch discarded."
+   ```
+
+Continue to Phase 4 (QA) on `$BRANCH`.
+
+---
+
 ## Phase 4 — QA: Testing
 
 Spawn with `subagent_type: "team-qa"`:
@@ -328,7 +418,15 @@ If BLOCKED: fix the issue (spawn the relevant agent again), then re-run QA.
 
 **Resume Team Lead persona.** Read `.devpilot/prompts/team/lead-review.md`.
 
-1. Run `git diff <BASE_BRANCH>...HEAD` — review against `.devpilot/rules.md`
+1. **Review gate — must pass before any PR is opened.** Run `git diff <BASE_BRANCH>...HEAD`
+   and review it against `.devpilot/skills/code-review.md` and `.devpilot/skills/security-scan.md`
+   (and `.devpilot/rules.md`):
+   - Tag findings 🔴 BLOCKER / 🟡 SHOULD / 🟢 NIT.
+   - Run the dependency audit: `bash scripts/audit.sh` — treat new high/critical
+     vulnerabilities as 🔴.
+   - **Any 🔴 → fix it (re-spawn the owning agent), then re-review.** Never open a PR
+     with an open 🔴 or a BLOCKED QA verdict.
+   - Record the verdict (APPROVED / CHANGES REQUESTED) in the review report.
 2. Check `docs/qa/<slug>.md` — if BLOCKED, resolve before continuing
 3. Write `docs/reviews/<slug>.md` using `.devpilot/templates/team/review-report.md`
 4. Commit docs:
@@ -336,20 +434,16 @@ If BLOCKED: fix the issue (spawn the relevant agent again), then re-run QA.
    git add docs/
    git commit -m "docs(<slug>): add requirements, plan, qa, and review docs"
    ```
-5. **Create PR + auto-merge into develop:**
+5. **Create PR + auto-merge into develop** (tool-agnostic — uses `gh` if present,
+   else prints a compare URL / GitHub-MCP fallback):
    ```bash
-   PR_URL=$(gh pr create \
-     --base "$BASE_BRANCH" \
-     --title "<KEY>: <description>" \
-     --body "$(cat docs/reviews/<slug>.md)" | tail -1)
-   PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
-
    # Auto-merge into develop — production (main) requires /binaa-prd with human sign-off
-   if gh pr merge "$PR_NUM" --squash --delete-branch 2>&1; then
+   PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$KEY: <description>" "docs/reviews/<slug>.md")
+   if [ $? -eq 0 ]; then
      bash scripts/update-jira-status.sh "$KEY" "Done"
    else
      bash scripts/update-jira-status.sh "$KEY" "In Review"
-     echo "⚠️  Auto-merge failed — merge $PR_URL manually, then: bash scripts/update-jira-status.sh $KEY Done"
+     echo "⚠️  Merge not completed automatically — finish it at: $PR_URL"
    fi
    ```
 
