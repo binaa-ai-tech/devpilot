@@ -30,11 +30,11 @@ bash devpilot/install.sh
 
 The installer:
 1. Detects Claude Code, OpenCode, and Antigravity on your system
-2. Scans your project stack (Angular, React, .NET, Python, SQL, etc.)
+2. Scans your project stack (Angular, React, .NET, Node, Python, Go, Java, SQL, etc.)
 3. Enables only the agents your stack actually needs
-4. Configures engine routing (`claude` | `opencode` | `antigravity`)
-5. Writes per-engine model config (`coding_models` in `project.config.md`)
-6. Copies `.claude/`, `.opencode/`, `.devpilot/`, `scripts/`, `AGENTS.md`, `CLAUDE.md`
+4. Configures engine routing (`claude` | `opencode` | `antigravity`), issue tracker (`local` | `github` | `jira`), and merge policy (`auto` | `pr-only`)
+5. Writes per-engine model config (`coding_models` in `project.config.md`) and copies only the rule snippets for your stack
+6. Copies `.claude/` (commands, agents, SessionStart hook), `.opencode/`, `.devpilot/`, `scripts/`, `AGENTS.md`, `CLAUDE.md`
 
 Setup time: ~5 minutes.
 
@@ -170,7 +170,101 @@ Restricts agent permissions to a single technical vertical. Use when you need a 
 /ceo-subdomain security "audit and fix all SQL injection risks in repository layer"
 ```
 
-The agent receives an explicit `SCOPE LOCK` constraint. Any file outside the declared domain is off-limits. Produces the same QA report and PR as Track 1.
+The agent receives an explicit `SCOPE LOCK` constraint. Any file outside the declared domain is off-limits — enforced by `scripts/scope-guard.sh`. Produces the same QA report and PR as Track 1.
+
+---
+
+## Command Reference
+
+**Build / fix**
+
+| Command | Purpose |
+|---------|---------|
+| `/ceo [--claude \| --opencode \| --max] <task>` | Full autonomous flow; engine mode optional |
+| `/ceo-plan <task>` · `/ceo-run <KEY>` | Plan only / execute a saved plan |
+| `/ceo-fix <bug>` | Fast bug fix (no BA, no formal docs) |
+| `/ceo-issue <bug>` | Issue triage → per-layer locked fix |
+| `/ceo-subdomain <scope> <task>` | Layer-locked change (`frontend`/`backend`/`db`/`security`) |
+| `/ceo-fe` · `/ceo-be` · `/ceo-db` · `/ceo-int` | Single-agent implementation |
+
+**Individual agents**
+
+| Command | Runs |
+|---------|------|
+| `/team-task <task>` | The full team flow (what `/ceo` orchestrates) |
+| `/team-ba` · `/team-lead` · `/team-frontend` · `/team-backend` · `/team-qa` | One role directly |
+
+**Config & deploy**
+
+| Command | Purpose |
+|---------|---------|
+| `/binaa reconfig` · `/binaa-models` | Re-run the wizard / set per-agent models |
+| `/binaa-index` | Refresh the project index |
+| `/binaa-sit` · `/binaa-uat` · `/binaa-prd` · `/binaa-hotfix` | Promote DEV→SIT→UAT→PRD / emergency hotfix |
+| `bash install.sh --update` | Refresh devpilot itself (config preserved) |
+
+---
+
+## Issue Tracking — zero setup by default
+
+devpilot logs each task's lifecycle (start → plan → implementation → QA → merge). Pick a backend in `project.config.md`; all flows go through `scripts/track.sh`, so you can switch anytime without touching a command.
+
+| `tracker.type` | Behaviour | Setup |
+|----------------|-----------|-------|
+| `local` *(default)* | Logs to `docs/tasks/<KEY>.md` — no external service | none |
+| `github` | Opens & comments on GitHub Issues via `gh` | `gh auth login` (falls back to `local` if absent) |
+| `jira` | Full Jira Cloud integration | credentials in `.devpilot/config.sh` |
+
+---
+
+## Token Efficiency
+
+devpilot works on **only the code relevant to the task** — never the whole repo:
+
+- **Project index** (`scripts/generate-project-index.sh`) — a fast-scan map of the codebase, auto-refreshed (and on session start).
+- **Scoped retrieval** (`scripts/scope.sh`) — ranks the few files relevant to a task; agents read those, not the tree.
+- **Size routing** — `/ceo` sends trivial work to a fast path and single-layer work to a locked track, skipping the full 5-phase docs for small changes.
+- **Compact handoffs** — agents get a compact brief (ACs + files to touch), not raw document dumps.
+- **On-demand skills** — agents always load `core-rules.md` and pull heavier skills only when needed.
+
+---
+
+## Quality Gates
+
+Nothing merges until it passes:
+
+- **Definition of Done** — per-role checklist (`.devpilot/skills/definition-of-done.md`).
+- **Code-review gate** — Team Lead reviews the diff with severity tags (🔴/🟡/🟢); an open 🔴 blocks the PR.
+- **Security scan** — checklist over the diff; zero 🔴 CRITICAL to pass.
+- **QA verdict** — every acceptance criterion has a test; PASS or BLOCKED.
+- **Scope guard** — `scripts/scope-guard.sh` enforces layer locks in `/ceo-subdomain`.
+- **Merge policy** — `auto` (squash-merge) or `pr-only` (a human merges); production always needs human sign-off.
+
+---
+
+## Stack Support
+
+A single **stack-aware backend agent** adapts to your language; rules are split into per-stack snippets so agents read only what applies (`.devpilot/rules/<stack>.md`, routed by `.devpilot/rules.md`).
+
+| Layer | Supported |
+|-------|-----------|
+| Frontend | Angular · React · Vue · Next.js |
+| Backend | .NET · Node/TypeScript · Python · Go · Java |
+| Database | SQL Server · PostgreSQL · MySQL |
+
+---
+
+## Skills — the Team's Operating Manual
+
+`.devpilot/skills/` is what makes the agents behave like a disciplined team. Index: `.devpilot/skills/README.md`.
+
+| Phase | Skills |
+|-------|--------|
+| Always | `core-rules` · `get-shit-done` · `compact-context` |
+| Planning | `spec-first` · `estimation-and-slicing` |
+| Build | `architecture-guard` · `test-strategy` · `observability` · `performance-review` · `self-heal` |
+| Quality & ship | `code-review` · `security-scan` · `definition-of-done` · `release-discipline` |
+| Cross-cutting | `debug-method` · `tech-debt` · `status-reporting` |
 
 ---
 
@@ -413,6 +507,12 @@ CLAUDE.md            # Claude Code project context
 project.config.md    # Per-project config — engine routing, models, stack, agents
 install.sh           # One-command installer
 ```
+
+---
+
+## Testing & CI
+
+devpilot ships its own test suite — `bash tests/run.sh` exercises the helper scripts (`run-mode`, `track`, `scope`, `scope-guard`, `open-pr`). `.github/workflows/ci.yml` runs `shellcheck` + bash syntax checks + the suite on every push and PR, so changes to devpilot itself stay green.
 
 ---
 
