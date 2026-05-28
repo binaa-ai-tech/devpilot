@@ -1,6 +1,7 @@
 # devpilot Enhancement Plan — Token-Lean, Tracker-Optional, Any-Project
 
-> Status: **PROPOSAL — awaiting review**. No code changed yet.
+> Status: **IMPLEMENTED** — Workstreams A, B, C, D all landed on
+> `claude/dev-workflow-automation-Fv0ie`. See "Implementation status" at the end.
 > Goal: make devpilot installable into *any* repo and run the full
 > `/ceo → BA → dev team → QA → PR → develop` loop fully automatically,
 > while reading only the code related to the task (fewer tokens) and
@@ -229,6 +230,21 @@ threads `RUN_MODE` into the full-team flow.
       one, and leaves the feature branch with the winning diff only.
 - [ ] `/ceo <task>` with no flag uses the config default unchanged.
 - [ ] `--max` on a machine without opencode completes as claude-only with a notice.
+
+---
+
+## Implementation status
+
+| Workstream | Status | Key artifacts |
+|------------|--------|---------------|
+| **D — engine modes** | ✅ done | `scripts/run-mode.sh`; `--claude/--opencode/--max` in `ceo.md`; `max` race in `team-task.md` |
+| **B — tracker optional** | ✅ done | `scripts/track.sh`; `tracker.type` in config + installer (default `local`); jira scripts delegate |
+| **A — any-project** | ✅ done | `team-backend` agent + `backend-agent.md`; `.devpilot/rules/<stack>.md` + router; `scripts/open-pr.sh` |
+| **C — token-lean** | ✅ done | `scripts/scope.sh`; `/ceo` size routing; `scripts/scope-guard.sh`; richer index; `skills/core-rules.md`; on-demand skill loading |
+
+All scripts syntax-checked; `track.sh` (local), `scope.sh`, `scope-guard.sh`,
+and the index generator were run successfully. `team-dotnet` is retained as a
+working alias so existing installs keep functioning.
 
 ---
 
