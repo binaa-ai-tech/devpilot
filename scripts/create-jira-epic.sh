@@ -12,14 +12,6 @@ if [ -z "${DEVPILOT_TRACKER_DIRECT:-}" ]; then
   fi
 fi
 
-# Verify DEVPILOT_CONFIG_UPDATED_AT against current context to ensure fresh credentials
-if [ -f "$(dirname "$0")/../.devpilot/config.sh" ]; then
-  DISK_UPDATED_AT=$(grep 'DEVPILOT_CONFIG_UPDATED_AT=' "$(dirname "$0")/../.devpilot/config.sh" | head -1 | cut -d"'" -f2 || echo "")
-  if [ -n "${DEVPILOT_CONFIG_UPDATED_AT:-}" ] && [ "$DISK_UPDATED_AT" != "$DEVPILOT_CONFIG_UPDATED_AT" ]; then
-    echo "🔄 Config update detected (disk: $DISK_UPDATED_AT, context: $DEVPILOT_CONFIG_UPDATED_AT). Refreshing..." >&2
-  fi
-fi
-
 source "$(dirname "$0")/../.devpilot/config.sh"
 
 SUMMARY="$1"

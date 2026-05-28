@@ -6,7 +6,8 @@
 project_name: "my-project"
 project_type: fullstack          # frontend | backend | fullstack | db | integration | all
 ticket_prefix: "KEY"             # e.g. MSK, APP, PRJ — matches Jira project key (lowercase in branches)
-base_branch: main                # main | develop
+base_branch: develop             # branch PRs target & DEV deploys from. Use `develop` for the
+                                  # DEV→SIT→UAT→PRD pipeline; `main` only for trunk-based projects.
 
 ## Issue Tracker
 # local  — no external service; tasks logged to docs/tasks/<KEY>.md  (zero setup — default)
@@ -15,6 +16,12 @@ base_branch: main                # main | develop
 
 tracker:
   type: local                    # local | github | jira
+
+## Merge Policy
+# auto    — devpilot squash-merges the PR into base_branch automatically (default)
+# pr-only — devpilot opens the PR and stops; a human merges it
+
+merge_policy: auto               # auto | pr-only
 
 ## Tech Stack
 

@@ -15,11 +15,13 @@
 | `backend: dotnet` | `.devpilot/rules/dotnet.md` |
 | `backend: node` | `.devpilot/rules/node.md` |
 | `backend: python` | `.devpilot/rules/python.md` |
+| `backend: go` | `.devpilot/rules/go.md` |
+| `backend: java` | `.devpilot/rules/java.md` |
 | `database: sqlserver` | `.devpilot/rules/sqlserver.md` |
 | `database: postgres` / `mysql` | `.devpilot/rules/postgres-mysql.md` |
 
-> Go / Java and other stacks: follow `core-rules.md` + the project's existing
-> conventions (its lint config, CI, and neighboring code).
+> Any other stack: follow `core-rules.md` + the project's existing conventions
+> (its lint config, CI, and neighboring code).
 
 ---
 

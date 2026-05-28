@@ -187,7 +187,7 @@ If BLOCKED: fix the issue, then re-run QA.
 END_TIME=$(date '+%Y-%m-%d %H:%M:%S')
 ALL_COMMITS=$(git log ${BASE_BRANCH}..HEAD --oneline 2>/dev/null | awk '{print $1}' | head -10 | tr '\n' ' ')
 
-cat > /tmp/devpilot-pr-body.md << EOF
+cat > /tmp/devpilot-pr-body-$$.md << EOF
 ## Bug Fix: $ARGUMENTS
 
 **Root cause:** <root cause>
@@ -199,7 +199,7 @@ Commits: $ALL_COMMITS
 EOF
 
 # Auto-merge into develop — production (main) requires /binaa-prd with human sign-off
-PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$KEY: fix: <summary>" /tmp/devpilot-pr-body.md)
+PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$KEY: fix: <summary>" /tmp/devpilot-pr-body-$$.md)
 if [ $? -eq 0 ]; then
   bash scripts/update-jira-status.sh "$KEY" "Done"
   bash scripts/add-jira-comment.sh "$KEY" "✅ Merged into $BASE_BRANCH [$END_TIME]

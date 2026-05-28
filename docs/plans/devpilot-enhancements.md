@@ -246,6 +246,24 @@ All scripts syntax-checked; `track.sh` (local), `scope.sh`, `scope-guard.sh`,
 and the index generator were run successfully. `team-dotnet` is retained as a
 working alias so existing installs keep functioning.
 
+## Follow-up enhancements (round 2) — ✅ done
+
+| # | Item | Artifacts |
+|---|------|-----------|
+| 1 | Tests + CI | `tests/run.sh` (14 assertions, all pass), `.github/workflows/ci.yml` (shellcheck + syntax + tests) |
+| 2 | Update path | `install.sh --update` refreshes managed files, preserves `project.config.md` / `config.sh` |
+| 3 | Merge policy | `merge_policy: auto \| pr-only` in config + installer; honored in `open-pr.sh` |
+| 4 | Hard review gate | `team-task.md` Phase 5: code-review + security gate, no PR with an open 🔴 |
+| 5 | base_branch default | installer defaults to `develop` when it exists; config comments clarified |
+| 6 | Concurrency-safe temp | PR-body files use `/tmp/devpilot-pr-body-$$.md` |
+| 7 | go/java rules | `.devpilot/rules/go.md`, `java.md` + router + installer |
+| 8 | Dead-code cleanup | removed `DEVPILOT_CONFIG_UPDATED_AT` block from the 5 Jira scripts |
+| 9 | README refresh | engine modes, tracker, merge policy, stack-aware backend, structure |
+| 10 | SessionStart hook | `scripts/session-start.sh` + `.claude/settings.json` (installed if absent) |
+
+Note on #6: `max` mode remains sequential branch-isolation (correct; a `git worktree`
+parallel variant is a possible future optimization, not required for correctness).
+
 ---
 
 ## Risks / notes

@@ -217,14 +217,14 @@ If BLOCKED: correct the code strictly within the vertical layer and re-run QA.
 END_TIME=$(date '+%Y-%m-%d %H:%M:%S')
 COMMITS=$(git log ${BASE_BRANCH}..HEAD --oneline | awk '{print $1}' | head -10 | tr '\n' ' ')
 
-cat > /tmp/devpilot-pr-body.md << EOF
+cat > /tmp/devpilot-pr-body-$$.md << EOF
 Track 3 Layer-Locked Fix ($SCOPE): $TASK_DESC
 
 QA: PASS — docs/qa/<SLUG>.md
 Commits: $COMMITS
 EOF
 
-PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$KEY: [$SCOPE] $TASK_DESC" /tmp/devpilot-pr-body.md)
+PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$KEY: [$SCOPE] $TASK_DESC" /tmp/devpilot-pr-body-$$.md)
 if [ $? -eq 0 ]; then
   bash scripts/update-jira-status.sh "$KEY" "Done"
   bash scripts/add-jira-comment.sh "$KEY" "✅ Layer-Locked PR merged into $BASE_BRANCH [$END_TIME]

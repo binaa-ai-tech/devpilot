@@ -1,8 +1,15 @@
-# devpilot `v2.1.0`
+# devpilot `v2.2.0`
 
 > One command. An AI team delivers the full feature — from BA breakdown to merged PR. Compatible with Claude Code, OpenCode, and Antigravity.
 
-devpilot is a **portable, zero-config multi-agent orchestration layer** that installs into any project in minutes. It gives every AI coding engine — Claude, OpenCode, or Antigravity — the same structured team: Business Analyst, Team Lead, Frontend Dev, Backend Dev, DB Agent, and QA. You pick the engine; devpilot handles the rest.
+devpilot is a **portable, zero-config multi-agent orchestration layer** that installs into any project in minutes. It gives every AI coding engine — Claude, OpenCode, or Antigravity — the same structured team: Business Analyst, Team Lead, Frontend Dev, Backend Dev (stack-aware), DB Agent, and QA. You pick the engine; devpilot handles the rest.
+
+**Built for a one-person team to operate like a small company:**
+- **Engine modes per task** — `/ceo --claude`, `--opencode`, or `--max` (race both engines and merge the winner).
+- **Zero external setup** — issue tracking defaults to `local` (a file log); GitHub Issues or Jira are opt-in. `gh` is optional too.
+- **Token-lean** — agents retrieve only the files relevant to a task (`scope.sh` + a project index) and `/ceo` routes small work to a fast path instead of the full 5-phase flow.
+- **Any stack** — a stack-aware backend agent + per-stack rule snippets (`.devpilot/rules/<stack>.md`) for .NET, Node, Python, Go, Java, Angular, React/Vue, SQL Server, Postgres/MySQL.
+- **A professional operating manual** — process skills for code review, testing, debugging, slicing, tech-debt, observability, release discipline, and status reporting (`.devpilot/skills/`).
 
 ---
 
@@ -30,6 +37,13 @@ The installer:
 6. Copies `.claude/`, `.opencode/`, `.devpilot/`, `scripts/`, `AGENTS.md`, `CLAUDE.md`
 
 Setup time: ~5 minutes.
+
+**Updating an existing install** — refresh the managed files without touching your config:
+
+```bash
+bash install.sh --update    # refreshes .claude/, .devpilot/, scripts/
+                            # never overwrites project.config.md or .devpilot/config.sh
+```
 
 ---
 
@@ -89,7 +103,17 @@ End-to-end autonomous engineering. The BA reads the codebase, writes requirement
 ✅  Merged + Jira Done + promote commands printed
 ```
 
-**No stopping. No questions. No manual steps.** Auto-merges into `develop`; you review only for production.
+**No stopping. No questions. No manual steps.** Auto-merges into `develop` (set `merge_policy: pr-only` to require a human merge); you review only for production.
+
+**Engine modes** — pick how a task runs with a leading flag (no flag → `engines.coding`):
+
+| Flag | Behaviour |
+|------|-----------|
+| `/ceo --claude <task>` | All phases + coding on Claude subagents |
+| `/ceo --opencode <task>` | Claude orchestrates; opencode writes all code |
+| `/ceo --max <task>` | Race **both** engines on isolated branches, judge, merge the winner |
+
+**Size routing** — `/ceo` sizes the task first: trivial → fast fix path, single-layer → layer-locked, multi-layer/large → the full team flow below. Small work never pays for the full 5-phase pipeline.
 
 Subcommands:
 
@@ -158,11 +182,16 @@ The agent receives an explicit `SCOPE LOCK` constraint. Any file outside the dec
 # project.config.md
 
 project_name: my-app
-base_branch: develop
+base_branch: develop   # PRs target & DEV deploys from this; defaults to develop when it exists
+
+tracker:
+  type: local          # local | github | jira  — local = zero setup, logs to docs/tasks/
+
+merge_policy: auto      # auto = devpilot squash-merges the PR | pr-only = a human merges
 
 stack:
-  frontend: angular    # angular | react | vue | none
-  backend:  dotnet     # dotnet | node | python | go | none
+  frontend: angular    # angular | react | vue | nextjs | none
+  backend:  dotnet     # dotnet | node | python | go | java | none
   database: sqlserver  # sqlserver | postgres | mysql | none
   mobile:   none
 
@@ -329,10 +358,10 @@ Repo → Settings → Environments: `dev`, `sit`, `uat`, `prd`
 | Tool | Required | Purpose |
 |------|----------|---------|
 | [Claude Code](https://claude.ai/code) | Yes | Orchestration — BA, planning, QA, review |
-| [GitHub CLI (`gh`)](https://cli.github.com) | Yes | PR creation, auto-merge, branch management |
 | `git` | Yes | Branch management |
-| `jq` or `python3` | Yes | JSON operations in checkpoint/config scripts |
-| [OpenCode](https://opencode.ai) | Optional | If `engines.coding: opencode` |
+| [GitHub CLI (`gh`)](https://cli.github.com) | Optional | PR auto-merge; without it `open-pr.sh` prints a compare URL / uses GitHub MCP |
+| `jq` or `python3` | Optional | JSON operations in checkpoint/config scripts |
+| [OpenCode](https://opencode.ai) | Optional | If `engines.coding: opencode` or `/ceo --opencode` / `--max` |
 | Antigravity | Optional | If `engines.coding: antigravity` |
 
 ---
@@ -343,23 +372,34 @@ Repo → Settings → Environments: `dev`, `sit`, `uat`, `prd`
 .claude/
   commands/          # /ceo, /ceo-issue, /ceo-subdomain, /ceo-fix, /ceo-fe, /ceo-be, /ceo-db, /ceo-int, /ceo-plan, /ceo-run
                      # /binaa-sit, /binaa-uat, /binaa-prd, /binaa-hotfix, /binaa-models, /binaa-index, /binaa-reconfig
-  agents/            # team-ba, team-lead, team-frontend, team-dotnet, team-qa
+  agents/            # team-ba, team-lead, team-frontend, team-backend (stack-aware), team-dotnet (alias), team-qa
+  settings.json      # SessionStart hook → scripts/session-start.sh
 .opencode/
   config.json        # OpenCode project config — points to AGENTS.md and .devpilot/rules.md
 .devpilot/
-  rules.md           # Universal + stack-conditional code rules
-  skills/            # compact-context, self-heal, definition-of-done, security-scan, performance-review
+  rules.md           # Router → reads core-rules + the snippet for your stack
+  rules/             # angular, react-vue, dotnet, node, python, go, java, sqlserver, postgres-mysql
+  skills/            # README.md index + core-rules, get-shit-done, compact-context, self-heal,
+                     # code-review, test-strategy, debug-method, estimation-and-slicing, tech-debt,
+                     # observability, release-discipline, status-reporting, security-scan, …
   config/            # models.md — per-agent model reference
   templates/         # requirements, plan, qa-report, review-report, adr
 scripts/
+  run-mode.sh        # Parse /ceo engine flag (--claude | --opencode | --max)
+  track.sh           # Issue-tracker abstraction (local | github | jira)
+  open-pr.sh         # Create/merge PR via gh, or print compare URL / use GitHub MCP
+  scope.sh           # Rank task-relevant files from the index (retrieve, don't scan)
+  scope-guard.sh     # Enforce layer locks in /ceo-subdomain
+  session-start.sh   # SessionStart warm-up (chmod scripts + refresh index)
   run-command.sh     # Generic AI command runner — routes to claude | opencode | antigravity
   checkpoint.sh      # Task state persistence engine
   devpilot-config.sh # Credential management + Jira validation CLI
   git-flow.sh        # Feature/release/hotfix branch helper
   generate-project-index.sh  # Dynamic codebase index generator
-  create-jira-ticket.sh      # Jira Task/Epic creation
-  update-jira-status.sh      # Jira workflow transitions
+  create-jira-ticket.sh / update-jira-status.sh / …   # Jira helpers (delegate to track.sh when not jira)
   deploy-*.sh                # Per-environment deploy scripts
+tests/
+  run.sh             # Script test suite (run by .github/workflows/ci.yml)
 docs/
   requirements/      # BA output — one file per task
   plans/             # Implementation plans

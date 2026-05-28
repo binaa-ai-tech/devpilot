@@ -418,7 +418,13 @@ If BLOCKED: fix the issue (spawn the relevant agent again), then re-run QA.
 
 **Resume Team Lead persona.** Read `.devpilot/prompts/team/lead-review.md`.
 
-1. Run `git diff <BASE_BRANCH>...HEAD` — review against `.devpilot/rules.md`
+1. **Review gate — must pass before any PR is opened.** Run `git diff <BASE_BRANCH>...HEAD`
+   and review it against `.devpilot/skills/code-review.md` and `.devpilot/skills/security-scan.md`
+   (and `.devpilot/rules.md`):
+   - Tag findings 🔴 BLOCKER / 🟡 SHOULD / 🟢 NIT.
+   - **Any 🔴 → fix it (re-spawn the owning agent), then re-review.** Never open a PR
+     with an open 🔴 or a BLOCKED QA verdict.
+   - Record the verdict (APPROVED / CHANGES REQUESTED) in the review report.
 2. Check `docs/qa/<slug>.md` — if BLOCKED, resolve before continuing
 3. Write `docs/reviews/<slug>.md` using `.devpilot/templates/team/review-report.md`
 4. Commit docs:

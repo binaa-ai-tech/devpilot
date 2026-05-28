@@ -232,7 +232,7 @@ If BLOCKED: fix and re-run QA. If P0 severity: escalate immediately before re-ru
 END_TIME=$(date '+%Y-%m-%d %H:%M:%S')
 ALL_COMMITS=$(git log ${BASE_BRANCH}..HEAD --oneline | awk '{print $1}' | head -10 | tr '\n' ' ')
 
-cat > /tmp/devpilot-pr-body.md << EOF
+cat > /tmp/devpilot-pr-body-$$.md << EOF
 ## Issue Fix: $ARGUMENTS
 
 **Severity:** <P0/P1/P2>
@@ -244,7 +244,7 @@ cat > /tmp/devpilot-pr-body.md << EOF
 Commits: $ALL_COMMITS
 EOF
 
-PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$EPIC_KEY: fix: <issue summary>" /tmp/devpilot-pr-body.md)
+PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$EPIC_KEY: fix: <issue summary>" /tmp/devpilot-pr-body-$$.md)
 if [ $? -eq 0 ]; then
   bash scripts/update-jira-status.sh "$EPIC_KEY" "Done"
   bash scripts/add-jira-comment.sh "$EPIC_KEY" "✅ Merged [$END_TIME]

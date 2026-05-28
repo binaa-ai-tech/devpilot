@@ -65,6 +65,53 @@ fetch() {
   fi
 }
 
+# ── Update mode ──────────────────────────────────────────────────────────────
+# `bash install.sh --update` refreshes the managed devpilot files in place and
+# NEVER touches your settings: project.config.md, .devpilot/config.sh,
+# AGENTS.md, and CLAUDE.md are left exactly as they are.
+# (Keep these lists in sync with STEP 9.)
+run_update() {
+  echo ""
+  echo -e "${BOLD}  devpilot — update (config preserved)${RESET}"
+  echo ""
+
+  RULE_SNIPPETS="angular.md react-vue.md dotnet.md node.md python.md go.md java.md sqlserver.md postgres-mysql.md"
+  PROMPT_TEAM="ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md backend-agent.md qa-agent.md"
+  TEMPLATE_TEAM="requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md"
+  SKILLS="get-shit-done.md spec-first.md security-scan.md performance-review.md architecture-guard.md self-heal.md definition-of-done.md compact-context.md core-rules.md code-review.md test-strategy.md debug-method.md estimation-and-slicing.md tech-debt.md observability.md release-discipline.md status-reporting.md README.md"
+  CHECKLISTS="feature.md bugfix.md hotfix.md"
+  CMDS="ceo.md ceo-plan.md ceo-run.md ceo-fix.md ceo-fe.md ceo-be.md ceo-db.md ceo-int.md ceo-issue.md ceo-subdomain.md binaa.md binaa-sit.md binaa-uat.md binaa-prd.md binaa-hotfix.md binaa-reconfig.md binaa-models.md binaa-index.md team-task.md team-ba.md team-lead.md team-frontend.md team-dotnet.md team-backend.md team-qa.md"
+  AGENTS_LIST="team-lead.md team-ba.md team-frontend.md team-dotnet.md team-backend.md team-qa.md"
+  SCRIPTS="git-flow.sh new-feature.sh run-command.sh checkpoint.sh devpilot-config.sh run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh session-start.sh deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh create-jira-ticket.sh create-jira-epic.sh update-jira-status.sh update-jira-description.sh add-jira-comment.sh generate-project-index.sh ceo.sh ceo-fix.sh ceo-plan.sh ceo-run.sh ceo-fe.sh ceo-be.sh ceo-db.sh ceo-int.sh"
+
+  info "Refreshing .devpilot/rules..."
+  fetch ".devpilot/rules.md" ".devpilot/rules.md"
+  for f in $RULE_SNIPPETS;   do fetch ".devpilot/rules/$f"        ".devpilot/rules/$f";        done
+  for f in $PROMPT_TEAM;     do fetch ".devpilot/prompts/team/$f" ".devpilot/prompts/team/$f"; done
+  for f in 6-env-diff.md 6-generate-tests.md; do fetch ".devpilot/prompts/$f" ".devpilot/prompts/$f"; done
+  for f in $TEMPLATE_TEAM;   do fetch ".devpilot/templates/team/$f" ".devpilot/templates/team/$f"; done
+  for f in changelog-entry.md ticket.md; do fetch ".devpilot/templates/$f" ".devpilot/templates/$f"; done
+  for f in $CHECKLISTS;      do fetch ".devpilot/checklists/$f"   ".devpilot/checklists/$f";   done
+  for f in $SKILLS;          do fetch ".devpilot/skills/$f"       ".devpilot/skills/$f";       done
+  fetch ".devpilot/config/models.md" ".devpilot/config/models.md"
+
+  info "Refreshing .claude/..."
+  for f in $CMDS;       do fetch ".claude/commands/$f" ".claude/commands/$f"; done
+  for f in $AGENTS_LIST; do fetch ".claude/agents/$f"  ".claude/agents/$f";  done
+
+  info "Refreshing scripts/..."
+  for f in $SCRIPTS; do fetch "scripts/$f" "scripts/$f"; chmod +x "scripts/$f" 2>/dev/null || true; done
+
+  echo ""
+  echo -e "${GREEN}  ✅ devpilot updated.${RESET}  project.config.md and .devpilot/config.sh were left untouched."
+  echo ""
+  exit 0
+}
+
+if [ "${1:-}" = "--update" ] || [ "${1:-}" = "update" ]; then
+  run_update
+fi
+
 # ── Banner ─────────────────────────────────────────────────────────────────────
 echo ""
 DEVPILOT_VERSION=""
@@ -355,7 +402,14 @@ section "STEP 8 — Project identity..."
 DEFAULT_NAME=$(basename "$PROJECT_ROOT")
 ask "  Project name [$DEFAULT_NAME]: ";    read -r PROJECT_NAME;   [ -z "$PROJECT_NAME" ]   && PROJECT_NAME="$DEFAULT_NAME"
 ask "  Ticket prefix (e.g. MSK, APP): ";   read -r TICKET_PREFIX;  [ -z "$TICKET_PREFIX" ]  && TICKET_PREFIX="KEY"
-ask "  Base branch [main]: ";              read -r BASE_BRANCH;    [ -z "$BASE_BRANCH" ]    && BASE_BRANCH="main"
+
+# Default base branch to develop when a develop branch exists (DEV→SIT→UAT→PRD pipeline).
+DEFAULT_BASE="main"
+if git show-ref --verify --quiet refs/heads/develop 2>/dev/null \
+   || git ls-remote --exit-code --heads origin develop >/dev/null 2>&1; then
+  DEFAULT_BASE="develop"
+fi
+ask "  Base branch [$DEFAULT_BASE]: ";      read -r BASE_BRANCH;    [ -z "$BASE_BRANCH" ]    && BASE_BRANCH="$DEFAULT_BASE"
 
 echo ""
 echo "  Issue tracker:"
@@ -370,6 +424,18 @@ case "${TRK_CHOICE:-1}" in
   *) TRACKER_TYPE="local" ;;
 esac
 info "Tracker: $TRACKER_TYPE"
+
+echo ""
+echo "  Merge policy:"
+echo "    [1] auto     — devpilot squash-merges the PR into $BASE_BRANCH automatically"
+echo "    [2] pr-only  — devpilot opens the PR; you merge it"
+MERGE_POLICY="auto"
+ask "  Choice [1]: "; read -r MP_CHOICE
+case "${MP_CHOICE:-1}" in
+  2) MERGE_POLICY="pr-only" ;;
+  *) MERGE_POLICY="auto" ;;
+esac
+info "Merge policy: $MERGE_POLICY"
 
 # ═════════════════════════════════════════════════════════════════════════════
 # STEP 9 — DOWNLOAD / COPY FILES
@@ -386,13 +452,13 @@ mkdir -p docs/{requirements,plans,qa,reviews,adrs,domain-models,fallback,impleme
 
 # .devpilot — shared rules, prompts, templates, skills
 info "Installing .devpilot/..."
-for f in rules.md config.sh; do
-  fetch ".devpilot/$f" ".devpilot/$f"
-done
+fetch ".devpilot/rules.md" ".devpilot/rules.md"
+# Never overwrite an existing config.sh — it holds the user's credentials.
+[ -f ".devpilot/config.sh" ] && info ".devpilot/config.sh exists — keeping it" || fetch ".devpilot/config.sh" ".devpilot/config.sh"
 
 # Per-stack rule snippets (router in rules.md tells agents which to read)
 mkdir -p .devpilot/rules
-for f in angular.md react-vue.md dotnet.md node.md python.md sqlserver.md postgres-mysql.md; do
+for f in angular.md react-vue.md dotnet.md node.md python.md go.md java.md sqlserver.md postgres-mysql.md; do
   fetch ".devpilot/rules/$f" ".devpilot/rules/$f"
 done
 
@@ -437,6 +503,14 @@ for f in team-lead.md team-ba.md team-frontend.md team-dotnet.md team-backend.md
   fetch ".claude/agents/$f" ".claude/agents/$f"
 done
 
+# SessionStart hook — install only if the user has no settings yet (never clobber).
+if [ ! -f ".claude/settings.json" ]; then
+  fetch ".claude/settings.json" ".claude/settings.json"
+  info ".claude/settings.json created (SessionStart hook → scripts/session-start.sh)"
+else
+  info ".claude/settings.json exists — to enable the warm-up hook, add a SessionStart entry running: bash scripts/session-start.sh"
+fi
+
 # .opencode/ — opencode project config
 info "Installing .opencode/..."
 fetch ".opencode/config.json" ".opencode/config.json"
@@ -459,7 +533,7 @@ fi
 # scripts/
 info "Installing scripts/..."
 for f in git-flow.sh new-feature.sh run-command.sh checkpoint.sh devpilot-config.sh \
-          run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh \
+          run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh session-start.sh \
           deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh \
           create-jira-ticket.sh create-jira-epic.sh \
           update-jira-status.sh update-jira-description.sh \
@@ -514,6 +588,12 @@ base_branch: $BASE_BRANCH
 
 tracker:
   type: $TRACKER_TYPE
+
+## Merge Policy
+# auto    — devpilot squash-merges the PR into base_branch automatically
+# pr-only — devpilot opens the PR and stops; a human merges it
+
+merge_policy: $MERGE_POLICY
 
 ## Tech Stack
 

@@ -25,6 +25,12 @@ fi
 if [ -f "$BODY_SRC" ]; then BODY=$(cat "$BODY_SRC"); else BODY="${BODY_SRC:-_(opened by devpilot)_}"; fi
 BRANCH=$(git branch --show-current)
 
+# Honor merge_policy from project.config.md: pr-only never auto-merges.
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+POLICY=$(grep -E '^[[:space:]]*merge_policy:' "$ROOT/project.config.md" 2>/dev/null | head -1 \
+  | sed 's/.*merge_policy:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
+[ "$POLICY" = "pr-only" ] && MERGE="--no-merge"
+
 push_branch() { git push -u origin "$BRANCH" >/dev/null 2>&1 || true; }
 
 if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
