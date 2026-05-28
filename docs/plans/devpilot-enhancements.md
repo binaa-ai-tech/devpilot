@@ -194,6 +194,44 @@ Each workstream is independently shippable and independently testable.
 
 ---
 
+## Workstream D — `/ceo` engine modes (inline flag)
+
+### Goal
+Let the operator choose, per task, how the work runs:
+
+| Flag | Mode | Behaviour |
+|------|------|-----------|
+| `--claude`   / `-c` | claude   | All phases + all coding on Claude subagents. |
+| `--opencode` / `-o` | opencode | Claude orchestrates; opencode writes all code. |
+| `--max`      / `-m` | max      | Coding runs on **both** Claude and opencode on isolated branches; the better implementation is judged and merged. |
+
+No flag → fall back to `engines.coding` in `project.config.md` (then `claude`).
+
+### Changes
+**D1 — `scripts/run-mode.sh`** — deterministic flag parser. `eval "$(bash
+scripts/run-mode.sh "$ARGUMENTS")"` sets `$RUN_MODE` and the flag-stripped `$TASK`.
+
+**D2 — `/ceo` resolves the mode first** (new Step 0) and announces it, then
+threads `RUN_MODE` into the full-team flow.
+
+**D3 — `team-task.md` Phase 3 dispatches on `RUN_MODE`:**
+- `claude` / `opencode` → existing single-engine paths (engine forced to the mode).
+- `max` → **dual-engine race**: commit plan/docs, branch `…-claude` and
+  `…-opencode` from the same point, run each engine on its own branch, then a
+  Team-Lead judge step (correctness vs ACs → build/tests green → cleaner diff)
+  picks a winner, squash-merges it into the feature branch, deletes both
+  candidates, and logs the rationale. If opencode is absent, max degrades
+  gracefully to single-engine claude with a note.
+
+### Acceptance criteria
+- [ ] `/ceo --opencode <task>` runs all coding through opencode regardless of config.
+- [ ] `/ceo --max <task>` produces two candidate branches, judges them, merges
+      one, and leaves the feature branch with the winning diff only.
+- [ ] `/ceo <task>` with no flag uses the config default unchanged.
+- [ ] `--max` on a machine without opencode completes as claude-only with a notice.
+
+---
+
 ## Risks / notes
 - Touching every command file (`ceo*.md`, `team-task.md`) for the wrapper
   swaps is mechanical but broad — do it per-workstream, not all at once.

@@ -7,6 +7,27 @@ Execute it fully. The only required human interactions are:
 1. Test on DEV and decide when to promote each stage
 2. Run opencode if Claude limit fallback is triggered (prompted automatically)
 
+**Engine modes** — an optional leading flag selects how the work runs:
+- `/ceo --claude <task>`   — all phases + coding on Claude subagents
+- `/ceo --opencode <task>` — Claude orchestrates; opencode writes all code
+- `/ceo --max <task>`      — race **both** engines, judge, merge the winner
+- no flag                  — uses `engines.coding` from `project.config.md`
+
+---
+
+## Step 0 — Resolve run mode (engine selection)
+
+Parse the optional leading flag and strip it from the task:
+
+```bash
+eval "$(bash scripts/run-mode.sh "$ARGUMENTS")"
+# $RUN_MODE = claude | opencode | max   ·   $TASK = task with the flag removed
+echo "Run mode: $RUN_MODE"
+```
+
+Use `$TASK` (not `$ARGUMENTS`) as the task description from here on, and carry
+`$RUN_MODE` into the full-team flow. Announce: "🎛  Run mode: `<RUN_MODE>`".
+
 ---
 
 ## Step 1 — Read project config
@@ -28,6 +49,8 @@ Read `project.config.md` — note base_branch, active agents, model routing.
 ## Feature or Bug → Full Team Flow
 
 Read `.claude/commands/team-task.md` and execute all 5 phases fully.
+Pass `$RUN_MODE` and `$TASK` through — Phase 3 dispatches on `$RUN_MODE`
+(`claude` / `opencode` / `max`).
 
 Run all phases autonomously. Do not stop unless:
 - A Claude limit triggers the fallback engine (self-heal.md handles this — see engines.fallback in project.config.md)

@@ -10,6 +10,14 @@ One command. AI team delivers the full feature or bug fix from requirement to PR
 /ceo <description of feature, bug, or production issue>
 ```
 
+**Engine modes** (optional leading flag — defaults to `engines.coding` in `project.config.md`):
+
+```
+/ceo --claude   <description>   # all phases + coding on Claude subagents
+/ceo --opencode <description>   # Claude orchestrates; opencode writes all code
+/ceo --max      <description>   # race BOTH engines, judge, merge the winner
+```
+
 ---
 
 ## How It Works

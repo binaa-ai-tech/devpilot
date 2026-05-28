@@ -35,12 +35,23 @@ Never skip a phase. Follow `.devpilot/rules.md` throughout.
    BASE_BRANCH=$(grep 'base_branch' project.config.md | head -1 | sed 's/.*base_branch:[[:space:]]*//')
    ```
 
-4. Set engine variables from `project.config.md → engines`:
+4. Set engine variables from `project.config.md → engines`, then apply the
+   run mode (`$RUN_MODE` from `/ceo` Step 0 — defaults to the config value):
    ```bash
    IMPL_ENGINE=$(grep -A 5 '^engines:' project.config.md | grep 'coding:' | head -1 | sed 's/.*coding:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
    FALLBACK_ENGINE=$(grep -A 5 '^engines:' project.config.md | grep 'fallback:' | head -1 | sed 's/.*fallback:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
    [ -z "$IMPL_ENGINE" ] && IMPL_ENGINE="claude"
+
+   # Run mode overrides the configured coding engine for this task.
+   RUN_MODE="${RUN_MODE:-$IMPL_ENGINE}"
+   case "$RUN_MODE" in
+     claude|opencode|antigravity) IMPL_ENGINE="$RUN_MODE" ;;   # single-engine
+     max)                         IMPL_ENGINE="claude" ;;      # max judges both; Claude is candidate A
+   esac
+   echo "Run mode: $RUN_MODE · coding engine: $IMPL_ENGINE"
    ```
+   When invoked directly (not via `/ceo`), `$RUN_MODE` is unset and falls back
+   to the configured engine — behaviour is unchanged.
 
 5. Set per-agent models — read from `coding_models.<IMPL_ENGINE>` section:
    ```bash
@@ -189,7 +200,13 @@ ACs: $AC_COUNT"
 
 ## Phase 3 — Implementation
 
-Read `project.config.md → engines.coding`. IMPL_ENGINE determines who writes the code.
+`$RUN_MODE` (resolved in Phase 0) determines how the code is written:
+
+| RUN_MODE | Follow |
+|----------|--------|
+| `claude` | **### Engine: `claude`** below |
+| `opencode` / `antigravity` | **### Engine: `opencode` or `antigravity`** below (IMPL_ENGINE is already set) |
+| `max` | **### Mode: `max`** below — race both engines and merge the winner |
 
 ---
 
@@ -301,6 +318,75 @@ fi
 ```
 
 Do NOT output a handoff block. Do NOT stop. Proceed directly to Phase 4 (QA) once all commands exit 0.
+
+---
+
+### Mode: `max` — dual-engine race (Claude + opencode)
+
+Implement the plan **twice** — once with Claude subagents, once with opencode —
+on isolated branches, then judge and merge the better result.
+
+**Pre-check:** if `command -v opencode` is missing, skip the race, run the
+`### Engine: claude` path on `$BRANCH`, announce
+"⚠️ max mode: opencode not installed — ran claude-only", and continue to Phase 4.
+
+1. **Set a common starting point** — commit the docs so both candidates diverge
+   from the same tree:
+   ```bash
+   git add docs/ && git commit -m "docs(<slug>): requirements + plan (max baseline)" || true
+   CAND_CLAUDE="${BRANCH}-claude"
+   CAND_OC="${BRANCH}-opencode"
+   git branch "$CAND_CLAUDE"
+   git branch "$CAND_OC"
+   ```
+
+2. **Candidate A — Claude:**
+   ```bash
+   git checkout "$CAND_CLAUDE"
+   ```
+   Spawn the developer agents exactly as in **### Engine: `claude`** above.
+   Wait for completion and confirm the work is committed on this branch.
+
+3. **Candidate B — opencode:**
+   ```bash
+   git checkout "$CAND_OC"
+   ```
+   Write the per-agent briefs and run opencode exactly as in
+   **### Engine: `opencode` or `antigravity`** above, using the `opencode`
+   models (`IMPL_MODEL_*`). Confirm the work is committed on this branch.
+
+4. **Judge — pick the winner.** For each candidate, check it out, run the
+   stack-appropriate build + tests, and capture the result:
+   ```bash
+   for C in "$CAND_CLAUDE" "$CAND_OC"; do
+     git checkout "$C"
+     echo "=== $C ==="; git diff "$BRANCH".."$C" --stat
+     # run build + tests for the stack; note PASS/FAIL
+   done
+   ```
+   As **Team Lead**, compare both against the acceptance criteria and
+   `.devpilot/rules.md`, in this priority order:
+   1. **Correctness** — meets every acceptance criterion.
+   2. **Build + tests green** — a failing build/test loses outright.
+   3. **Rule adherence + smaller, cleaner diff** — tiebreaker.
+   Choose `WINNER` (`claude` or `opencode`) and write a one-paragraph rationale.
+
+5. **Merge the winner, discard the loser:**
+   ```bash
+   git checkout "$BRANCH"
+   git merge --squash "${BRANCH}-${WINNER}"
+   git commit -m "feat(<slug>): implement via max mode (winner: ${WINNER})"
+   git branch -D "$CAND_CLAUDE" "$CAND_OC"
+   ```
+
+6. **Log the outcome:**
+   ```bash
+   bash scripts/add-jira-comment.sh "$KEY" "🏁 Max mode — winner: ${WINNER}
+Rationale: <one-line rationale>
+Both candidates built + tested; losing branch discarded."
+   ```
+
+Continue to Phase 4 (QA) on `$BRANCH`.
 
 ---
 

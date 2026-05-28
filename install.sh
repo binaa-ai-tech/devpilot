@@ -438,6 +438,7 @@ fi
 # scripts/
 info "Installing scripts/..."
 for f in git-flow.sh new-feature.sh run-command.sh checkpoint.sh devpilot-config.sh \
+          run-mode.sh \
           deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh \
           create-jira-ticket.sh create-jira-epic.sh \
           update-jira-status.sh update-jira-description.sh \
