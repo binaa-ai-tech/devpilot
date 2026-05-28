@@ -69,9 +69,9 @@ EOF
 
 ### Engine: `claude`
 
-Spawn `subagent_type: "team-dotnet"`:
+Spawn `subagent_type: "team-backend"`:
 
-> Integration task: `$ARGUMENTS`. Branch: `<BRANCH>`. Implement the integration change (messaging / external service / API connector). Read `.devpilot/skills/self-heal.md` and `.devpilot/rules.md`. Run build + integration tests if available. Commit with `feat|fix(integration): <description>`. Report: commit hash + what service was integrated + what changed in 3 bullets.
+> Integration task: `$ARGUMENTS`. Branch: `<BRANCH>`. Implement the integration change (messaging / external service / API connector). Read `.devpilot/skills/core-rules.md` and your backend stack snippet in `.devpilot/rules/`; read `.devpilot/skills/self-heal.md` if a step fails. Run build + integration tests if available. Commit with `feat|fix(integration): <description>`. Report: commit hash + what service was integrated + what changed in 3 bullets.
 
 ### Engine: `opencode`
 
@@ -107,17 +107,16 @@ If BLOCKED: fix the issue, then re-run QA.
 END_TIME=$(date '+%Y-%m-%d %H:%M:%S')
 COMMITS=$(git log ${BASE_BRANCH}..HEAD --oneline | awk '{print $1}' | head -10 | tr '\n' ' ')
 
-PR_URL=$(gh pr create \
-  --base "$BASE_BRANCH" \
-  --title "$KEY: $ARGUMENTS" \
-  --body "Integration change: $ARGUMENTS
+cat > /tmp/devpilot-pr-body.md << EOF
+Integration change: $ARGUMENTS
 
 QA: PASS — docs/qa/<SLUG>.md
-Commits: $COMMITS" | tail -1)
-PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
+Commits: $COMMITS
+EOF
 
 # Auto-merge into develop — production (main) requires /binaa-prd with human sign-off
-if gh pr merge "$PR_NUM" --squash --delete-branch 2>&1; then
+PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$KEY: $ARGUMENTS" /tmp/devpilot-pr-body.md)
+if [ $? -eq 0 ]; then
   bash scripts/update-jira-status.sh "$KEY" "Done"
   bash scripts/add-jira-comment.sh "$KEY" "✅ Merged into $BASE_BRANCH [$END_TIME]
 PR: $PR_URL

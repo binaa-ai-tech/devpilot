@@ -132,9 +132,9 @@ Use `IMPL_ENGINE` from Step 0 (already loaded from `project.config.md → engine
 Spawn agents in parallel for all scoped work. Use the same agent prompts as `/team-task` Phase 3:
 
 - **Frontend** → `subagent_type: "team-frontend"` if frontend work exists
-- **Backend** → `subagent_type: "team-dotnet"` if backend work exists
-- **DB** → `subagent_type: "team-dotnet"` if DB/migration work exists
-- **Integration** → `subagent_type: "team-dotnet"` if integration work exists
+- **Backend** → `subagent_type: "team-backend"` if backend work exists
+- **DB** → `subagent_type: "team-backend"` if DB/migration work exists
+- **Integration** → `subagent_type: "team-backend"` if integration work exists
 
 Each agent prompt:
 > Task: `<task description>`. Requirements: `docs/requirements/<SLUG>.md`. Plan: `docs/plans/<SLUG>.md`. Branch: `<BRANCH>`. Implement all <scope> work per the plan. Read `.devpilot/skills/self-heal.md`. Run build + tests. Commit with conventional commit message. Report what you built in 3 bullets.
@@ -189,14 +189,9 @@ If BLOCKED: fix and re-run QA.
    ```
 3. Create PR + auto-merge into develop:
    ```bash
-   PR_URL=$(gh pr create \
-     --base "$BASE_BRANCH" \
-     --title "$KEY: <description>" \
-     --body "$(cat docs/reviews/<SLUG>.md)" | tail -1)
-   PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
-
    # Auto-merge into develop — production (main) requires /binaa-prd with human sign-off
-   if gh pr merge "$PR_NUM" --squash --delete-branch 2>&1; then
+   PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$KEY: <description>" "docs/reviews/<SLUG>.md")
+   if [ $? -eq 0 ]; then
      bash scripts/update-jira-status.sh "$KEY" "Done"
    else
      bash scripts/update-jira-status.sh "$KEY" "In Review"
