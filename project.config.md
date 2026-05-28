@@ -8,6 +8,14 @@ project_type: fullstack          # frontend | backend | fullstack | db | integra
 ticket_prefix: "KEY"             # e.g. MSK, APP, PRJ — matches Jira project key (lowercase in branches)
 base_branch: main                # main | develop
 
+## Issue Tracker
+# local  — no external service; tasks logged to docs/tasks/<KEY>.md  (zero setup — default)
+# github — GitHub Issues via the gh CLI (falls back to local if gh is unavailable)
+# jira   — Jira Cloud (set credentials in .devpilot/config.sh)
+
+tracker:
+  type: local                    # local | github | jira
+
 ## Tech Stack
 
 stack:

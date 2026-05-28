@@ -354,8 +354,22 @@ section "STEP 8 — Project identity..."
 
 DEFAULT_NAME=$(basename "$PROJECT_ROOT")
 ask "  Project name [$DEFAULT_NAME]: ";    read -r PROJECT_NAME;   [ -z "$PROJECT_NAME" ]   && PROJECT_NAME="$DEFAULT_NAME"
-ask "  Jira prefix (e.g. MSK, APP): ";     read -r TICKET_PREFIX;  [ -z "$TICKET_PREFIX" ]  && TICKET_PREFIX="KEY"
+ask "  Ticket prefix (e.g. MSK, APP): ";   read -r TICKET_PREFIX;  [ -z "$TICKET_PREFIX" ]  && TICKET_PREFIX="KEY"
 ask "  Base branch [main]: ";              read -r BASE_BRANCH;    [ -z "$BASE_BRANCH" ]    && BASE_BRANCH="main"
+
+echo ""
+echo "  Issue tracker:"
+echo "    [1] local   — no setup; tasks logged to docs/tasks/  (recommended for solo / quick start)"
+echo "    [2] github  — GitHub Issues via the gh CLI"
+echo "    [3] jira    — Jira Cloud (needs credentials in .devpilot/config.sh)"
+TRACKER_TYPE="local"
+ask "  Choice [1]: "; read -r TRK_CHOICE
+case "${TRK_CHOICE:-1}" in
+  2) TRACKER_TYPE="github" ;;
+  3) TRACKER_TYPE="jira" ;;
+  *) TRACKER_TYPE="local" ;;
+esac
+info "Tracker: $TRACKER_TYPE"
 
 # ═════════════════════════════════════════════════════════════════════════════
 # STEP 9 — DOWNLOAD / COPY FILES
@@ -438,7 +452,7 @@ fi
 # scripts/
 info "Installing scripts/..."
 for f in git-flow.sh new-feature.sh run-command.sh checkpoint.sh devpilot-config.sh \
-          run-mode.sh \
+          run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh \
           deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh \
           create-jira-ticket.sh create-jira-epic.sh \
           update-jira-status.sh update-jira-description.sh \
@@ -487,6 +501,12 @@ project_name: "$PROJECT_NAME"
 project_type: $DETECTED_TYPE
 ticket_prefix: "$TICKET_PREFIX"
 base_branch: $BASE_BRANCH
+
+## Issue Tracker
+# local | github | jira  — switch anytime by editing this value.
+
+tracker:
+  type: $TRACKER_TYPE
 
 ## Tech Stack
 
