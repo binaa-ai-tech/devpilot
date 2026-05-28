@@ -46,7 +46,24 @@ Read `project.config.md` — note base_branch, active agents, model routing.
 
 ---
 
-## Feature or Bug → Full Team Flow
+## Step 2b — Route by size (token-lean)
+
+After the type, size-classify so small work skips the heavy 5-phase flow and
+its five docs. Use `scripts/scope.sh "$TASK"` to gauge how many files/layers
+are involved.
+
+| Size | Signal | Route |
+|------|--------|-------|
+| **Trivial** | one file; copy / text / config tweak; no real logic | run `.claude/commands/ceo-fix.md` |
+| **Single-layer** | clearly one of FE / BE / DB and self-contained | run `.claude/commands/ceo-subdomain.md` with that scope |
+| **Multi-layer / large** | spans layers, or > ~5 acceptance criteria | full team flow below |
+
+Prefer the lighter route when in doubt; escalate to the full flow only if the
+lighter track uncovers cross-layer work. HOTFIX always uses the expedited flow.
+
+---
+
+## Feature or Bug (multi-layer / large) → Full Team Flow
 
 Read `.claude/commands/team-task.md` and execute all 5 phases fully.
 Pass `$RUN_MODE` and `$TASK` through — Phase 3 dispatches on `$RUN_MODE`

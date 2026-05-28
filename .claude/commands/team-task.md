@@ -208,6 +208,10 @@ ACs: $AC_COUNT"
 | `opencode` / `antigravity` | **### Engine: `opencode` or `antigravity`** below (IMPL_ENGINE is already set) |
 | `max` | **### Mode: `max`** below — race both engines and merge the winner |
 
+> **Token discipline:** brief each agent with a *compact* context (see
+> `.devpilot/skills/compact-context.md`) — the acceptance criteria plus the
+> named files to touch — not raw `docs/requirements` / `docs/plans` file dumps.
+
 ---
 
 ### Engine: `claude`

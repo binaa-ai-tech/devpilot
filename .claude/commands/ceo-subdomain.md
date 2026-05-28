@@ -182,6 +182,18 @@ Proceed to QA when it exits 0.
 
 ---
 
+## Step 2b — Enforce the scope lock
+
+After the agent finishes, verify it stayed inside the layer:
+```bash
+STRICT=1 bash scripts/scope-guard.sh "$SCOPE" "$BASE_BRANCH"
+```
+If it reports out-of-scope files, the lock was violated — revert those files (or
+re-brief the agent to undo them) before continuing. Only proceed to QA once the
+guard passes.
+
+---
+
 ## Step 3 — QA Verification (Layer-Targeted)
 
 Spawn `subagent_type: "team-qa"` with a targeted brief:
