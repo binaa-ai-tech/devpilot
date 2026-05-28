@@ -222,19 +222,19 @@ Spawn with `subagent_type: "team-frontend"`:
 
 **Backend Agent** (if `agents.backend.enabled: true` AND backend work identified)
 
-Spawn with `subagent_type: "team-dotnet"`:
+Spawn with `subagent_type: "team-backend"`:
 
 > Task: `[task description]`. Requirements: `docs/requirements/<slug>.md`. Plan: `docs/plans/<slug>.md`. Branch: `<branch>`. Implement all backend work per the plan. Read `.devpilot/skills/self-heal.md`. Run build + tests. Commit with conventional commit message. Report what you built in 3 bullets.
 
 **DB Agent** (if `agents.db.enabled: true` AND DB schema/migration work identified)
 
-Spawn with `subagent_type: "team-dotnet"`:
+Spawn with `subagent_type: "team-backend"`:
 
 > Task: DB changes for `[task description]`. Branch: `<branch>`. Implement all migrations per the plan. Run migration tests. Commit.
 
 **Integration Agent** (if `agents.integration.enabled: true` AND integration work identified)
 
-Spawn with `subagent_type: "team-dotnet"`:
+Spawn with `subagent_type: "team-backend"`:
 
 > Task: Integration work for `[task description]`. Branch: `<branch>`. Implement all integration work per the plan. Run tests. Commit.
 
@@ -422,20 +422,16 @@ If BLOCKED: fix the issue (spawn the relevant agent again), then re-run QA.
    git add docs/
    git commit -m "docs(<slug>): add requirements, plan, qa, and review docs"
    ```
-5. **Create PR + auto-merge into develop:**
+5. **Create PR + auto-merge into develop** (tool-agnostic — uses `gh` if present,
+   else prints a compare URL / GitHub-MCP fallback):
    ```bash
-   PR_URL=$(gh pr create \
-     --base "$BASE_BRANCH" \
-     --title "<KEY>: <description>" \
-     --body "$(cat docs/reviews/<slug>.md)" | tail -1)
-   PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
-
    # Auto-merge into develop — production (main) requires /binaa-prd with human sign-off
-   if gh pr merge "$PR_NUM" --squash --delete-branch 2>&1; then
+   PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$KEY: <description>" "docs/reviews/<slug>.md")
+   if [ $? -eq 0 ]; then
      bash scripts/update-jira-status.sh "$KEY" "Done"
    else
      bash scripts/update-jira-status.sh "$KEY" "In Review"
-     echo "⚠️  Auto-merge failed — merge $PR_URL manually, then: bash scripts/update-jira-status.sh $KEY Done"
+     echo "⚠️  Merge not completed automatically — finish it at: $PR_URL"
    fi
    ```
 

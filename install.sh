@@ -390,11 +390,17 @@ for f in rules.md config.sh; do
   fetch ".devpilot/$f" ".devpilot/$f"
 done
 
+# Per-stack rule snippets (router in rules.md tells agents which to read)
+mkdir -p .devpilot/rules
+for f in angular.md react-vue.md dotnet.md node.md python.md sqlserver.md postgres-mysql.md; do
+  fetch ".devpilot/rules/$f" ".devpilot/rules/$f"
+done
+
 for f in 6-env-diff.md 6-generate-tests.md; do
   fetch ".devpilot/prompts/$f" ".devpilot/prompts/$f"
 done
 
-for f in ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md qa-agent.md; do
+for f in ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md backend-agent.md qa-agent.md; do
   fetch ".devpilot/prompts/team/$f" ".devpilot/prompts/team/$f"
 done
 
@@ -410,7 +416,7 @@ for f in feature.md bugfix.md hotfix.md; do
   fetch ".devpilot/checklists/$f" ".devpilot/checklists/$f"
 done
 
-for f in get-shit-done.md spec-first.md security-scan.md performance-review.md architecture-guard.md self-heal.md definition-of-done.md compact-context.md; do
+for f in get-shit-done.md spec-first.md security-scan.md performance-review.md architecture-guard.md self-heal.md definition-of-done.md compact-context.md core-rules.md; do
   fetch ".devpilot/skills/$f" ".devpilot/skills/$f"
 done
 
@@ -422,11 +428,11 @@ for f in ceo.md ceo-plan.md ceo-run.md ceo-fix.md ceo-fe.md ceo-be.md ceo-db.md 
          ceo-issue.md ceo-subdomain.md \
          binaa.md binaa-sit.md binaa-uat.md binaa-prd.md binaa-hotfix.md \
          binaa-reconfig.md binaa-models.md binaa-index.md \
-         team-task.md team-ba.md team-lead.md team-frontend.md team-dotnet.md team-qa.md; do
+         team-task.md team-ba.md team-lead.md team-frontend.md team-dotnet.md team-backend.md team-qa.md; do
   fetch ".claude/commands/$f" ".claude/commands/$f"
 done
 
-for f in team-lead.md team-ba.md team-frontend.md team-dotnet.md team-qa.md; do
+for f in team-lead.md team-ba.md team-frontend.md team-dotnet.md team-backend.md team-qa.md; do
   fetch ".claude/agents/$f" ".claude/agents/$f"
 done
 

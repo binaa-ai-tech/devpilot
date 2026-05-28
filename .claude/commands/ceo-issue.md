@@ -150,7 +150,7 @@ Spawn `subagent_type: "team-frontend"`:
 
 **Backend agent** (spawn only if KEY_BE was created):
 
-Spawn `subagent_type: "team-dotnet"`:
+Spawn `subagent_type: "team-backend"`:
 > Issue fix: `$ARGUMENTS`. Jira: `<KEY_BE>`. Branch: `<BRANCH>`.
 > Root cause: `<root cause hypothesis>`.
 > **SCOPE LOCK: You may ONLY modify files in these paths: `<backend directories from project index>`. Do not touch any frontend, DB migration, or shared-model files unless they are part of a direct backend contract change.**
@@ -160,7 +160,7 @@ Spawn `subagent_type: "team-dotnet"`:
 
 **DB agent** (spawn only if KEY_DB was created):
 
-Spawn `subagent_type: "team-dotnet"`:
+Spawn `subagent_type: "team-backend"`:
 > DB issue fix: `$ARGUMENTS`. Jira: `<KEY_DB>`. Branch: `<BRANCH>`.
 > **SCOPE LOCK: Migrations and stored procedures ONLY. Do not touch application code.**
 > Read `.devpilot/rules.md → SQL Server` section.
@@ -232,10 +232,8 @@ If BLOCKED: fix and re-run QA. If P0 severity: escalate immediately before re-ru
 END_TIME=$(date '+%Y-%m-%d %H:%M:%S')
 ALL_COMMITS=$(git log ${BASE_BRANCH}..HEAD --oneline | awk '{print $1}' | head -10 | tr '\n' ' ')
 
-PR_URL=$(gh pr create \
-  --base "$BASE_BRANCH" \
-  --title "$EPIC_KEY: fix: <issue summary>" \
-  --body "## Issue Fix: $ARGUMENTS
+cat > /tmp/devpilot-pr-body.md << EOF
+## Issue Fix: $ARGUMENTS
 
 **Severity:** <P0/P1/P2>
 **Root cause:** <hypothesis confirmed or revised>
@@ -243,11 +241,11 @@ PR_URL=$(gh pr create \
 **Sub-tasks:** ${KEY_FE:-—} · ${KEY_BE:-—} · ${KEY_DB:-—}
 **QA:** PASS — docs/qa/<SLUG>.md
 
-Commits: $ALL_COMMITS" | tail -1)
+Commits: $ALL_COMMITS
+EOF
 
-PR_NUM=$(echo "$PR_URL" | grep -oE '[0-9]+$')
-
-if gh pr merge "$PR_NUM" --squash --delete-branch 2>&1; then
+PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$EPIC_KEY: fix: <issue summary>" /tmp/devpilot-pr-body.md)
+if [ $? -eq 0 ]; then
   bash scripts/update-jira-status.sh "$EPIC_KEY" "Done"
   bash scripts/add-jira-comment.sh "$EPIC_KEY" "✅ Merged [$END_TIME]
 PR: $PR_URL
@@ -255,7 +253,7 @@ Duration: $START_TIME → $END_TIME
 → Promote: /binaa-sit <version>"
 else
   bash scripts/update-jira-status.sh "$EPIC_KEY" "In Review"
-  echo "⚠️  Auto-merge failed — merge $PR_URL manually"
+  echo "⚠️  Merge not completed automatically — finish it at: $PR_URL"
 fi
 
 # Final checkpoint update
