@@ -1,8 +1,28 @@
+# ── Local config & secrets (never commit) ───────────────────────────────────
 .devpilot/config.sh
 .devpilot/.scope-lock
 .env
 .env.local
 .env.*.local
+
+# ── Generated / transient task output ────────────────────────────────────────
 docs/fallback/
+
+# ── opencode local install (regenerate: cd .opencode && npm install) ─────────
 .opencode/node_modules/
 .opencode/package-lock.json
+
+# ── OS / editor junk ─────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.log
