@@ -4,7 +4,7 @@
 
 **One command. An AI team ships the whole feature — from BA breakdown to merged PR.**
 
-[![Version](https://img.shields.io/badge/version-2.3.0-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-2.4.0-blue.svg)](VERSION)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#license)
 [![Engines](https://img.shields.io/badge/engines-Claude%20%7C%20OpenCode%20%7C%20Antigravity-7c3aed.svg)](#configuration)
 [![Stacks](https://img.shields.io/badge/stacks-.NET%20%7C%20Node%20%7C%20Python%20%7C%20Go%20%7C%20Java%20%7C%20Angular%20%7C%20React-orange.svg)](#stack-support)
@@ -321,14 +321,23 @@ devpilot works on **only the code relevant to the task** — never the whole rep
 
 ## Issue Tracking
 
-Zero setup by default. devpilot logs each task's lifecycle (start → plan → implementation → QA →
-merge) through `scripts/track.sh`, so you can switch backends anytime without touching a command.
+Zero setup by default. Tracking works at **two altitudes** so a task is fully auditable without
+flooding the ticket (see `core-rules` #11):
+
+- **`docs/tasks/<KEY>.md`** — the live, per-step log: who/what/when, decisions, and deviations.
+  Durable, diffable, and it survives even if the ticket is archived.
+- **The ticket** (Jira/GitHub) — only two routine comments: a **start** comment and a single
+  **DONE** summary, plus status transitions. A **QA BLOCKED** / hard-failure comment is the only
+  exception. Routine progress (plan-complete, impl-complete, QA-passed, merged) goes to the task
+  log, not the ticket — it would just duplicate the PR and the DONE block.
+
+Switch backends anytime via `scripts/track.sh` without touching a command:
 
 | `tracker.type` | Behaviour | Setup |
 |----------------|-----------|-------|
-| `local` *(default)* | Logs to `docs/tasks/<KEY>.md` — no external service | none |
-| `github` | Opens & comments on GitHub Issues via `gh` | `gh auth login` (falls back to `local`) |
-| `jira` | Full Jira Cloud integration | credentials in `.devpilot/config.sh` |
+| `local` *(default)* | Everything in `docs/tasks/<KEY>.md` — no external service | none |
+| `github` | Start + DONE on GitHub Issues via `gh`; detail in the task log | `gh auth login` (falls back to `local`) |
+| `jira` | Start + DONE on Jira Cloud; detail in the task log | credentials in `.devpilot/config.sh` |
 
 ---
 
