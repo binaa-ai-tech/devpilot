@@ -301,6 +301,14 @@ engines:
   runner: claude                # claude | opencode | antigravity | custom
   fallback: opencode            # engine to use when primary hits a limit
 
+# Route a single layer to a different engine than engines.coding.
+# An explicit override here also wins over the runner=claude coupling below.
+layer_overrides:
+  frontend:    ""               # e.g. opencode → FE via coding_models.opencode.frontend
+  backend:     ""               # e.g. opencode → BE via coding_models.opencode.backend
+  db:          ""
+  integration: ""
+
 coding_models:
   opencode:
     frontend:    "github-copilot/gpt-4o"
@@ -312,6 +320,11 @@ coding_models:
     backend:     ""
     db:          ""
     integration: ""
+  ollama:                       # fully offline local models (opencode/antigravity)
+    frontend:    "ollama/qwen2.5-coder:14b"
+    backend:     "ollama/deepseek-coder-v2:16b"
+    db:          "ollama/qwen2.5-coder:7b"
+    integration: "ollama/qwen2.5-coder:7b"
 
 agents:
   ba:          { enabled: true,  model: "claude-sonnet-4-6" }
@@ -343,6 +356,24 @@ engines:
   runner: antigravity
   fallback: opencode
 ```
+
+**Entry-point coupling** (enforced by `scripts/resolve-engine.sh`):
+
+- **Run from Claude Code** → the whole lifecycle stays on the Claude model family. Coding is forced to `claude` regardless of `engines.coding`, *unless* a `layer_overrides` entry routes a specific layer elsewhere.
+- **Run from OpenCode / Antigravity** → the entire lifecycle runs natively on that engine's models (including local models via Ollama).
+- **Per-run override** → a leading flag on `/ceo` forces one engine across every layer for that run:
+  ```bash
+  /ceo --claude   <task>   # all phases + coding on Claude subagents
+  /ceo --opencode <task>   # Claude orchestrates; opencode writes all code
+  /ceo --max      <task>   # race both engines, judge, merge the winner
+  ```
+- **Layer override** → keep orchestration + most coding on Claude, but generate one layer (e.g. backend) via opencode + GitHub Copilot:
+  ```yaml
+  layer_overrides:
+    backend: opencode
+  ```
+
+Every command (`/ceo`, `/ceo-issue`, `/ceo-subdomain`, `/ceo-fix`, `/team-task`, per-layer commands) resolves engines through the same coupling, runs a git-driven **preflight scan** to enrich missing ticket detail, and appends a **per-model run summary** to the tracker after each execution.
 
 Change models for a single agent without touching the file:
 
@@ -499,6 +530,9 @@ scripts/
   rollback.sh        # Prepare a safe rollback to a previous release tag
   install-git-hooks.sh     # Install the Conventional-Commits commit-msg hook
   run-command.sh     # Generic AI command runner — routes to claude | opencode | antigravity
+  resolve-engine.sh  # Engine resolver — Claude-entry coupling + layer_overrides (single source of truth)
+  preflight-scan.sh  # Git-driven context enrichment → docs/preflight/<slug>.md (no LLM)
+  run-summary.sh     # Per-model run summary → appended to the tracker after each task
   checkpoint.sh      # Task state persistence engine
   devpilot-config.sh # Credential management + Jira validation CLI
   git-flow.sh        # Feature/release/hotfix branch helper
@@ -525,7 +559,7 @@ install.sh           # One-command installer
 
 ## Testing & CI
 
-devpilot ships its own test suite — `bash tests/run.sh` exercises the helper scripts (`run-mode`, `track`, `scope`, `scope-guard`, `open-pr`). `.github/workflows/ci.yml` runs `shellcheck` + bash syntax checks + the suite on every push and PR, so changes to devpilot itself stay green.
+devpilot ships its own test suite — `bash tests/run.sh` exercises the helper scripts (`run-mode`, `track`, `scope`, `scope-guard`, `open-pr`, `resolve-engine`, `preflight-scan`, `run-summary`). `.github/workflows/ci.yml` is split so cost follows the lifecycle: pull requests run only the cheap gate (`shellcheck` + bash syntax checks + the suite), while the full pipeline runs on push to `base_branch` after a PR merges — so PR iterations stay fast and expensive workflows fire once per merge.
 
 ---
 

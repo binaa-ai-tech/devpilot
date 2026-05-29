@@ -45,7 +45,10 @@ if [ "$SCOPE" = "backend" ] && [ "$(grep -A 10 '^agents:' project.config.md | gr
   exit 1
 fi
 
-IMPL_ENGINE=$(grep -A 10 '^engines:' project.config.md | grep '^\s*coding:' | head -1 | sed 's/.*coding:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
+# Resolve engine + model for the locked layer ($SCOPE). resolve-engine.sh applies
+# the Claude-entry coupling and any layer_overrides — single source of truth.
+eval "$(bash scripts/resolve-engine.sh layer "$SCOPE")"
+IMPL_ENGINE="$LAYER_ENGINE"; IMPL_MODEL="$LAYER_MODEL"
 [ -z "$IMPL_ENGINE" ] && IMPL_ENGINE="claude"
 ```
 
@@ -57,6 +60,9 @@ Create a single targeted ticket for the scope, transition it to In Progress, and
 
 ```bash
 SLUG=$(echo "$TASK_DESC" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g' | sed -E 's/-+/-/g' | sed -E 's/^-|-$//g' | cut -d'-' -f1-5)
+
+# Pre-flight scan — enrich a thin ticket with local signal (read-only, no LLM).
+PREFLIGHT=$(bash scripts/preflight-scan.sh "$TASK_DESC" "$SLUG")
 
 KEY=$(bash scripts/create-jira-ticket.sh "[${SCOPE^^}] ${TASK_DESC}" "$TASK_DESC" "Task")
 bash scripts/update-jira-status.sh "$KEY" "In Progress"
@@ -236,6 +242,8 @@ EOF
 
 PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$KEY: [$SCOPE] $TASK_DESC" /tmp/devpilot-pr-body-$$.md)
 if [ $? -eq 0 ]; then
+  DEVPILOT_ENGINES="$SCOPE: $IMPL_ENGINE${IMPL_MODEL:+ ($IMPL_MODEL)}" \
+    bash scripts/run-summary.sh "$KEY" "$SLUG" "<what changed>" "QA: PASS" "$BASE_BRANCH" --post
   bash scripts/update-jira-status.sh "$KEY" "Done"
   bash scripts/add-jira-comment.sh "$KEY" "✅ Layer-Locked PR merged into $BASE_BRANCH [$END_TIME]
 PR: $PR_URL

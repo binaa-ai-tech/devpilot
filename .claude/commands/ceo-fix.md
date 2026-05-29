@@ -35,6 +35,22 @@ Validate: if `project.config.md` is missing or `base_branch` is empty, stop and 
 
 ---
 
+## Step 0b — Pre-flight scan (context enrichment)
+
+Tickets are often thin. Gather local signal before scoping so you infer the right
+files and layer instead of guessing:
+
+```bash
+SLUG=<derive in Step 1; for now use a short slug from "$ARGUMENTS">
+PREFLIGHT=$(bash scripts/preflight-scan.sh "$ARGUMENTS" "$SLUG")
+```
+
+Read `$PREFLIGHT` — use the recent history, working-tree diff, and "files likely
+in scope" sections to localize the root cause faster. This is read-only signal; it
+calls no LLM.
+
+---
+
 ## Step 1 — Team Lead: Scope the fix
 
 **Adopt Team Lead persona.** Read `.devpilot/prompts/team/lead-plan.md` and `.devpilot/skills/debug-method.md` (reproduce → localize → root cause before changing code).
@@ -201,6 +217,10 @@ EOF
 # Auto-merge into develop — production (main) requires /binaa-prd with human sign-off
 PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$KEY: fix: <summary>" /tmp/devpilot-pr-body-$$.md)
 if [ $? -eq 0 ]; then
+  # Generate an execution summary and append it to the ticket. The ticket only
+  # moves to Done AFTER the merge succeeds and the summary is posted — until
+  # then it stays In Progress (set in Step 2).
+  bash scripts/run-summary.sh "$KEY" "<SLUG>" "<root cause>" "QA: PASS" "$BASE_BRANCH" --post
   bash scripts/update-jira-status.sh "$KEY" "Done"
   bash scripts/add-jira-comment.sh "$KEY" "✅ Merged into $BASE_BRANCH [$END_TIME]
 PR: $PR_URL

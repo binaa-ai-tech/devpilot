@@ -96,18 +96,26 @@ Speed is critical. Skip BA and go directly to planning.
 
 **Phase 3 — Implementation (minimal diff only)**
 
-Read `project.config.md → implementation.engine`.
+Resolve the engine for the broken layer (`backend` shown; use `frontend` if the
+fix is FE). `resolve-engine.sh` applies the Claude-entry coupling + `layer_overrides`.
+A `--claude`/`--opencode`/`--max` flag on `/ceo` (`$RUN_MODE`) forces that engine.
+```bash
+eval "$(bash scripts/resolve-engine.sh layer backend)"
+HOTFIX_ENGINE="$LAYER_ENGINE"; HOTFIX_MODEL="$LAYER_MODEL"
+case "$RUN_MODE" in claude|opencode|antigravity) HOTFIX_ENGINE="$RUN_MODE" ;; max) HOTFIX_ENGINE="claude" ;; esac
+[ -z "$HOTFIX_ENGINE" ] && HOTFIX_ENGINE="claude"
+```
 
-If engine = `opencode` or `antigravity`:
+If `$HOTFIX_ENGINE` = `opencode` or `antigravity`:
   ⚠️ **CRITICAL: Use the Bash tool to run the engine command directly. NEVER output a HANDOFF block.**
   Write `docs/implementation/<slug>-hotfix.md` with the minimal fix scope (one agent only).
   Then immediately run via Bash tool:
   ```bash
-  $IMPL_ENGINE --model "$IMPL_MODEL_BE" < "docs/implementation/<slug>-hotfix.md"
+  $HOTFIX_ENGINE --model "$HOTFIX_MODEL" < "docs/implementation/<slug>-hotfix.md"
   ```
   Proceed to Phase 4 when it exits 0.
 
-If engine = `claude`:
+If `$HOTFIX_ENGINE` = `claude`:
   Spawn only the relevant agent (frontend OR backend — not both unless both are broken).
   Brief: minimum diff, no refactoring, no unrelated changes, follow hotfix rules in `.devpilot/rules.md`.
 

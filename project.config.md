@@ -69,12 +69,34 @@ agents:
 #   opencode     — fallback to opencode
 #   antigravity  — fallback to antigravity
 #   none         — disable auto-fallback
+#
+# Entry-point coupling (enforced by scripts/resolve-engine.sh):
+#   When runner = claude, the whole lifecycle stays on the Claude model family —
+#   coding is forced to `claude` regardless of the value below, UNLESS a
+#   layer_overrides entry explicitly routes that layer elsewhere.
+#   When runner = opencode/antigravity, the lifecycle runs natively on that
+#   engine's models (including local models via Ollama — see coding_models.ollama).
 
 engines:
   orchestrator: claude
   coding: claude                 # claude | opencode | antigravity
   runner: claude                 # claude | opencode | antigravity | custom
   fallback: opencode             # opencode | antigravity | none
+
+## Layer-Specific Engine Overrides
+#
+# Route a single codebase layer to a different coding engine than engines.coding.
+# Use case: keep orchestration + most coding on Claude, but generate backend (or
+# frontend) code via opencode + GitHub Copilot models.
+#
+# Each value: claude | opencode | antigravity | "" (empty = inherit engines.coding)
+# An explicit override here also wins over the runner=claude coupling above.
+
+layer_overrides:
+  frontend:    ""                # e.g. opencode  → FE code via coding_models.opencode.frontend
+  backend:     ""                # e.g. opencode  → BE code via coding_models.opencode.backend
+  db:          ""
+  integration: ""
 
 ## Coding Engine Models
 #
@@ -102,6 +124,15 @@ coding_models:
     backend:     ""
     db:          ""
     integration: ""
+
+  # Local models via Ollama (opencode/antigravity can target these — fully offline).
+  # Used when a layer's resolved model is empty and DEVPILOT_LOCAL=1, or when you
+  # set a layer override's model to one of these. Run: ollama list
+  ollama:
+    frontend:    "ollama/qwen2.5-coder:14b"
+    backend:     "ollama/deepseek-coder-v2:16b"
+    db:          "ollama/qwen2.5-coder:7b"
+    integration: "ollama/qwen2.5-coder:7b"
 
 ## Model Routing — Claude (orchestration phases only)
 #

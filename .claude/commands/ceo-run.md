@@ -17,19 +17,18 @@ KEY="$ARGUMENTS"   # e.g. MSK-22
 
 BASE_BRANCH=$(grep '^base_branch:' project.config.md | head -1 | sed 's/base_branch:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
 
-IMPL_ENGINE=$(grep -A 10 '^engines:' project.config.md | grep '^\s*coding:' | head -1 | sed 's/.*coding:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
-[ -z "$IMPL_ENGINE" ] && IMPL_ENGINE="claude"
+# Resolve engine + model PER LAYER via resolve-engine.sh — the single source of
+# truth. It applies the Claude-entry coupling (runner=claude → all Claude) and any
+# layer_overrides. ENG_<layer> = engine for that layer; IMPL_MODEL_<layer> = model.
+_resolve() { eval "$(bash scripts/resolve-engine.sh layer "$1")"; printf '%s\t%s' "$LAYER_ENGINE" "$LAYER_MODEL"; }
+IFS=$'\t' read -r ENG_FE  IMPL_MODEL_FE  < <(_resolve frontend)
+IFS=$'\t' read -r ENG_BE  IMPL_MODEL_BE  < <(_resolve backend)
+IFS=$'\t' read -r ENG_DB  IMPL_MODEL_DB  < <(_resolve db)
+IFS=$'\t' read -r ENG_INT IMPL_MODEL_INT < <(_resolve integration)
 
-# Load per-agent models from the active engine's section in coding_models:
-_model() {
-  grep -A 20 "^  ${IMPL_ENGINE}:" project.config.md 2>/dev/null \
-    | grep "    ${1}:" | head -1 \
-    | sed "s/.*${1}:[[:space:]]*//" | tr -d '"' | awk '{print $1}'
-}
-IMPL_MODEL_FE=$(_model frontend)
-IMPL_MODEL_BE=$(_model backend)
-IMPL_MODEL_DB=$(_model db)
-IMPL_MODEL_INT=$(_model integration)
+# Layer-agnostic default engine (coupled CODING) for logging / references.
+eval "$(bash scripts/resolve-engine.sh effective)"
+IMPL_ENGINE="$CODING"; [ -z "$IMPL_ENGINE" ] && IMPL_ENGINE="claude"
 ```
 
 Also load and validate the checkpoint if one exists for KEY:
@@ -154,10 +153,10 @@ Then execute each brief directly via bash — run sequentially, block until each
 
 ```bash
 # Run only agents with work in the plan
-[ -f "docs/implementation/${SLUG}-frontend.md" ]    && $IMPL_ENGINE --model "$IMPL_MODEL_FE"  < "docs/implementation/${SLUG}-frontend.md"
-[ -f "docs/implementation/${SLUG}-backend.md" ]     && $IMPL_ENGINE --model "$IMPL_MODEL_BE"  < "docs/implementation/${SLUG}-backend.md"
-[ -f "docs/implementation/${SLUG}-db.md" ]          && $IMPL_ENGINE --model "$IMPL_MODEL_DB"  < "docs/implementation/${SLUG}-db.md"
-[ -f "docs/implementation/${SLUG}-integration.md" ] && $IMPL_ENGINE --model "$IMPL_MODEL_INT" < "docs/implementation/${SLUG}-integration.md"
+[ -f "docs/implementation/${SLUG}-frontend.md" ]    && $ENG_FE  --model "$IMPL_MODEL_FE"  < "docs/implementation/${SLUG}-frontend.md"
+[ -f "docs/implementation/${SLUG}-backend.md" ]     && $ENG_BE  --model "$IMPL_MODEL_BE"  < "docs/implementation/${SLUG}-backend.md"
+[ -f "docs/implementation/${SLUG}-db.md" ]          && $ENG_DB  --model "$IMPL_MODEL_DB"  < "docs/implementation/${SLUG}-db.md"
+[ -f "docs/implementation/${SLUG}-integration.md" ] && $ENG_INT --model "$IMPL_MODEL_INT" < "docs/implementation/${SLUG}-integration.md"
 ```
 
 Do NOT output a handoff block. Do NOT stop. Proceed directly to Step 5 (QA) once all commands exit 0.
@@ -192,6 +191,8 @@ If BLOCKED: fix and re-run QA.
    # Auto-merge into develop — production (main) requires /binaa-prd with human sign-off
    PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$KEY: <description>" "docs/reviews/<SLUG>.md")
    if [ $? -eq 0 ]; then
+     DEVPILOT_ENGINES="frontend: $ENG_FE${IMPL_MODEL_FE:+ ($IMPL_MODEL_FE)}; backend: $ENG_BE${IMPL_MODEL_BE:+ ($IMPL_MODEL_BE)}; db: $ENG_DB${IMPL_MODEL_DB:+ ($IMPL_MODEL_DB)}; integration: $ENG_INT${IMPL_MODEL_INT:+ ($IMPL_MODEL_INT)}" \
+       bash scripts/run-summary.sh "$KEY" "$SLUG" "<what changed>" "QA: $QA_VERDICT" "$BASE_BRANCH" --post
      bash scripts/update-jira-status.sh "$KEY" "Done"
    else
      bash scripts/update-jira-status.sh "$KEY" "In Review"

@@ -82,7 +82,7 @@ run_update() {
   CHECKLISTS="feature.md bugfix.md hotfix.md"
   CMDS="ceo.md ceo-plan.md ceo-run.md ceo-fix.md ceo-fe.md ceo-be.md ceo-db.md ceo-int.md ceo-issue.md ceo-subdomain.md ceo-review-fix.md binaa.md binaa-sit.md binaa-uat.md binaa-prd.md binaa-hotfix.md binaa-reconfig.md binaa-models.md binaa-index.md binaa-doctor.md binaa-status.md binaa-metrics.md binaa-rollback.md team-task.md team-ba.md team-lead.md team-frontend.md team-dotnet.md team-backend.md team-qa.md"
   AGENTS_LIST="team-lead.md team-ba.md team-frontend.md team-dotnet.md team-backend.md team-qa.md"
-  SCRIPTS="git-flow.sh new-feature.sh run-command.sh checkpoint.sh devpilot-config.sh run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh create-jira-ticket.sh create-jira-epic.sh update-jira-status.sh update-jira-description.sh add-jira-comment.sh generate-project-index.sh ceo.sh ceo-fix.sh ceo-plan.sh ceo-run.sh ceo-fe.sh ceo-be.sh ceo-db.sh ceo-int.sh"
+  SCRIPTS="git-flow.sh new-feature.sh run-command.sh resolve-engine.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh create-jira-ticket.sh create-jira-epic.sh update-jira-status.sh update-jira-description.sh add-jira-comment.sh generate-project-index.sh ceo.sh ceo-fix.sh ceo-plan.sh ceo-run.sh ceo-fe.sh ceo-be.sh ceo-db.sh ceo-int.sh"
 
   info "Refreshing .devpilot/rules..."
   fetch ".devpilot/rules.md" ".devpilot/rules.md"
@@ -538,7 +538,7 @@ fi
 
 # scripts/
 info "Installing scripts/..."
-for f in git-flow.sh new-feature.sh run-command.sh checkpoint.sh devpilot-config.sh \
+for f in git-flow.sh new-feature.sh run-command.sh resolve-engine.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh \
           run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh session-start.sh \
           doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh \
           deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh \

@@ -16,11 +16,13 @@ START_TIME=$(date '+%Y-%m-%d %H:%M:%S')
 
 BASE_BRANCH=$(grep '^base_branch:' project.config.md | head -1 | sed 's/base_branch:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
 
-IMPL_ENGINE=$(grep -A 10 '^engines:' project.config.md | grep '^\s*coding:' | head -1 | sed 's/.*coding:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
+# Resolve engine + model for the BACKEND layer. resolve-engine.sh is the single
+# source of truth: it applies the Claude-entry coupling (runner=claude → all
+# Claude) and any layer_overrides. Run from Claude Code → claude; from opencode →
+# opencode models; pre-configured override → that engine for this layer.
+eval "$(bash scripts/resolve-engine.sh layer backend)"
+IMPL_ENGINE="$LAYER_ENGINE"; IMPL_MODEL_BE="$LAYER_MODEL"
 [ -z "$IMPL_ENGINE" ] && IMPL_ENGINE="claude"
-
-IMPL_MODEL_BE=$(grep -A 20 "^  ${IMPL_ENGINE}:" project.config.md 2>/dev/null \
-  | grep '    backend:' | head -1 | sed 's/.*backend:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
 ```
 
 If `agents.backend.enabled` is false in project.config.md, stop and tell the user.
@@ -32,6 +34,9 @@ If `project.config.md` is missing, stop and tell the user to run `bash install.s
 
 ```bash
 SLUG="<derived from $ARGUMENTS — lowercase, hyphens, max 5 words>"
+
+# Pre-flight scan — enrich a thin ticket with local signal (read-only, no LLM).
+PREFLIGHT=$(bash scripts/preflight-scan.sh "$ARGUMENTS" "$SLUG")
 
 KEY=$(bash scripts/create-jira-ticket.sh "<summary>" "$ARGUMENTS" "Task")
 bash scripts/update-jira-status.sh "$KEY" "In Progress"
@@ -123,6 +128,9 @@ EOF
 # Auto-merge into develop — production (main) requires /binaa-prd with human sign-off
 PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$KEY: $ARGUMENTS" /tmp/devpilot-pr-body-$$.md)
 if [ $? -eq 0 ]; then
+  # Per-model run summary appended to the ticket BEFORE it closes.
+  DEVPILOT_ENGINES="backend: $IMPL_ENGINE${IMPL_MODEL_BE:+ ($IMPL_MODEL_BE)}" \
+    bash scripts/run-summary.sh "$KEY" "$SLUG" "<what changed>" "QA: PASS" "$BASE_BRANCH" --post
   bash scripts/update-jira-status.sh "$KEY" "Done"
   bash scripts/add-jira-comment.sh "$KEY" "✅ Merged into $BASE_BRANCH [$END_TIME]
 PR: $PR_URL

@@ -174,6 +174,18 @@ RUNNER=$(_read_config "engines" "runner")
 CODING=$(_read_config "engines" "coding")
 [ -z "$CODING" ] && CODING="claude"
 
+# Claude entry-point coupling: when the command is launched via Claude Code,
+# the whole lifecycle stays on the Claude model family. Per-layer exceptions are
+# applied later by scripts/resolve-engine.sh (layer_overrides).
+LAYER_NOTE=""
+if [ "$RUNNER" = "claude" ] && [ "$CODING" != "claude" ]; then
+  CODING="claude"
+fi
+if [ "$RUNNER" = "claude" ] && grep -A 6 '^layer_overrides:' project.config.md 2>/dev/null \
+     | grep -qE '^[[:space:]]+(frontend|backend|db|integration):[[:space:]]*"(opencode|antigravity)"'; then
+  LAYER_NOTE=" (+ active layer_overrides)"
+fi
+
 # Runner model — for opencode/antigravity, read from coding_models section
 # (runner uses same model as coding engine by default)
 RUNNER_MODEL=""
@@ -225,9 +237,13 @@ Execution rules:
     ;;
   claude)
     PREAMBLE="# RUNNER: Claude Code CLI
-# CODING ENGINE: ${CODING}
+# CODING ENGINE: ${CODING}${LAYER_NOTE}
 
 You are running this devpilot command via the Claude Code CLI.
+All downstream phases, sub-agents, and LLM calls use the Claude model family.
+Exception: layers listed in layer_overrides (project.config.md) route to the
+engine resolved by 'bash scripts/resolve-engine.sh layer <layer>'. Call it
+before each implementation phase to get the correct engine + model per layer.
 Follow every step in the command below exactly.
 
 ---
@@ -255,7 +271,7 @@ if [ -n "$TASK" ]; then
   echo "  Task:   $TASK"
 fi
 echo "  Runner: ${RUNNER}${RUNNER_MODEL:+ ($RUNNER_MODEL)}"
-echo "  Coding: ${CODING}"
+echo "  Coding: ${CODING}${LAYER_NOTE}"
 echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
 echo ""
 

@@ -35,35 +35,48 @@ Never skip a phase. Follow `.devpilot/rules.md` throughout.
    BASE_BRANCH=$(grep 'base_branch' project.config.md | head -1 | sed 's/.*base_branch:[[:space:]]*//')
    ```
 
-4. Set engine variables from `project.config.md → engines`, then apply the
-   run mode (`$RUN_MODE` from `/ceo` Step 0 — defaults to the config value):
+4. Resolve the engine + model **per layer**. `scripts/resolve-engine.sh` is the
+   single source of truth — it applies the Claude-entry coupling (runner=claude ⇒
+   all layers run on Claude) and any `layer_overrides` from `project.config.md`.
    ```bash
-   IMPL_ENGINE=$(grep -A 5 '^engines:' project.config.md | grep 'coding:' | head -1 | sed 's/.*coding:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
    FALLBACK_ENGINE=$(grep -A 5 '^engines:' project.config.md | grep 'fallback:' | head -1 | sed 's/.*fallback:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
-   [ -z "$IMPL_ENGINE" ] && IMPL_ENGINE="claude"
 
-   # Run mode overrides the configured coding engine for this task.
-   RUN_MODE="${RUN_MODE:-$IMPL_ENGINE}"
+   _resolve() {  # $1 = layer name → sets ENG_<L> + MODEL_<L>
+     eval "$(bash scripts/resolve-engine.sh layer "$1")"
+     [ -z "$LAYER_ENGINE" ] && LAYER_ENGINE="claude"
+     echo "$LAYER_ENGINE|$LAYER_MODEL"
+   }
+   IFS='|' read -r ENG_FE  IMPL_MODEL_FE  <<< "$(_resolve frontend)"
+   IFS='|' read -r ENG_BE  IMPL_MODEL_BE  <<< "$(_resolve backend)"
+   IFS='|' read -r ENG_DB  IMPL_MODEL_DB  <<< "$(_resolve db)"
+   IFS='|' read -r ENG_INT IMPL_MODEL_INT <<< "$(_resolve integration)"
+
+   # Run mode (`$RUN_MODE` from `/ceo` Step 0) is the user's explicit
+   # "pre-configuration" — an explicit flag forces ONE engine across ALL layers,
+   # overriding per-layer coupling + overrides. No flag ⇒ keep per-layer values.
    case "$RUN_MODE" in
-     claude|opencode|antigravity) IMPL_ENGINE="$RUN_MODE" ;;   # single-engine
-     max)                         IMPL_ENGINE="claude" ;;      # max judges both; Claude is candidate A
+     claude|opencode|antigravity)
+       ENG_FE="$RUN_MODE"; ENG_BE="$RUN_MODE"; ENG_DB="$RUN_MODE"; ENG_INT="$RUN_MODE"
+       _m() { grep -A 20 "^  ${RUN_MODE}:" project.config.md | grep "    ${1}:" | head -1 | sed "s/.*${1}:[[:space:]]*//" | tr -d '"'; }
+       IMPL_MODEL_FE=$(_m frontend); IMPL_MODEL_BE=$(_m backend); IMPL_MODEL_DB=$(_m db); IMPL_MODEL_INT=$(_m integration) ;;
+     max)
+       ENG_FE="claude"; ENG_BE="claude"; ENG_DB="claude"; ENG_INT="claude" ;;  # max judges both; Claude is candidate A
    esac
-   echo "Run mode: $RUN_MODE · coding engine: $IMPL_ENGINE"
+   echo "Run mode: ${RUN_MODE:-per-layer} · FE=$ENG_FE BE=$ENG_BE DB=$ENG_DB INT=$ENG_INT"
    ```
-   When invoked directly (not via `/ceo`), `$RUN_MODE` is unset and falls back
-   to the configured engine — behaviour is unchanged.
+   When invoked directly (not via `/ceo`), `$RUN_MODE` is unset and each layer
+   uses its resolved engine — Claude-Code entry keeps everything on Claude unless
+   `layer_overrides` route a specific layer elsewhere.
 
-5. Set per-agent models — read from `coding_models.<IMPL_ENGINE>` section:
+5. Read `.devpilot/skills/get-shit-done.md`, `.devpilot/skills/architecture-guard.md`, `.devpilot/skills/self-heal.md`
+
+6. **Pre-flight scan** — enrich the task with local signal (git diffs, recent
+   commits, in-scope files) before the BA writes requirements. Read-only, no LLM:
    ```bash
-   # Reads the block under coding_models: → <engine>:
-   _model() { grep -A 20 "^  ${IMPL_ENGINE}:" project.config.md | grep "    ${1}:" | head -1 | sed "s/.*${1}:[[:space:]]*//" | tr -d '"'; }
-   IMPL_MODEL_FE=$(_model frontend)
-   IMPL_MODEL_BE=$(_model backend)
-   IMPL_MODEL_DB=$(_model db)
-   IMPL_MODEL_INT=$(_model integration)
+   SLUG="<derived from $ARGUMENTS — lowercase, hyphens, max 5 words>"
+   PREFLIGHT=$(bash scripts/preflight-scan.sh "$ARGUMENTS" "$SLUG")
    ```
-
-6. Read `.devpilot/skills/get-shit-done.md`, `.devpilot/skills/architecture-guard.md`, `.devpilot/skills/self-heal.md`
+   Pass `docs/preflight/<SLUG>.md` to the BA in Phase 1 as additional context.
 
 Set `ACTIVE_AGENTS` = agents where `enabled: true` in project.config.md.
 
@@ -131,7 +144,7 @@ Read `docs/project-index.md`. Use it to scope all file reading (3-8 files max).
 Command: /ceo \"$ARGUMENTS\"
 Branch: feature/$(echo $KEY | tr '[:upper:]' '[:lower:]')-<slug>
 Started: $START_TIME
-Engine: $IMPL_ENGINE
+Engines: FE=$ENG_FE BE=$ENG_BE DB=$ENG_DB INT=$ENG_INT
 Agents: <list of active agents>"
    ```
 
@@ -200,13 +213,18 @@ ACs: $AC_COUNT"
 
 ## Phase 3 — Implementation
 
-`$RUN_MODE` (resolved in Phase 0) determines how the code is written:
+The per-layer engines resolved in Phase 0 (`$ENG_FE/$ENG_BE/$ENG_DB/$ENG_INT`)
+determine how each layer's code is written. Layers can be mixed (e.g. backend on
+opencode via a `layer_overrides`, everything else on Claude):
 
-| RUN_MODE | Follow |
-|----------|--------|
-| `claude` | **### Engine: `claude`** below |
-| `opencode` / `antigravity` | **### Engine: `opencode` or `antigravity`** below (IMPL_ENGINE is already set) |
-| `max` | **### Mode: `max`** below — race both engines and merge the winner |
+| Layer engine | Follow |
+|--------------|--------|
+| `claude` | **### Engine: `claude`** below — spawn via the Agent tool |
+| `opencode` / `antigravity` | **### Engine: `opencode` or `antigravity`** below — run that layer via Bash |
+| `$RUN_MODE = max` | **### Mode: `max`** below — race both engines and merge the winner |
+
+When `$RUN_MODE` is an explicit flag, all four `$ENG_*` are forced to the same
+engine, so a single section applies. With no flag, route each layer by its own engine.
 
 > **Token discipline:** brief each agent with a *compact* context (see
 > `.devpilot/skills/compact-context.md`) — the acceptance criteria plus the
@@ -297,27 +315,31 @@ Read .devpilot/rules.md before writing any code.
 - [ ] Committed with: <feat|fix>(<slug>): <description>
 ```
 
-Then execute each brief directly via bash — run sequentially, block until each completes:
+Then execute each brief directly via bash — run sequentially, block until each
+completes. Each layer uses **its own resolved engine** (`$ENG_FE/$ENG_BE/$ENG_DB/$ENG_INT`).
+A layer that resolved to `claude` (e.g. under Claude-entry coupling, or a layer
+not covered by a `layer_overrides`) is **not** run here — spawn it via the Agent
+tool under **### Engine: `claude`** instead.
 
 ```bash
-# Frontend (if in scope)
-if [ -f "docs/implementation/<slug>-frontend.md" ]; then
-  $IMPL_ENGINE --model "$IMPL_MODEL_FE" < docs/implementation/<slug>-frontend.md
+# Frontend (if in scope and routed off-Claude)
+if [ -f "docs/implementation/<slug>-frontend.md" ] && [ "$ENG_FE" != "claude" ]; then
+  $ENG_FE --model "$IMPL_MODEL_FE" < docs/implementation/<slug>-frontend.md
 fi
 
-# Backend (if in scope)
-if [ -f "docs/implementation/<slug>-backend.md" ]; then
-  $IMPL_ENGINE --model "$IMPL_MODEL_BE" < docs/implementation/<slug>-backend.md
+# Backend (if in scope and routed off-Claude)
+if [ -f "docs/implementation/<slug>-backend.md" ] && [ "$ENG_BE" != "claude" ]; then
+  $ENG_BE --model "$IMPL_MODEL_BE" < docs/implementation/<slug>-backend.md
 fi
 
-# DB (if in scope)
-if [ -f "docs/implementation/<slug>-db.md" ]; then
-  $IMPL_ENGINE --model "$IMPL_MODEL_DB" < docs/implementation/<slug>-db.md
+# DB (if in scope and routed off-Claude)
+if [ -f "docs/implementation/<slug>-db.md" ] && [ "$ENG_DB" != "claude" ]; then
+  $ENG_DB --model "$IMPL_MODEL_DB" < docs/implementation/<slug>-db.md
 fi
 
-# Integration (if in scope)
-if [ -f "docs/implementation/<slug>-integration.md" ]; then
-  $IMPL_ENGINE --model "$IMPL_MODEL_INT" < docs/implementation/<slug>-integration.md
+# Integration (if in scope and routed off-Claude)
+if [ -f "docs/implementation/<slug>-integration.md" ] && [ "$ENG_INT" != "claude" ]; then
+  $ENG_INT --model "$IMPL_MODEL_INT" < docs/implementation/<slug>-integration.md
 fi
 ```
 
@@ -440,6 +462,10 @@ If BLOCKED: fix the issue (spawn the relevant agent again), then re-run QA.
    # Auto-merge into develop — production (main) requires /binaa-prd with human sign-off
    PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$KEY: <description>" "docs/reviews/<slug>.md")
    if [ $? -eq 0 ]; then
+     # Run summary — records what changed + the engine/model used per layer,
+     # posted as a Jira comment via track.sh.
+     DEVPILOT_ENGINES="frontend: $ENG_FE${IMPL_MODEL_FE:+ ($IMPL_MODEL_FE)}; backend: $ENG_BE${IMPL_MODEL_BE:+ ($IMPL_MODEL_BE)}; db: $ENG_DB${IMPL_MODEL_DB:+ ($IMPL_MODEL_DB)}; integration: $ENG_INT${IMPL_MODEL_INT:+ ($IMPL_MODEL_INT)}" \
+       bash scripts/run-summary.sh "$KEY" "<slug>" "<what changed>" "QA: PASS — all $AC_COUNT ACs" "$BASE_BRANCH" --post
      bash scripts/update-jira-status.sh "$KEY" "Done"
    else
      bash scripts/update-jira-status.sh "$KEY" "In Review"

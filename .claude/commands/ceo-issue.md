@@ -18,18 +18,18 @@ START_TIME=$(date '+%Y-%m-%d %H:%M:%S')
 BASE_BRANCH=$(grep '^base_branch:' project.config.md | head -1 \
   | sed 's/base_branch:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
 
-IMPL_ENGINE=$(grep -A 10 '^engines:' project.config.md | grep '^\s*coding:' | head -1 \
-  | sed 's/.*coding:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
-[ -z "$IMPL_ENGINE" ] && IMPL_ENGINE="claude"
+# Resolve engine + model PER LAYER via resolve-engine.sh — the single source of
+# truth. It applies the Claude-entry coupling (runner=claude → all Claude) and any
+# layer_overrides. ENG_<layer> = engine for that layer; IMPL_MODEL_<layer> = model.
+_resolve() { eval "$(bash scripts/resolve-engine.sh layer "$1")"; printf '%s\t%s' "$LAYER_ENGINE" "$LAYER_MODEL"; }
+IFS=$'\t' read -r ENG_FE  IMPL_MODEL_FE  < <(_resolve frontend)
+IFS=$'\t' read -r ENG_BE  IMPL_MODEL_BE  < <(_resolve backend)
+IFS=$'\t' read -r ENG_DB  IMPL_MODEL_DB  < <(_resolve db)
+IFS=$'\t' read -r ENG_INT IMPL_MODEL_INT < <(_resolve integration)
 
-_model() {
-  grep -A 20 "^  ${IMPL_ENGINE}:" project.config.md 2>/dev/null \
-    | grep "    ${1}:" | head -1 \
-    | sed "s/.*${1}:[[:space:]]*//" | tr -d '"' | awk '{print $1}'
-}
-IMPL_MODEL_FE=$(_model frontend)
-IMPL_MODEL_BE=$(_model backend)
-IMPL_MODEL_DB=$(_model db)
+# Layer-agnostic default engine (coupled CODING) for logging / references.
+eval "$(bash scripts/resolve-engine.sh effective)"
+IMPL_ENGINE="$CODING"; [ -z "$IMPL_ENGINE" ] && IMPL_ENGINE="claude"
 ```
 
 ---
@@ -65,6 +65,11 @@ IMPL_MODEL_DB=$(_model db)
 Create one parent Epic and one child Task per affected layer.
 
 ```bash
+# Derive a slug from the issue, then pre-flight scan to enrich the thin issue
+# with local signal (recent commits, working-tree diff, in-scope files).
+SLUG=$(echo "$ARGUMENTS" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]/-/g; s/--*/-/g; s/^-//; s/-$//' | cut -c1-40)
+PREFLIGHT=$(bash scripts/preflight-scan.sh "$ARGUMENTS" "$SLUG")
+
 # Parent Epic
 EPIC_KEY=$(bash scripts/create-jira-epic.sh \
   "[Issue] <one-line issue summary>" \
@@ -176,10 +181,10 @@ Include the SCOPE LOCK constraint in every brief.
 ⚠️ **CRITICAL: Use the Bash tool to run the engine command directly. NEVER output a HANDOFF block. NEVER ask the user to run anything manually.**
 Write briefs then immediately run each via Bash tool:
 ```bash
-[ -f "docs/implementation/${SLUG}-frontend.md" ]    && $IMPL_ENGINE --model "$IMPL_MODEL_FE"  < "docs/implementation/${SLUG}-frontend.md"
-[ -f "docs/implementation/${SLUG}-backend.md" ]     && $IMPL_ENGINE --model "$IMPL_MODEL_BE"  < "docs/implementation/${SLUG}-backend.md"
-[ -f "docs/implementation/${SLUG}-db.md" ]          && $IMPL_ENGINE --model "$IMPL_MODEL_DB"  < "docs/implementation/${SLUG}-db.md"
-[ -f "docs/implementation/${SLUG}-integration.md" ] && $IMPL_ENGINE --model "$IMPL_MODEL_INT" < "docs/implementation/${SLUG}-integration.md"
+[ -f "docs/implementation/${SLUG}-frontend.md" ]    && $ENG_FE  --model "$IMPL_MODEL_FE"  < "docs/implementation/${SLUG}-frontend.md"
+[ -f "docs/implementation/${SLUG}-backend.md" ]     && $ENG_BE  --model "$IMPL_MODEL_BE"  < "docs/implementation/${SLUG}-backend.md"
+[ -f "docs/implementation/${SLUG}-db.md" ]          && $ENG_DB  --model "$IMPL_MODEL_DB"  < "docs/implementation/${SLUG}-db.md"
+[ -f "docs/implementation/${SLUG}-integration.md" ] && $ENG_INT --model "$IMPL_MODEL_INT" < "docs/implementation/${SLUG}-integration.md"
 ```
 Proceed to QA when all commands exit 0.
 
@@ -246,6 +251,9 @@ EOF
 
 PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$EPIC_KEY: fix: <issue summary>" /tmp/devpilot-pr-body-$$.md)
 if [ $? -eq 0 ]; then
+  # Per-layer model summary appended to the issue BEFORE it closes.
+  DEVPILOT_ENGINES="frontend: $ENG_FE${IMPL_MODEL_FE:+ ($IMPL_MODEL_FE)}; backend: $ENG_BE${IMPL_MODEL_BE:+ ($IMPL_MODEL_BE)}; db: $ENG_DB${IMPL_MODEL_DB:+ ($IMPL_MODEL_DB)}; integration: $ENG_INT${IMPL_MODEL_INT:+ ($IMPL_MODEL_INT)}" \
+    bash scripts/run-summary.sh "$EPIC_KEY" "$SLUG" "<root cause / what changed>" "QA: PASS" "$BASE_BRANCH" --post
   bash scripts/update-jira-status.sh "$EPIC_KEY" "Done"
   bash scripts/add-jira-comment.sh "$EPIC_KEY" "✅ Merged [$END_TIME]
 PR: $PR_URL

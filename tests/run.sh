@@ -113,6 +113,65 @@ echo "== changelog.sh =="
 set +e
 bash "$REPO/scripts/changelog.sh" >/dev/null 2>&1; assert_code "$?" "1" "changelog with no version → exit 1"
 
+echo "== resolve-engine.sh =="
+D=$(mktemp -d)
+git -C "$D" init -q
+mkdir -p "$D/scripts"
+cp "$REPO/scripts/resolve-engine.sh" "$D/scripts/"
+cat > "$D/project.config.md" <<'EOF'
+engines:
+  orchestrator: claude
+  coding: opencode
+  runner: claude
+  fallback: opencode
+
+layer_overrides:
+  frontend:    ""
+  backend:     "opencode"
+  db:          ""
+  integration: ""
+
+coding_models:
+  opencode:
+    frontend:    "github-copilot/gpt-4o"
+    backend:     "github-copilot/gpt-4o"
+  ollama:
+    backend:     "ollama/deepseek-coder-v2:16b"
+EOF
+# runner=claude couples coding back to claude
+EFF=$( cd "$D" && bash scripts/resolve-engine.sh effective )
+assert_contains "$EFF" "CODING=claude" "runner=claude forces coding=claude"
+# frontend has no override → coupling keeps it on claude (no model)
+FE=$( cd "$D" && bash scripts/resolve-engine.sh layer frontend )
+assert_contains "$FE" "LAYER_ENGINE=claude" "no override under claude runner → claude"
+# backend override wins over coupling → opencode + its model
+BE=$( cd "$D" && bash scripts/resolve-engine.sh layer backend )
+assert_contains "$BE" "LAYER_ENGINE=opencode" "layer override beats claude coupling"
+assert_contains "$BE" "github-copilot/gpt-4o" "override resolves opencode backend model"
+# local routing swaps in the ollama model
+BL=$( cd "$D" && DEVPILOT_LOCAL=1 bash scripts/resolve-engine.sh layer backend )
+assert_contains "$BL" "ollama/deepseek-coder-v2:16b" "DEVPILOT_LOCAL=1 → ollama model"
+# complexity suggestion
+SG=$( cd "$D" && bash scripts/resolve-engine.sh suggest "refactor the auth schema across services" )
+assert_contains "$SG" "COMPLEXITY=high" "architectural task → high complexity"
+rm -rf "$D"
+
+echo "== preflight-scan.sh / run-summary.sh =="
+D=$(mktemp -d)
+git -C "$D" init -q; git -C "$D" config user.email t@t.t; git -C "$D" config user.name t
+mkdir -p "$D/scripts"
+cp "$REPO/scripts/preflight-scan.sh" "$REPO/scripts/run-summary.sh" "$REPO/scripts/track.sh" "$D/scripts/"
+printf 'base_branch: develop\ntracker:\n  type: local\n' > "$D/project.config.md"
+( cd "$D" && git checkout -q -b develop && echo a > a.txt && git add a.txt project.config.md scripts && git commit -qm base )
+PF=$( cd "$D" && bash scripts/preflight-scan.sh "fix the a file" pf-test )
+assert_contains "$PF" "docs/preflight/pf-test.md" "preflight writes a brief path"
+assert_contains "$(cat "$D/$PF" 2>/dev/null)" "Pre-flight scan" "preflight brief has a header"
+( cd "$D" && git checkout -q -b feature/y && echo b >> a.txt && git commit -qam "fix(core): edit a" )
+RS=$( cd "$D" && bash scripts/run-summary.sh LOCAL-1 sum-test "root cause text" "3 passed" develop )
+assert_contains "$RS" "docs/summaries/sum-test.md" "run-summary writes a summary path"
+assert_contains "$(cat "$D/$RS" 2>/dev/null)" "root cause text" "summary includes root cause"
+rm -rf "$D"
+
 echo ""
 echo "── Results: $PASS passed, $FAIL failed ──"
 [ "$FAIL" -eq 0 ]

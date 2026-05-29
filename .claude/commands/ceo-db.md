@@ -13,9 +13,13 @@ Read `project.config.md`.
 
 ```bash
 START_TIME=$(date '+%Y-%m-%d %H:%M:%S')
-BASE_BRANCH=$(grep 'base_branch' project.config.md | head -1 | sed 's/.*base_branch:[[:space:]]*//')
-IMPL_ENGINE=$(grep 'engine:' project.config.md | head -1 | sed 's/.*engine:[[:space:]]*//' | tr -d '"')
-IMPL_MODEL_DB=$(grep 'model_db:' project.config.md | head -1 | sed 's/.*model_db:[[:space:]]*//' | tr -d '"')
+BASE_BRANCH=$(grep '^base_branch:' project.config.md | head -1 | sed 's/base_branch:[[:space:]]*//; s/#.*//' | tr -d '"' | awk '{print $1}')
+
+# Resolve engine + model for the DB layer. resolve-engine.sh applies the
+# Claude-entry coupling and any layer_overrides — single source of truth.
+eval "$(bash scripts/resolve-engine.sh layer db)"
+IMPL_ENGINE="$LAYER_ENGINE"; IMPL_MODEL_DB="$LAYER_MODEL"
+[ -z "$IMPL_ENGINE" ] && IMPL_ENGINE="claude"
 ```
 
 If `agents.db.enabled` is false in project.config.md, stop and tell the user.
@@ -26,6 +30,9 @@ If `agents.db.enabled` is false in project.config.md, stop and tell the user.
 
 ```bash
 SLUG="<derived from $ARGUMENTS — lowercase, hyphens, max 5 words>"
+
+# Pre-flight scan — enrich a thin ticket with local signal (read-only, no LLM).
+PREFLIGHT=$(bash scripts/preflight-scan.sh "$ARGUMENTS" "$SLUG")
 
 KEY=$(bash scripts/create-jira-ticket.sh "<summary>" "$ARGUMENTS" "Task")
 bash scripts/update-jira-status.sh "$KEY" "In Progress"
@@ -117,6 +124,8 @@ EOF
 # Auto-merge into develop — production (main) requires /binaa-prd with human sign-off
 PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$KEY: $ARGUMENTS" /tmp/devpilot-pr-body-$$.md)
 if [ $? -eq 0 ]; then
+  DEVPILOT_ENGINES="db: $IMPL_ENGINE${IMPL_MODEL_DB:+ ($IMPL_MODEL_DB)}" \
+    bash scripts/run-summary.sh "$KEY" "$SLUG" "<what changed>" "QA: PASS" "$BASE_BRANCH" --post
   bash scripts/update-jira-status.sh "$KEY" "Done"
   bash scripts/add-jira-comment.sh "$KEY" "✅ Merged into $BASE_BRANCH [$END_TIME]
 PR: $PR_URL
