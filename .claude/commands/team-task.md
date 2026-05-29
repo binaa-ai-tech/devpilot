@@ -198,13 +198,12 @@ Agents: <list of active agents>"
    EOF
    ```
 
-10. **Log plan complete to Jira:**
+10. **Log plan complete to the task log** (routine progress → repo, not Jira, per
+    core-rules #11):
     ```bash
     PLAN_TIME=$(date '+%Y-%m-%d %H:%M:%S')
-    bash scripts/add-jira-comment.sh "$KEY" "📋 Plan complete [$PLAN_TIME]
-Plan: docs/plans/<slug>.md
-Scope: <frontend / backend / DB / integration>
-ACs: $AC_COUNT"
+    printf -- '- %s — plan complete: docs/plans/<slug>.md, scope <…>, %s ACs\n' \
+      "$PLAN_TIME" "$AC_COUNT" >> "docs/tasks/${KEY}.md"
     ```
 
 11. Announce: "✅ Planning Phase complete. Plan at `docs/plans/<slug>.md`"
@@ -266,9 +265,9 @@ Wait for all agents to complete.
 ```bash
 IMPL_TIME=$(date '+%Y-%m-%d %H:%M:%S')
 COMMITS=$(git log ${BASE_BRANCH}..HEAD --oneline 2>/dev/null | awk '{print $1}' | head -10 | tr '\n' ' ')
-bash scripts/add-jira-comment.sh "$KEY" "⚙️ Implementation complete [$IMPL_TIME]
-Commits: $COMMITS
-Agents: <list of agents that ran>"
+# Routine progress → task log, not Jira (core-rules #11).
+printf -- '- %s — implementation complete (%s); agents: <list>\n' \
+  "$IMPL_TIME" "$COMMITS" >> "docs/tasks/${KEY}.md"
 ```
 
 **If any agent FAILED:**
@@ -426,9 +425,9 @@ Wait for QA agent to complete.
 
 ```bash
 QA_TIME=$(date '+%Y-%m-%d %H:%M:%S')
-# PASS:
-bash scripts/add-jira-comment.sh "$KEY" "✅ QA passed [$QA_TIME] — All $AC_COUNT ACs verified. Report: docs/qa/<slug>.md"
-# BLOCKED:
+# PASS: routine — record in the task log, not Jira (core-rules #11).
+printf -- '- %s — QA PASS, all %s ACs verified (docs/qa/<slug>.md)\n' "$QA_TIME" "$AC_COUNT" >> "docs/tasks/${KEY}.md"
+# BLOCKED: an exception — post it to Jira.
 bash scripts/add-jira-comment.sh "$KEY" "🚫 QA BLOCKED [$QA_TIME] — See docs/qa/<slug>.md for failures"
 ```
 
@@ -462,10 +461,11 @@ If BLOCKED: fix the issue (spawn the relevant agent again), then re-run QA.
    # Auto-merge into develop — production (main) requires /binaa-prd with human sign-off
    PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$KEY: <description>" "docs/reviews/<slug>.md")
    if [ $? -eq 0 ]; then
-     # Run summary — records what changed + the engine/model used per layer,
-     # posted as a Jira comment via track.sh.
+     # Run summary — records what changed + the engine/model used per layer to a
+     # local summary file. No --post: the single DONE comment (Final Output) is
+     # the one Jira summary, per core-rules #11.
      DEVPILOT_ENGINES="frontend: $ENG_FE${IMPL_MODEL_FE:+ ($IMPL_MODEL_FE)}; backend: $ENG_BE${IMPL_MODEL_BE:+ ($IMPL_MODEL_BE)}; db: $ENG_DB${IMPL_MODEL_DB:+ ($IMPL_MODEL_DB)}; integration: $ENG_INT${IMPL_MODEL_INT:+ ($IMPL_MODEL_INT)}" \
-       bash scripts/run-summary.sh "$KEY" "<slug>" "<what changed>" "QA: PASS — all $AC_COUNT ACs" "$BASE_BRANCH" --post
+       bash scripts/run-summary.sh "$KEY" "<slug>" "<what changed>" "QA: PASS — all $AC_COUNT ACs" "$BASE_BRANCH"
      bash scripts/update-jira-status.sh "$KEY" "Done"
    else
      bash scripts/update-jira-status.sh "$KEY" "In Review"
@@ -480,15 +480,10 @@ If BLOCKED: fix the issue (spawn the relevant agent again), then re-run QA.
    COMMIT_HASHES=$(echo "$ALL_COMMITS" | awk '{print $1}' | tr '\n' ' ')
    ```
 
-7. **Log final Jira comment:**
-   ```bash
-   bash scripts/add-jira-comment.sh "$KEY" "✅ Merged into $BASE_BRANCH [$END_TIME]
-PR: $PR_URL
-QA: PASS · Commits: $COMMIT_HASHES
-Duration: $START_TIME → $END_TIME
-Docs: requirements · plan · qa · review saved in docs/
-→ Promote: /binaa-sit <version>"
-   ```
+7. **(No interim Jira comment here.)** Per core-rules #11, the only summary
+   posted to Jira is the single DONE block in *Final Output* below — posting a
+   "merged" comment here as well would duplicate it. The merge facts are captured
+   in the task log (next step) and the PR.
 
 8. **Finalize task log:**
    ```bash

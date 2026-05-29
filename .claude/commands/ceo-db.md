@@ -101,7 +101,10 @@ Spawn with `subagent_type: "team-qa"`:
 
 ```bash
 QA_TIME=$(date '+%Y-%m-%d %H:%M:%S')
-bash scripts/add-jira-comment.sh "$KEY" "✅ QA passed [$QA_TIME] — docs/qa/<SLUG>.md"
+# Routine QA PASS → task log (core-rules #11); only a BLOCKED state is posted to Jira.
+printf -- '- %s — QA PASS (docs/qa/<SLUG>.md)\n' "$QA_TIME" >> "docs/tasks/${KEY}.md"
+# On BLOCKED instead:
+# bash scripts/add-jira-comment.sh "$KEY" "🚫 QA BLOCKED [$QA_TIME] — see docs/qa/<SLUG>.md"
 ```
 
 If BLOCKED: fix the issue, then re-run QA.
@@ -125,13 +128,10 @@ EOF
 PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$KEY: $ARGUMENTS" /tmp/devpilot-pr-body-$$.md)
 if [ $? -eq 0 ]; then
   DEVPILOT_ENGINES="db: $IMPL_ENGINE${IMPL_MODEL_DB:+ ($IMPL_MODEL_DB)}" \
-    bash scripts/run-summary.sh "$KEY" "$SLUG" "<what changed>" "QA: PASS" "$BASE_BRANCH" --post
+    # No --post: the single DONE summary below is the one Jira comment (core-rules #11).
+    bash scripts/run-summary.sh "$KEY" "$SLUG" "<what changed>" "QA: PASS" "$BASE_BRANCH"
   bash scripts/update-jira-status.sh "$KEY" "Done"
-  bash scripts/add-jira-comment.sh "$KEY" "✅ Merged into $BASE_BRANCH [$END_TIME]
-PR: $PR_URL
-QA: PASS · Commits: $COMMITS
-Duration: $START_TIME → $END_TIME
-→ Promote: /binaa-sit <version>"
+  # No interim "merged" comment — the DONE block below is the single Jira summary (core-rules #11).
 else
   bash scripts/update-jira-status.sh "$KEY" "In Review"
   echo "⚠️  Auto-merge failed — merge $PR_URL manually, then: bash scripts/update-jira-status.sh $KEY Done"

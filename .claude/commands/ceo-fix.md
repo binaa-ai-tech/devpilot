@@ -173,8 +173,9 @@ After agent completes:
 git log ${BASE_BRANCH}..HEAD --oneline   # confirm commit exists
 IMPL_TIME=$(date '+%Y-%m-%d %H:%M:%S')
 COMMITS=$(git log ${BASE_BRANCH}..HEAD --oneline | awk '{print $1}' | tr '\n' ' ')
-bash scripts/add-jira-comment.sh "$KEY" "⚙️ Fix implemented [$IMPL_TIME]
-Commits: $COMMITS"
+# Process-logging policy (core-rules #11): routine progress goes to the task log,
+# not Jira. Jira gets only the start comment and the final DONE summary.
+printf -- '- %s — fix implemented (%s)\n' "$IMPL_TIME" "$COMMITS" >> "docs/tasks/${KEY}.md"
 ```
 
 ---
@@ -187,9 +188,9 @@ Spawn with `subagent_type: "team-qa"`:
 
 ```bash
 QA_TIME=$(date '+%Y-%m-%d %H:%M:%S')
-# PASS:
-bash scripts/add-jira-comment.sh "$KEY" "✅ QA passed [$QA_TIME] — fix verified. Report: docs/qa/<SLUG>.md"
-# BLOCKED:
+# PASS: record in the task log only (routine — not posted to Jira).
+printf -- '- %s — QA PASS, fix verified (docs/qa/<SLUG>.md)\n' "$QA_TIME" >> "docs/tasks/${KEY}.md"
+# BLOCKED: an exception — post it to Jira.
 bash scripts/add-jira-comment.sh "$KEY" "🚫 QA BLOCKED [$QA_TIME] — see docs/qa/<SLUG>.md"
 ```
 
@@ -220,13 +221,10 @@ if [ $? -eq 0 ]; then
   # Generate an execution summary and append it to the ticket. The ticket only
   # moves to Done AFTER the merge succeeds and the summary is posted — until
   # then it stays In Progress (set in Step 2).
-  bash scripts/run-summary.sh "$KEY" "<SLUG>" "<root cause>" "QA: PASS" "$BASE_BRANCH" --post
+  bash scripts/run-summary.sh "$KEY" "<SLUG>" "<root cause>" "QA: PASS" "$BASE_BRANCH"
   bash scripts/update-jira-status.sh "$KEY" "Done"
-  bash scripts/add-jira-comment.sh "$KEY" "✅ Merged into $BASE_BRANCH [$END_TIME]
-PR: $PR_URL
-QA: PASS · Commits: $ALL_COMMITS
-Duration: $START_TIME → $END_TIME
-→ Promote: /binaa-sit <version>"
+  # The single DONE summary comment is posted below (Final Output). No separate
+  # "merged" comment here — it would duplicate the DONE block (core-rules #11).
 else
   bash scripts/update-jira-status.sh "$KEY" "In Review"
   echo "⚠️  Merge not completed automatically — finish it at: $PR_URL"

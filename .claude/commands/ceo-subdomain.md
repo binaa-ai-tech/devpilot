@@ -220,10 +220,17 @@ Spawn `subagent_type: "team-qa"` with a targeted brief:
 
 ```bash
 QA_TIME=$(date '+%Y-%m-%d %H:%M:%S')
-bash scripts/add-jira-comment.sh "$KEY" "✅ Layer-Locked QA Passed [$QA_TIME] — docs/qa/<SLUG>.md"
+# Process-logging policy (core-rules #11): routine QA-pass is NOT posted to Jira —
+# record it in the task log instead. Only a BLOCKED state gets a Jira comment.
+printf -- '- %s — QA PASS (docs/qa/<SLUG>.md)\n' "$QA_TIME" >> "docs/tasks/${KEY}.md"
 ```
 
-If BLOCKED: correct the code strictly within the vertical layer and re-run QA.
+If BLOCKED: post the exception to Jira, then correct the code strictly within the
+vertical layer and re-run QA:
+
+```bash
+bash scripts/add-jira-comment.sh "$KEY" "🚫 QA BLOCKED [$QA_TIME] — see docs/qa/<SLUG>.md"
+```
 
 ---
 
@@ -242,12 +249,11 @@ EOF
 
 PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$KEY: [$SCOPE] $TASK_DESC" /tmp/devpilot-pr-body-$$.md)
 if [ $? -eq 0 ]; then
+  # Local summary only (no --post): the single DONE comment below is the one
+  # Jira summary, per the process-logging policy (core-rules #11).
   DEVPILOT_ENGINES="$SCOPE: $IMPL_ENGINE${IMPL_MODEL:+ ($IMPL_MODEL)}" \
-    bash scripts/run-summary.sh "$KEY" "$SLUG" "<what changed>" "QA: PASS" "$BASE_BRANCH" --post
+    bash scripts/run-summary.sh "$KEY" "$SLUG" "<what changed>" "QA: PASS" "$BASE_BRANCH"
   bash scripts/update-jira-status.sh "$KEY" "Done"
-  bash scripts/add-jira-comment.sh "$KEY" "✅ Layer-Locked PR merged into $BASE_BRANCH [$END_TIME]
-PR: $PR_URL
-Commits: $COMMITS"
 else
   bash scripts/update-jira-status.sh "$KEY" "In Review"
   echo "⚠️  Merge not completed automatically — finish it at: $PR_URL"

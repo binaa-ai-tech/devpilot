@@ -172,6 +172,19 @@ assert_contains "$RS" "docs/summaries/sum-test.md" "run-summary writes a summary
 assert_contains "$(cat "$D/$RS" 2>/dev/null)" "root cause text" "summary includes root cause"
 rm -rf "$D"
 
+echo "== process-logging policy (core-rules #11) =="
+# The policy: each /ceo flow posts only a start + DONE comment to the ticket
+# (plus BLOCKED as the exception). Routine progress comments must not creep back.
+assert_contains "$(cat "$REPO/.devpilot/skills/core-rules.md")" "Process logging" "core-rules documents the policy"
+ROUTINE_RE='add-jira-comment.sh "\$KEY" "(✅ QA passed|✅ Layer-Locked QA Passed|✅ Merged into|✅ Layer-Locked PR merged|📋 Plan complete|⚙️ Implementation complete|⚙️ Fix implemented)'
+for f in ceo-subdomain ceo-fix team-task ceo-fe ceo-be ceo-db ceo-int; do
+  CMD="$REPO/.claude/commands/$f.md"
+  n=$(grep -cE "$ROUTINE_RE" "$CMD")
+  assert_eq "$n" "0" "$f.md posts no routine progress comments"
+  p=$(grep -cE 'run-summary\.sh.*--post' "$CMD"); p=${p:-0}
+  assert_eq "$p" "0" "$f.md drops redundant run-summary --post"
+done
+
 echo ""
 echo "── Results: $PASS passed, $FAIL failed ──"
 [ "$FAIL" -eq 0 ]
