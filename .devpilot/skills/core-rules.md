@@ -18,3 +18,16 @@
 10. **Reach for heavier skills on demand only** — `self-heal` on a failure,
     `security-scan` on auth/input handling, `architecture-guard` on structural
     change. Don't pre-load them.
+11. **Process logging — two altitudes, no echo.** The blow-by-blow lives in the
+    repo, not the ticket:
+    - **`docs/tasks/<KEY>.md`** is the live per-step log — append who/what/when,
+      decisions, and deviations as you go. This is the durable, diffable audit.
+    - **Jira gets exactly two routine comments:** a **start** comment (branch,
+      scope, engine, intent) and a **DONE** summary (what shipped as bullets, PR
+      link, QA verdict, duration). Status transitions track real phases
+      (`In Progress → In Review/Done`).
+    - **Do not post routine progress comments** (plan-complete, impl-complete,
+      QA-passed, merged) — they restate the PR and the DONE block and bury the
+      summary. **Exception:** a **QA BLOCKED** (or hard-failure) state _is_ worth
+      a comment, because it's an exception, not narration.
+    - Technical detail belongs in the **PR description**; the ticket links to it.
