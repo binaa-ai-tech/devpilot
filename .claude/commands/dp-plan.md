@@ -87,9 +87,15 @@ is in the **gray band** (ambiguous), STOP and ask the user, showing the 1–2 ca
 
 ## Step 5 — Write to Jira (per the Step 3 verdict)
 
+First assemble a **self-contained implementation brief** — the Jira description any other
+session / opencode / AI tool will build from. Use `.devpilot/templates/team/jira-brief.md`,
+filling it from the full requirements (NOT truncated): user story, **all** ACs, scope, technical
+notes, the repo + branch convention, the spec file paths, and the DoD. Save it:
+
 ```bash
 SUMMARY="<one-line summary>"
-USER_STORY=$(grep -A 5 "## User Story" docs/requirements/<SLUG>.md | head -5)
+USER_STORY=$(grep -A 5 "## User Story" docs/requirements/<SLUG>.md | head -5)   # short seed for create
+mkdir -p docs/tasks
 ```
 
 - **UNRELATED** → create Epic, then first Story under it:
@@ -117,16 +123,23 @@ New ACs appended — see docs/requirements/<SLUG>.md"
   KEY="<EXISTING_KEY>"
   ```
 
-Attach the spec to the resulting/target issue and log the plan:
+Now that `KEY` exists, build the **self-contained brief** and set it as the structured Jira
+description (so any tool can implement from Jira alone). Fill the template from the FULL
+requirements — never truncate the ACs:
 ```bash
-bash scripts/update-jira-description.sh "$KEY" "$(head -80 docs/requirements/<SLUG>.md)"
+# Assemble docs/tasks/${KEY}-brief.md from .devpilot/templates/team/jira-brief.md, resolving:
+#   <git-remote-url>=$(git remote get-url origin), <base_branch>, <KEY>, <slug>, <EPIC_KEY>,
+#   user story, ALL acceptance criteria, scope/layers, technical notes, DoD, sprint=unscheduled.
+bash scripts/jira-describe.sh "$KEY" "docs/tasks/${KEY}-brief.md"   # rich, structured ADF description
+
 bash scripts/add-jira-comment.sh "$KEY" "📋 Planned [$START_TIME] · Verdict: <VERDICT>
-Intent: $INTENT · ACs: $AC_COUNT · Scope: <frontend/backend/DB/integration>
-Spec: docs/requirements/<SLUG>.md
+Intent: $INTENT · ACs: $AC_COUNT · Scope: <frontend/backend/DB/integration> · DoR: <ready|needs grooming>
+Brief: docs/tasks/${KEY}-brief.md · Spec: docs/requirements/<SLUG>.md
 ▶ Organize into a sprint: /dp-sprint"
 ```
 
-Keep the issue in **To Do** — planning does not start work.
+The Jira description is now a complete implementation brief; the git spec remains the
+authoritative source it links to. Keep the issue in **To Do** — planning does not start work.
 
 ---
 

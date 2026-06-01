@@ -42,6 +42,11 @@ bash scripts/jira-sprint.sh list
 Read `docs/sprints/plan.md` to get the Story keys in `$SPRINT`. For each Story, read its
 spec `docs/requirements/<slug>.md` (scope per Story already recorded at plan time).
 
+**Portable / fresh checkout:** if the local specs aren't present (a different session,
+opencode, or another AI building from Jira alone), read each Story's **Jira description** —
+it's a self-contained implementation brief (`/dp-plan` set it via `jira-describe.sh`) with the
+full ACs, scope, technical notes, repo + branch convention, and DoD. Jira is sufficient to build.
+
 ---
 
 ## Step 2 — One branch for the whole sprint

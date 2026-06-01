@@ -53,6 +53,17 @@ SPRINT_ID=$(bash scripts/jira-sprint.sh create "<sprint name>")
 bash scripts/jira-sprint.sh assign "$SPRINT_ID" <KEY1> <KEY2> <KEY3> ...
 ```
 
+**Keep each Story self-contained.** For every Story assigned, make sure its Jira description is
+the full implementation brief (set at `/dp-plan` time). If a Story is missing one — or its brief
+predates this sprint — refresh it so any external tool can build from Jira alone:
+```bash
+for KEY in <KEY1> <KEY2> ...; do
+  # ensure docs/tasks/${KEY}-brief.md exists & has Sprint: <sprint name>, then:
+  bash scripts/jira-describe.sh "$KEY" "docs/tasks/${KEY}-brief.md"
+  bash scripts/add-jira-comment.sh "$KEY" "🗂 Added to sprint <sprint name>. Self-contained brief is in the description — implementable from Jira by any session/opencode/AI tool."
+done
+```
+
 Repeat per sprint. (`create`/`assign` auto-use real Sprints or Fix Versions per `$SPRINT_MODE`.)
 
 ---
