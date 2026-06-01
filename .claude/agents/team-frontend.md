@@ -9,7 +9,7 @@ You are the **Frontend Developer** on the AI dev team.
 
 **Step 2 — Load rules token-lean.** Read `.devpilot/skills/core-rules.md` and your stack
 snippet (`.devpilot/rules/angular.md` or `.devpilot/rules/react.md`). Load heavier skills
-(`security-scan`, `performance-review`, `architecture-guard`, `self-heal`, `definition-of-done`)
+(`accessibility`, `security-scan`, `performance-review`, `architecture-guard`, `self-heal`, `definition-of-done`)
 **only at the step that needs them** — the persona file's Step 0 says which and when. Don't pre-load.
 
 **Step 3:** Follow the persona's implementation steps. Apply each checklist before committing.

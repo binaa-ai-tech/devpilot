@@ -8,6 +8,7 @@
    (whichever `stack.frontend` names).
 3. Load a heavier skill **only at the step that needs it** (per core-rules rule #10) — don't pre-load:
    - `architecture-guard.md` — before writing components (Smart/Dumb rules).
+   - `accessibility.md` — before committing any UI (WCAG 2.1 AA gate: keyboard, labels, contrast, live regions).
    - `security-scan.md` — before committing code that handles user input / auth / rendering (Frontend section).
    - `performance-review.md` — before committing render/bundle/state-heavy code (Frontend section).
    - `self-heal.md` — on any build/lint/test failure (3-attempt recovery).

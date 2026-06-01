@@ -78,7 +78,7 @@ run_update() {
   RULE_SNIPPETS="angular.md react-vue.md dotnet.md node.md python.md go.md java.md sqlserver.md postgres-mysql.md"
   PROMPT_TEAM="ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md backend-agent.md qa-agent.md"
   TEMPLATE_TEAM="requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md"
-  SKILLS="get-shit-done.md spec-first.md security-scan.md performance-review.md architecture-guard.md self-heal.md definition-of-done.md compact-context.md core-rules.md code-review.md test-strategy.md debug-method.md estimation-and-slicing.md tech-debt.md observability.md release-discipline.md status-reporting.md README.md"
+  SKILLS="get-shit-done.md spec-first.md security-scan.md performance-review.md architecture-guard.md self-heal.md definition-of-done.md compact-context.md core-rules.md code-review.md test-strategy.md debug-method.md estimation-and-slicing.md tech-debt.md observability.md release-discipline.md status-reporting.md definition-of-ready.md incident-postmortem.md data-migration-safety.md api-design.md accessibility.md README.md"
   CHECKLISTS="feature.md bugfix.md hotfix.md"
   CMDS="ceo.md dp-plan.md dp-sprint.md dp-build.md dp-release.md dp-rollback.md dp-hotfix.md dp-status.md dp-config.md dp-review-fix.md"
   AGENTS_LIST="team-lead.md team-ba.md team-frontend.md team-dotnet.md team-backend.md team-qa.md"
@@ -485,7 +485,8 @@ for f in feature.md bugfix.md hotfix.md; do
 done
 
 for f in get-shit-done.md spec-first.md security-scan.md performance-review.md architecture-guard.md self-heal.md definition-of-done.md compact-context.md core-rules.md \
-         code-review.md test-strategy.md debug-method.md estimation-and-slicing.md tech-debt.md observability.md release-discipline.md status-reporting.md README.md; do
+         code-review.md test-strategy.md debug-method.md estimation-and-slicing.md tech-debt.md observability.md release-discipline.md status-reporting.md \
+         definition-of-ready.md incident-postmortem.md data-migration-safety.md api-design.md accessibility.md README.md; do
   fetch ".devpilot/skills/$f" ".devpilot/skills/$f"
 done
 

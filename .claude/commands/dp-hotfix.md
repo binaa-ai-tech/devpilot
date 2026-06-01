@@ -21,10 +21,14 @@ manual approval gate. Skips the backlog/sprint machinery — this is an emergenc
    ```
    Merges → `main`, tags `v<version>`, merges back → `develop`.
 6. **CI on `main`** → lint → test → build → **manual PRD gate** (approve `Deploy → PRD`).
-7. **Close ticket** + verify on production. Post-mortem if customer-impacting.
+7. **Close ticket** + verify on production.
+8. **Postmortem** — apply `.devpilot/skills/incident-postmortem.md`. Write a blameless
+   postmortem to `docs/postmortems/<ticket>-<slug>.md` (timeline, root cause, action items),
+   and turn each action item into a backlog Story via `/dp-plan`. Skip only for trivial
+   internal-only blips.
 
 ## Rules
 - Hotfix ALWAYS branches from `main`, never `develop`.
 - `develop` receives the fix automatically via `hotfix-finish`.
 
-**Report:** Jira URL, tag, production URL to verify.
+**Report:** Jira URL, tag, production URL to verify, postmortem path.

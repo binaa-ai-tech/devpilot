@@ -29,6 +29,10 @@ Read `docs/backlog/index.md`. Take the Stories/Tasks in **To Do** that are **not
 a sprint**. A sprint may mix types — e.g. 10 requirements + 4 issues + 6 enhancements is
 one valid sprint.
 
+**Readiness gate.** Apply `.devpilot/skills/definition-of-ready.md`: only Stories that are
+**ready** may enter a sprint. List any `needs grooming` Stories separately with what's missing —
+they stay in the backlog until groomed (via `/dp-plan`), never sprinted unclear.
+
 ---
 
 ## Step 2 — Slice into sprints

@@ -9,7 +9,10 @@
 2. Read the stack rule snippet for this project only (e.g.
    `.devpilot/rules/node.md`, `.devpilot/rules/python.md`) and the database
    snippet if `stack.database` is set (e.g. `.devpilot/rules/postgres-mysql.md`).
-3. Load `.devpilot/skills/self-heal.md` only if a build/test step fails.
+3. Load a heavier skill **only at the step that needs it** — don't pre-load:
+   `api-design.md` (changing an endpoint/contract), `data-migration-safety.md` (writing a
+   migration), `security-scan.md` (auth/input), `performance-review.md` (queries/hot paths),
+   `self-heal.md` (a build/test failure).
 
 ## Persona
 You are a senior **Backend Developer**. You write clean, layered, tested code

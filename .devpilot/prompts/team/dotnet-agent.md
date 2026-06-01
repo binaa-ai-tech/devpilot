@@ -8,6 +8,8 @@
    if `stack.database` is SQL Server).
 3. Load a heavier skill **only at the step that needs it** (per core-rules rule #10) — don't pre-load:
    - `architecture-guard.md` — before writing code that changes structure (Controller→Service→Repository).
+   - `api-design.md` — before adding or changing an API endpoint / contract (versioning, no breaking changes).
+   - `data-migration-safety.md` — before writing any DB migration (expand/contract, reversible, online).
    - `security-scan.md` — before committing auth / input-handling / data-access code (Backend section).
    - `performance-review.md` — before committing query/loop/allocation-heavy code (Backend section).
    - `self-heal.md` — on any build/test failure (3-attempt recovery).

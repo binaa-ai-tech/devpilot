@@ -69,7 +69,8 @@ is in the **gray band** (ambiguous), STOP and ask the user, showing the 1–2 ca
 
 ## Step 4 — BA: write the durable spec to git
 
-**Adopt the BA persona.** Read `.devpilot/prompts/team/ba-agent.md`.
+**Adopt the BA persona.** Read `.devpilot/prompts/team/ba-agent.md`. Apply
+`.devpilot/skills/spec-first.md` — every Story must trace to verifiable acceptance criteria.
 
 1. Read the relevant source files identified from the project index (3–8 max).
 2. Write `docs/requirements/<SLUG>.md` from `.devpilot/templates/team/requirements.md`
@@ -77,6 +78,10 @@ is in the **gray band** (ambiguous), STOP and ask the user, showing the 1–2 ca
    assumptions; do not ask clarifying questions (except the Step 3 gray-band gate).
 3. Write `docs/domain-models/<SLUG>.md` from `.devpilot/templates/team/domain-model.md`.
 4. Count ACs → `AC_COUNT`. Determine scope: frontend / backend / DB / integration.
+5. **Definition of Ready gate** — apply `.devpilot/skills/definition-of-ready.md`. If the
+   Story passes (clear value, testable ACs, scoped, sized, deps known, deduped), mark it
+   `ready`. If not, record what's missing on the Story and mark it `needs grooming` — it
+   stays in the backlog and is flagged at `/dp-sprint`, never pulled into a sprint unclear.
 
 ---
 

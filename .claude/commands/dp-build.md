@@ -101,14 +101,20 @@ then execute each that exists, blocking until done:
 ## Step 5 — QA (whole sprint)
 
 Spawn `subagent_type: "team-qa"`:
-> Sprint: `<SPRINT>`. Verify every acceptance criterion across all Stories. Write
-> `docs/qa/<SPRINT_SLUG>.md`. Verdict per Story: PASS / BLOCKED.
+> Sprint: `<SPRINT>`. Verify every acceptance criterion across all Stories. Apply
+> `.devpilot/skills/test-strategy.md` (what to test per AC) and gate on
+> `.devpilot/skills/definition-of-done.md`. Write `docs/qa/<SPRINT_SLUG>.md`.
+> Verdict per Story: PASS / BLOCKED.
 
 If any Story is BLOCKED: fix and re-run QA before proceeding.
 
 ---
 
 ## Step 6 — One PR → develop
+
+Before opening the PR, the Team Lead runs the review gate: apply
+`.devpilot/skills/code-review.md`, plus `.devpilot/skills/security-scan.md` over auth/input
+changes and `.devpilot/skills/definition-of-done.md` — never merge around a 🔴 BLOCKER.
 
 ```bash
 git add docs/ && git commit -m "docs($SPRINT_SLUG): sprint plans, qa, review"
