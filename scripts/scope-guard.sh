@@ -2,7 +2,7 @@
 # =============================================================================
 # scope-guard.sh <layer> [base-branch] — report changes outside a vertical layer.
 #
-# Makes the layer-locks in /ceo-subdomain enforceable instead of advisory.
+# Makes per-layer scope locks enforceable instead of advisory.
 # Layers: frontend | backend | db | security
 #
 # Advisory by default (exit 0, prints warnings). Set STRICT=1 to exit 1 when any

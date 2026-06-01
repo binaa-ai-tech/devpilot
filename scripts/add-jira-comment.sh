@@ -21,11 +21,17 @@ if [ -z "$KEY" ] || [ -z "$COMMENT" ]; then
   exit 1
 fi
 
+# Render each non-blank line as its own paragraph so multi-line comments (start /
+# DONE blocks) stay readable in Jira instead of collapsing into one blob.
 BODY=$(jq -n --arg comment "$COMMENT" '{
   body: {
     type: "doc",
     version: 1,
-    content: [{ type: "paragraph", content: [{ type: "text", text: $comment }] }]
+    content: (
+      [ $comment | split("\n")[] | select(test("^\\s*$") | not)
+        | { type: "paragraph", content: [{ type: "text", text: . }] } ]
+      | if length == 0 then [{ type: "paragraph", content: [{ type: "text", text: " " }] }] else . end
+    )
   }
 }')
 

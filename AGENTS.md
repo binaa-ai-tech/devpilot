@@ -85,7 +85,7 @@ Read `project.config.md` at the start of every task:
 ## Rules
 
 Always read `.devpilot/rules.md` before writing any code.
-Apply `.devpilot/skills/get-shit-done.md` throughout.
+Apply `.devpilot/skills/core-rules.md` throughout (it folds in get-shit-done).
 
 ---
 
@@ -93,17 +93,15 @@ Apply `.devpilot/skills/get-shit-done.md` throughout.
 
 | Command file | What it does |
 |---|---|
-| `.claude/commands/ceo.md` | Full pipeline — classify → BA → plan → code → QA → PR |
-| `.claude/commands/ceo-fix.md` | Fast bug fix — no BA, minimal docs |
-| `.claude/commands/ceo-plan.md` | BA + planning only, no code |
-| `.claude/commands/ceo-fe.md` | Frontend work only |
-| `.claude/commands/ceo-be.md` | Backend work only |
-| `.claude/commands/ceo-db.md` | DB migrations only |
-| `.claude/commands/ceo-int.md` | Integration work only |
+| `.claude/commands/ceo.md` | Express — plan → sprint → build, end to end |
+| `.claude/commands/dp-plan.md` | PM brain: dedup against the backlog, write Epic→Story (no code) |
+| `.claude/commands/dp-sprint.md` | Group the backlog into sprints, recommend run order |
+| `.claude/commands/dp-build.md` | Build a whole sprint → one PR → develop |
+| `.claude/commands/dp-review-fix.md` | Read PR review comments → apply fixes → push |
 
 Run any command:
 ```bash
-bash scripts/run-command.sh ceo "your task description"
+bash scripts/run-command.sh dp-plan "your feature, issue, or requirement"
 # or directly:
 opencode    < .claude/commands/ceo.md   # pipe full prompt
 antigravity < .claude/commands/ceo.md
@@ -114,9 +112,9 @@ antigravity < .claude/commands/ceo.md
 ## Deploy Pipeline
 
 ```
-/binaa-sit <version>   → cut release branch → SIT
-/binaa-uat             → approve UAT
-/binaa-prd <version>   → merge to main → production
+/dp-release sit <version>   → cut release branch → SIT
+/dp-release uat             → approve UAT
+/dp-release prd <version>   → merge to main → production
 ```
 
 These are Claude Code slash commands. From terminal:

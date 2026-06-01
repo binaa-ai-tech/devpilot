@@ -17,7 +17,7 @@
 #   scripts/          — git-flow, Jira, deploy helpers
 #   AGENTS.md         — project context (opencode / antigravity)
 #   CLAUDE.md         — project context (Claude Code)
-#   project.config.md — engine + model config (edit with /binaa reconfig)
+#   project.config.md — engine + model config (edit with /dp-config wizard)
 # =============================================================================
 set -euo pipefail
 
@@ -77,12 +77,12 @@ run_update() {
 
   RULE_SNIPPETS="angular.md react-vue.md dotnet.md node.md python.md go.md java.md sqlserver.md postgres-mysql.md"
   PROMPT_TEAM="ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md backend-agent.md qa-agent.md"
-  TEMPLATE_TEAM="requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md"
-  SKILLS="get-shit-done.md spec-first.md security-scan.md performance-review.md architecture-guard.md self-heal.md definition-of-done.md compact-context.md core-rules.md code-review.md test-strategy.md debug-method.md estimation-and-slicing.md tech-debt.md observability.md release-discipline.md status-reporting.md README.md"
+  TEMPLATE_TEAM="requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md jira-brief.md"
+  SKILLS="get-shit-done.md spec-first.md security-scan.md performance-review.md architecture-guard.md self-heal.md definition-of-done.md compact-context.md core-rules.md code-review.md test-strategy.md debug-method.md estimation-and-slicing.md tech-debt.md observability.md release-discipline.md status-reporting.md definition-of-ready.md incident-postmortem.md data-migration-safety.md api-design.md accessibility.md README.md"
   CHECKLISTS="feature.md bugfix.md hotfix.md"
-  CMDS="ceo.md ceo-plan.md ceo-run.md ceo-fix.md ceo-fe.md ceo-be.md ceo-db.md ceo-int.md ceo-issue.md ceo-subdomain.md ceo-review-fix.md binaa.md binaa-sit.md binaa-uat.md binaa-prd.md binaa-hotfix.md binaa-reconfig.md binaa-models.md binaa-index.md binaa-doctor.md binaa-status.md binaa-metrics.md binaa-rollback.md team-task.md team-ba.md team-lead.md team-frontend.md team-dotnet.md team-backend.md team-qa.md"
+  CMDS="ceo.md dp-plan.md dp-sprint.md dp-build.md dp-release.md dp-rollback.md dp-hotfix.md dp-status.md dp-config.md dp-review-fix.md"
   AGENTS_LIST="team-lead.md team-ba.md team-frontend.md team-dotnet.md team-backend.md team-qa.md"
-  SCRIPTS="git-flow.sh new-feature.sh run-command.sh resolve-engine.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh create-jira-ticket.sh create-jira-epic.sh update-jira-status.sh update-jira-description.sh add-jira-comment.sh generate-project-index.sh ceo.sh ceo-fix.sh ceo-plan.sh ceo-run.sh ceo-fe.sh ceo-be.sh ceo-db.sh ceo-int.sh"
+  SCRIPTS="git-flow.sh new-feature.sh run-command.sh resolve-engine.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh create-jira-ticket.sh create-jira-epic.sh update-jira-status.sh update-jira-description.sh add-jira-comment.sh generate-project-index.sh generate-backlog-index.sh jira-sprint.sh link-jira-issues.sh md-to-adf.sh jira-describe.sh ceo.sh dp-plan.sh dp-sprint.sh dp-build.sh dp-release.sh dp-status.sh dp-config.sh"
 
   info "Refreshing .devpilot/rules..."
   fetch ".devpilot/rules.md" ".devpilot/rules.md"
@@ -293,44 +293,41 @@ info "Coding engine: $CODING_ENGINE  (fallback: $FALLBACK_ENGINE)"
 # ═════════════════════════════════════════════════════════════════════════════
 section "STEP 5 — Coding models..."
 
-OC_MODEL_FE="github-copilot/gpt-4o"
-OC_MODEL_BE="github-copilot/gpt-4o"
-OC_MODEL_DB="github-copilot/gpt-4o"
-OC_MODEL_INT="github-copilot/gpt-4o"
+# Models are chosen PER TASK by complexity tier (power / standard / lite),
+# balancing power against token cost — not pinned per layer.
+CL_POWER="claude-opus-4-8"
+CL_STANDARD="claude-sonnet-4-6"
+CL_LITE="claude-haiku-4-5-20251001"
 
-AG_MODEL_FE=""
-AG_MODEL_BE=""
-AG_MODEL_DB=""
-AG_MODEL_INT=""
+OC_POWER="github-copilot/gpt-5"
+OC_STANDARD="github-copilot/gpt-4o"
+OC_LITE="github-copilot/gpt-4o-mini"
+OC_FALLBACK=""    # used when GitHub Copilot is unavailable in opencode ("" = opencode default)
 
-# opencode models
+AG_POWER=""
+AG_STANDARD=""
+AG_LITE=""
+
+# opencode / GitHub Copilot tiers
 if [ "$CODING_ENGINE" = "opencode" ] || [ "$FALLBACK_ENGINE" = "opencode" ] || [ "$HAS_OPENCODE" = true ]; then
   echo ""
-  echo "  opencode / GitHub Copilot models:"
-  echo "    github-copilot/gpt-4o           — best all-round (default)"
-  echo "    github-copilot/gpt-3.5-codex    — fast and cheap"
-  echo "    github-copilot/claude-3.5-sonnet — strong reasoning"
-  echo "  Run: opencode model list — to see all available"
+  echo "  opencode / GitHub Copilot models — pick one per complexity tier."
+  echo "  Run: opencode model list — to see all available."
   echo ""
-  ask "  Frontend model [$OC_MODEL_FE]: "; read -r v; [ -n "$v" ] && OC_MODEL_FE="$v"
-  ask "  Backend model  [$OC_MODEL_BE]: "; read -r v; [ -n "$v" ] && OC_MODEL_BE="$v"
-  ask "  DB model       [$OC_MODEL_DB]: "; read -r v; [ -n "$v" ] && OC_MODEL_DB="$v"
-  if [ "$AGENT_INTEGRATION" = "true" ]; then
-    ask "  Integration    [$OC_MODEL_INT]: "; read -r v; [ -n "$v" ] && OC_MODEL_INT="$v"
-  fi
+  ask "  Power model    [$OC_POWER]: ";    read -r v; [ -n "$v" ] && OC_POWER="$v"
+  ask "  Standard model [$OC_STANDARD]: "; read -r v; [ -n "$v" ] && OC_STANDARD="$v"
+  ask "  Lite model     [$OC_LITE]: ";     read -r v; [ -n "$v" ] && OC_LITE="$v"
+  ask "  Fallback when Copilot unavailable [blank = opencode default]: "; read -r v; OC_FALLBACK="$v"
 fi
 
-# antigravity models
+# antigravity tiers
 if [ "$CODING_ENGINE" = "antigravity" ] || [ "$FALLBACK_ENGINE" = "antigravity" ] || [ "$HAS_ANTIGRAVITY" = true ]; then
   echo ""
   echo "  antigravity models (run: antigravity model list — to see all available):"
   echo ""
-  ask "  Frontend model [leave blank to set later]: "; read -r v; AG_MODEL_FE="$v"
-  ask "  Backend model  [leave blank to set later]: "; read -r v; AG_MODEL_BE="$v"
-  ask "  DB model       [leave blank to set later]: "; read -r v; AG_MODEL_DB="$v"
-  if [ "$AGENT_INTEGRATION" = "true" ]; then
-    ask "  Integration    [leave blank to set later]: "; read -r v; AG_MODEL_INT="$v"
-  fi
+  ask "  Power model    [blank to set later]: "; read -r v; AG_POWER="$v"
+  ask "  Standard model [blank to set later]: "; read -r v; AG_STANDARD="$v"
+  ask "  Lite model     [blank to set later]: "; read -r v; AG_LITE="$v"
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -475,7 +472,7 @@ for f in ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.
   fetch ".devpilot/prompts/team/$f" ".devpilot/prompts/team/$f"
 done
 
-for f in requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md; do
+for f in requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md jira-brief.md; do
   fetch ".devpilot/templates/team/$f" ".devpilot/templates/team/$f"
 done
 
@@ -488,7 +485,8 @@ for f in feature.md bugfix.md hotfix.md; do
 done
 
 for f in get-shit-done.md spec-first.md security-scan.md performance-review.md architecture-guard.md self-heal.md definition-of-done.md compact-context.md core-rules.md \
-         code-review.md test-strategy.md debug-method.md estimation-and-slicing.md tech-debt.md observability.md release-discipline.md status-reporting.md README.md; do
+         code-review.md test-strategy.md debug-method.md estimation-and-slicing.md tech-debt.md observability.md release-discipline.md status-reporting.md \
+         definition-of-ready.md incident-postmortem.md data-migration-safety.md api-design.md accessibility.md README.md; do
   fetch ".devpilot/skills/$f" ".devpilot/skills/$f"
 done
 
@@ -496,12 +494,9 @@ fetch ".devpilot/config/models.md" ".devpilot/config/models.md"
 
 # .claude/ — Claude Code commands + agent definitions
 info "Installing .claude/..."
-for f in ceo.md ceo-plan.md ceo-run.md ceo-fix.md ceo-fe.md ceo-be.md ceo-db.md ceo-int.md \
-         ceo-issue.md ceo-subdomain.md ceo-review-fix.md \
-         binaa.md binaa-sit.md binaa-uat.md binaa-prd.md binaa-hotfix.md \
-         binaa-reconfig.md binaa-models.md binaa-index.md \
-         binaa-doctor.md binaa-status.md binaa-metrics.md binaa-rollback.md \
-         team-task.md team-ba.md team-lead.md team-frontend.md team-dotnet.md team-backend.md team-qa.md; do
+for f in ceo.md dp-plan.md dp-sprint.md dp-build.md \
+         dp-release.md dp-rollback.md dp-hotfix.md \
+         dp-status.md dp-config.md dp-review-fix.md; do
   fetch ".claude/commands/$f" ".claude/commands/$f"
 done
 
@@ -545,8 +540,10 @@ for f in git-flow.sh new-feature.sh run-command.sh resolve-engine.sh preflight-s
           create-jira-ticket.sh create-jira-epic.sh \
           update-jira-status.sh update-jira-description.sh \
           add-jira-comment.sh generate-project-index.sh \
-          ceo.sh ceo-fix.sh ceo-plan.sh ceo-run.sh \
-          ceo-fe.sh ceo-be.sh ceo-db.sh ceo-int.sh; do
+          generate-backlog-index.sh jira-sprint.sh link-jira-issues.sh \
+          md-to-adf.sh jira-describe.sh \
+          ceo.sh dp-plan.sh dp-sprint.sh dp-build.sh \
+          dp-release.sh dp-status.sh dp-config.sh; do
   fetch "scripts/$f" "scripts/$f"
   chmod +x "scripts/$f" 2>/dev/null || true
 done
@@ -581,7 +578,7 @@ section "STEP 10 — Writing project.config.md..."
 
 cat > project.config.md << CONFIGEOF
 # Project Configuration
-# Generated by devpilot install.sh — edit with /binaa reconfig
+# Generated by devpilot install.sh — edit with /dp-config wizard
 
 ## Project Identity
 
@@ -639,22 +636,27 @@ engines:
   runner: $RUNNER_CLI
   fallback: $FALLBACK_ENGINE
 
-## Coding Engine Models
-# Run: opencode model list   or   antigravity model list   (to see available)
-# Edit these anytime with: /binaa-models
+## Coding Engine Models — task-balanced tiers (power / standard / lite)
+# Models are chosen per task by complexity (resolve-engine.sh), balancing power
+# against token cost. Run: opencode model list   or   antigravity model list.
+# Edit these anytime with: /dp-config models
 
 coding_models:
+  claude:
+    power:    "$CL_POWER"
+    standard: "$CL_STANDARD"
+    lite:     "$CL_LITE"
+
   opencode:
-    frontend:    "$OC_MODEL_FE"
-    backend:     "$OC_MODEL_BE"
-    db:          "$OC_MODEL_DB"
-    integration: "$OC_MODEL_INT"
+    power:    "$OC_POWER"
+    standard: "$OC_STANDARD"
+    lite:     "$OC_LITE"
+    fallback: "$OC_FALLBACK"   # used when GitHub Copilot is unavailable ("" = opencode default)
 
   antigravity:
-    frontend:    "$AG_MODEL_FE"
-    backend:     "$AG_MODEL_BE"
-    db:          "$AG_MODEL_DB"
-    integration: "$AG_MODEL_INT"
+    power:    "$AG_POWER"
+    standard: "$AG_STANDARD"
+    lite:     "$AG_LITE"
 
 ## Model Routing — Claude (orchestration phases: BA · Team Lead · QA)
 
@@ -785,7 +787,7 @@ fi
 
 echo "  ── Change config anytime ───────────────────────────────"
 echo ""
-echo "    /binaa reconfig         — re-run engine + model wizard"
-echo "    /binaa-models engine opencode   — switch coding engine"
+echo "    /dp-config wizard       — re-run engine + model wizard"
+echo "    /dp-config models       — switch coding engine / per-layer models"
 echo "    Edit project.config.md directly"
 echo ""

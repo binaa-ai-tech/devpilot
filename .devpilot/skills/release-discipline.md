@@ -15,9 +15,9 @@ repeatable, reversible process — not from skipping steps.
 
 ## Promotion gates (never skip an environment)
 1. **DEV** — auto-deploys from the base branch after CI. Smoke test here first.
-2. **SIT** (`/binaa-sit <version>`) — cut release branch; QA verifies.
-3. **UAT** (`/binaa-uat`) — stakeholder sign-off.
-4. **PRD** (`/binaa-prd <version>`) — production PR; **requires human review**.
+2. **SIT** (`/dp-release sit <version>`) — cut release branch; QA verifies.
+3. **UAT** (`/dp-release uat`) — stakeholder sign-off.
+4. **PRD** (`/dp-release prd <version>`) — production PR; **requires human review**.
 
 ## Before promoting to production
 - [ ] All migrations are idempotent and ordered (dev → UAT → prod, no skips).

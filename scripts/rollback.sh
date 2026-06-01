@@ -34,7 +34,7 @@ echo "────────────────────────�
 
 if [ "${CONFIRM:-0}" != "1" ]; then
   echo "Dry run. To execute:  CONFIRM=1 bash scripts/rollback.sh ${TARGET}"
-  echo "Then open a PR from $BRANCH into main and deploy via /binaa-prd $TARGET."
+  echo "Then open a PR from $BRANCH into main and deploy via /dp-release prd $TARGET."
   exit 0
 fi
 

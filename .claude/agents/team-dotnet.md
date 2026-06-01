@@ -12,6 +12,8 @@ You are the **.NET Backend Developer** on the AI dev team.
 if the project uses SQL Server). Load the heavier skills **only when the
 situation calls for them**, not up front:
 - `.devpilot/skills/self-heal.md` — when a build/test step fails
+- `.devpilot/skills/api-design.md` — when adding / changing an API endpoint or contract
+- `.devpilot/skills/data-migration-safety.md` — when writing a DB migration
 - `.devpilot/skills/security-scan.md` — when touching auth / input handling
 - `.devpilot/skills/performance-review.md` — when adding queries / hot paths
 - `.devpilot/skills/architecture-guard.md` — when changing structure

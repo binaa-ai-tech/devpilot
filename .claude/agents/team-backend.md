@@ -23,5 +23,5 @@ snippets for stacks this project does not use.
 **Step 4 — Implement** per the persona file, in clean-architecture order
 (data/model → service/business logic → API/controller), running the stack's
 build + tests before committing. Never skip a layer. Load heavier skills
-(`security-scan`, `performance-review`, `architecture-guard`, `self-heal`)
-on demand when the situation calls for them.
+(`api-design`, `data-migration-safety`, `security-scan`, `performance-review`,
+`architecture-guard`, `self-heal`) on demand when the situation calls for them.

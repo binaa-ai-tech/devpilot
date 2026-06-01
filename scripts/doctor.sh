@@ -37,8 +37,15 @@ fi
 ENGINE=$(grep -A8 '^engines:' project.config.md 2>/dev/null | grep -E '^\s*coding:' | head -1 | sed 's/.*coding:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
 ENGINE="${ENGINE:-claude}"
 command -v claude >/dev/null 2>&1 && ok "claude CLI present (orchestrator)" || warn "claude CLI not found"
-if [ "$ENGINE" = opencode ] || [ "$ENGINE" = max ]; then
-  command -v opencode >/dev/null 2>&1 && ok "opencode present (coding=$ENGINE)" || warn "opencode not found but engine=$ENGINE"
+if [ "$ENGINE" = opencode ]; then
+  if command -v opencode >/dev/null 2>&1; then
+    ok "opencode present (coding=$ENGINE)"
+    [ "$(bash "$(dirname "$0")/resolve-engine.sh" copilot 2>/dev/null)" = yes ] \
+      && ok "GitHub Copilot available in opencode" \
+      || warn "GitHub Copilot not available in opencode — will use opencode's default model"
+  else
+    warn "opencode not found but engine=$ENGINE"
+  fi
 fi
 
 # Tracker
