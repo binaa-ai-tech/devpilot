@@ -3,8 +3,8 @@
 Agent model assignments are stored in `project.config.md` (per-project)
 and synced to `.claude/agents/<name>.md` frontmatter by the install/reconfig wizard.
 
-Run `/binaa reconfig` anytime to change model assignments.
-Run `/binaa-models engine <name>` to switch coding engine instantly.
+Run `/dp-config wizard` anytime to change model assignments.
+Run `/dp-config models` to switch the coding engine / per-layer models.
 
 ---
 
@@ -93,7 +93,7 @@ When Claude hits a rate/context limit during an agent phase:
 
 ## Changing Models
 
-Edit `project.config.md` → `coding_models` or `models` section, then run `/binaa-models`
+Edit `project.config.md` → `coding_models` or `models` section, then run `/dp-config models`
 to confirm changes are applied.
 
-Or re-run the full wizard: `/binaa reconfig`
+Or re-run the full wizard: `/dp-config wizard`

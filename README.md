@@ -156,60 +156,45 @@ Per-run engine modes — pick how a task runs with a leading flag (no flag → `
 | `/ceo --opencode <task>` | Claude orchestrates; opencode writes all code |
 | `/ceo --max <task>` | Race **both** engines on isolated branches, judge, merge the winner |
 
-### Track 2 — CEO Issue Loop · `/ceo-issue`
+### Plan-only vs Express
 
-Team Lead-driven rapid bug triage that **bypasses the BA layer**. Use it for a production or
-regression bug that needs a fast, targeted fix. The Team Lead forms a root-cause hypothesis,
-assigns a severity (P0/P1/P2), creates an epic with per-layer sub-tasks, and dispatches
-**layer-locked agents** so a hotfix can't cause cross-layer regressions. QA is
-severity-proportional (P0 → full regression, P2 → targeted check).
+Two ways to drive the same engine:
 
-### Track 3 — CEO Sub-Domain Fixer · `/ceo-subdomain`
+- **Plan first (approve, then build):** `/dp-plan <thing>` runs the PM brain — it dedups the
+  new item against the backlog (merging duplicates), then writes Epic→Story to Jira. No code.
+  When the backlog looks right, `/dp-sprint` groups it and recommends an order, and
+  `/dp-build <sprint>` ships a whole sprint on one branch → one PR → `develop`.
+- **Express (walk away):** `/ceo <thing>` does plan → sprint → build end to end, stopping only
+  to ask one thing — a gray-zone dedup decision.
 
-Restricts agent permissions to a single technical vertical. Use it when a change must stay strictly
-inside one layer — security hardening, a single-service perf optimization, or a schema-only migration.
-
-```bash
-/ceo-subdomain frontend "migrate all ngIf to the new @if control flow"
-/ceo-subdomain backend  "add rate limiting to all API endpoints"
-/ceo-subdomain db       "add missing indexes on FK columns"
-/ceo-subdomain security "audit and fix SQL injection risks in the repository layer"
-```
-
-The agent receives an explicit `SCOPE LOCK`; any file outside the declared domain is off-limits,
-enforced in real time by `scripts/scope-hook.sh`.
+A bug, an issue, a task, a requirement, and an enhancement all enter the same way — `/dp-plan`
+classifies intent and routes it. Add several over time; the backlog stays deduplicated.
 
 ---
 
 ## Command Reference
 
-**Build / fix**
+**Workflow**
 
 | Command | Purpose |
 |---------|---------|
-| `/ceo [--claude \| --opencode \| --max] <task>` | Full autonomous flow; engine mode optional |
-| `/ceo-plan <task>` · `/ceo-run <KEY>` | Plan only / execute a saved plan |
-| `/ceo-fix <bug>` | Fast bug fix (no BA, no formal docs) |
-| `/ceo-issue <bug>` | Issue triage → per-layer locked fix |
-| `/ceo-subdomain <scope> <task>` | Layer-locked change (`frontend`/`backend`/`db`/`security`) |
-| `/ceo-fe` · `/ceo-be` · `/ceo-db` · `/ceo-int` | Single-agent implementation |
-| `/ceo-review-fix <PR>` | Read PR review comments → apply fixes → push |
+| `/ceo [--claude \| --opencode \| --max] <description>` | Express — plan → sprint → build, end to end |
+| `/dp-plan <feature \| issue \| task \| requirement>` | PM brain: dedup against the backlog, write Epic→Story (no code). Accepts raw text or a Jira key |
+| `/dp-sprint` | Group the backlog into sprints, recommend which to run first |
+| `/dp-build [sprint]` | Build a whole sprint → one PR → develop |
+| `/dp-review-fix <PR>` | Read PR review comments → apply fixes → push |
 
-**Individual agents**
-
-| Command | Runs |
-|---------|------|
-| `/team-task <task>` | The full team flow (what `/ceo` orchestrates) |
-| `/team-ba` · `/team-lead` · `/team-frontend` · `/team-backend` · `/team-qa` | One role directly |
+The six team agents (`team-ba`, `team-lead`, `team-frontend`, `team-backend`, `team-dotnet`,
+`team-qa`) are spawned automatically by the workflow commands — no manual slash wrappers.
 
 **Config & deploy**
 
 | Command | Purpose |
 |---------|---------|
-| `/binaa reconfig` · `/binaa-models` | Re-run the wizard / set per-agent models |
-| `/binaa-index` | Refresh the project index |
-| `/binaa-doctor` · `/binaa-status` · `/binaa-metrics` | Health check · task dashboard · throughput metrics |
-| `/binaa-sit` · `/binaa-uat` · `/binaa-prd` · `/binaa-hotfix` · `/binaa-rollback` | Promote DEV→SIT→UAT→PRD · hotfix · roll back |
+| `/dp-config [models \| wizard \| index]` | Set models / re-run the wizard / refresh the project index |
+| `/dp-status [health \| board \| metrics]` | Health check · task dashboard · throughput metrics |
+| `/dp-release <sit \| uat \| prd> [version]` | Promote DEV→SIT→UAT→PRD |
+| `/dp-hotfix <ticket> <slug> <version>` · `/dp-rollback [version]` | Emergency fix · roll back |
 | `bash install.sh --update` | Refresh devpilot itself (config preserved) |
 
 ---
@@ -270,8 +255,8 @@ agents:
 Change a single agent's model without editing the file:
 
 ```bash
-/binaa-models backend github-copilot/gpt-4o
-/binaa-models                                  # interactive wizard
+/dp-config models backend github-copilot/gpt-4o
+/dp-config models                              # interactive
 ```
 
 ---
@@ -299,11 +284,11 @@ Nothing merges until it passes:
   (npm/pip/dotnet/go); new high/critical CVEs block the PR.
 - **QA verdict** — every acceptance criterion has a test; PASS or BLOCKED.
 - **Scope guard** — `scripts/scope-guard.sh` (post-check) **and** a real-time `PreToolUse` hook
-  (`scripts/scope-hook.sh`) that blocks out-of-layer writes during `/ceo-subdomain`.
+  (`scripts/scope-hook.sh`) that blocks out-of-layer writes, keeping each agent inside its layer.
 - **Conventional commits** — a `commit-msg` git hook enforces the format locally.
 - **Merge policy** — `auto` (squash-merge) or `pr-only` (a human merges); production always needs sign-off.
 
-Run `/binaa-doctor` before starting to catch setup problems early.
+Run `/dp-status health` before starting to catch setup problems early.
 
 ---
 
@@ -347,11 +332,11 @@ After CI deploys to DEV, promote through environments:
 
 | Command | Stage | Trigger |
 |---------|-------|---------|
-| `/binaa-sit <version>` | SIT | DEV testing passed |
-| `/binaa-uat` | UAT | SIT QA passed |
-| `/binaa-prd <version>` | PRD | UAT signed off — **opens PR, requires your review** |
-| `/binaa-hotfix <n> <slug> <ver>` | Emergency | Production incident |
-| `/binaa-rollback [version]` | Rollback | Revert to a previous release tag |
+| `/dp-release sit <version>` | SIT | DEV testing passed |
+| `/dp-release uat` | UAT | SIT QA passed |
+| `/dp-release prd <version>` | PRD | UAT signed off — **opens PR, requires your review** |
+| `/dp-hotfix <ticket> <slug> <ver>` | Emergency | Production incident |
+| `/dp-rollback [version]` | Rollback | Revert to a previous release tag |
 
 Version convention: features → bump MINOR (`1.0.0 → 1.1.0`), fixes → bump PATCH (`1.0.0 → 1.0.1`).
 
@@ -400,8 +385,8 @@ bash scripts/checkpoint.sh latest          # find the most recent in-progress ta
 
 ```
 .claude/
-  commands/          # /ceo + subcommands, /binaa-* deploy & config commands
-  agents/            # team-ba, team-lead, team-frontend, team-backend (stack-aware), team-qa
+  commands/          # /ceo + /dp-* workflow, deploy & config commands
+  agents/            # team-ba, team-lead, team-frontend, team-backend, team-dotnet, team-qa
   settings.json      # SessionStart hook → scripts/session-start.sh
 .opencode/
   config.json        # OpenCode project config — points to AGENTS.md and .devpilot/rules.md

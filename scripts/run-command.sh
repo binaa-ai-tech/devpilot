@@ -9,12 +9,12 @@
 #
 # Usage:
 #   bash scripts/run-command.sh ceo "add property search with filters"
-#   bash scripts/run-command.sh ceo-fix "sessions table not created on startup"
-#   bash scripts/run-command.sh ceo-run MSK-22
+#   bash scripts/run-command.sh dp-plan "add CSV export to reports"
+#   bash scripts/run-command.sh dp-build sprint-1
 #
 # Or via convenience wrappers:
 #   bash scripts/ceo.sh "add property search with filters"
-#   bash scripts/ceo-fix.sh "sessions table not created on startup"
+#   bash scripts/dp-plan.sh "add CSV export to reports"
 # =============================================================================
 set -euo pipefail
 
@@ -38,7 +38,7 @@ if [ -z "$CMD" ] || [ "$CMD" = "--help" ] || [ "$CMD" = "-h" ]; then
   echo "    ceo-int    Integration / external services only"
   echo ""
   echo "  Config: set engines.runner in project.config.md"
-  echo "  Or:     /binaa-models to configure via wizard"
+  echo "  Or:     /dp-config models to configure via wizard"
   echo ""
   exit 0
 fi

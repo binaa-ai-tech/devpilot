@@ -10,7 +10,7 @@ bash scripts/ceo.sh "add user authentication"
 
 # Or pipe a command directly
 opencode < .claude/commands/ceo.md
-opencode < .claude/commands/ceo-fix.md
+opencode < .claude/commands/dp-plan.md
 ```
 
 ## Config files loaded automatically by opencode
@@ -25,7 +25,7 @@ opencode < .claude/commands/ceo-fix.md
 
 Edit `project.config.md → coding_models.opencode` or run:
 ```
-/binaa-models   (from Claude Code)
+/dp-config models   (from Claude Code)
 ```
 
 Or edit `.opencode/config.json → model` directly for the default model when

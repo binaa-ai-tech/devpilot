@@ -2,8 +2,8 @@
 # =============================================================================
 # scope-hook.sh — PreToolUse hook that enforces an active layer lock in real time.
 #
-# When /ceo-subdomain (or /ceo-issue) is running layer-locked, it writes the
-# active layer to .devpilot/.scope-lock. This hook reads the Edit/Write target
+# When a layer-locked build is running, it writes the active layer to
+# .devpilot/.scope-lock. This hook reads the Edit/Write target
 # from the tool input on stdin and BLOCKS the write if it falls outside the
 # locked layer. With no lock file present, everything is allowed.
 #
