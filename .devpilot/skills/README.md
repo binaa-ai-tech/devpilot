@@ -1,14 +1,16 @@
 # devpilot Skills — the team's operating manual
 
-Each skill is a short, principle-driven playbook. Agents read `core-rules.md`
-plus the skills relevant to their phase; heavier skills are loaded on demand.
+Each skill is a short, principle-driven playbook. **Token discipline: agents read
+`core-rules.md` ONCE at spawn — nothing else up front.** Every heavier skill is loaded
+**only at the step that needs it** (per `core-rules.md` rule #10). Never pre-load skill lists.
 
-## Always (every agent)
+## Always (every agent) — read once
 | Skill | Purpose |
 |-------|---------|
-| `core-rules.md` | The non-negotiables, read at spawn. |
-| `get-shit-done.md` | Autonomous execution — no pauses, document assumptions. |
-| `compact-context.md` | Token-lean handoffs between phases. |
+| `core-rules.md` | The non-negotiables. Folds in `get-shit-done` + `spec-first` essentials, so those are **not** read separately. |
+
+## On demand only (load at point of use)
+`compact-context` (before a phase handoff) · `get-shit-done`/`spec-first` (full detail, rarely needed beyond core-rules) · everything below.
 
 ## Planning (BA / Team Lead)
 | Skill | Purpose |

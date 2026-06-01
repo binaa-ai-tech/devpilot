@@ -1,117 +1,84 @@
-# Dev Process — AI Team System
+# DevPilot — AI Team System
 
-One command. AI team delivers the full feature or bug fix from requirement to PR.
+Two phases. **Plan** builds a deduplicated Jira backlog; **Build** ships it sprint by sprint.
+Describe what you want — the AI team runs project management → code → QA → PR.
 
 ---
 
-## Single Entry Point
+## The 10 commands
+
+**Workflow**
+| Command | Does |
+|---------|------|
+| `/ceo <description>` | **Express** — plan → sprint → build, end to end. Walk away. Stops only on a gray-zone dedup question. Flags: `--claude` / `--opencode` / `--max`. |
+| `/dp-plan <feature\|issue\|task\|requirement>` | **Plan only** — PM dedups against the backlog (merges duplicates), writes Epic→Story in Jira. No code. Accepts raw text or a Jira key. |
+| `/dp-sprint` | Organize the backlog into sprints, recommend which to run first. |
+| `/dp-build [sprint]` | Build a whole sprint on one branch → one PR → `develop`. |
+
+**Deploy** · `/dp-release <sit\|uat\|prd> [version]` · `/dp-rollback [version]` · `/dp-hotfix <ticket> <slug> <version>`
+**Utility** · `/dp-status [health\|board\|metrics]` · `/dp-config [models\|wizard\|index]` · `/dp-review-fix <PR>`
+
+---
+
+## How it works
 
 ```
-/ceo <description of feature, bug, or production issue>
+PLAN                                   BUILD
+/dp-plan "add CSV export"              /dp-sprint
+  → classify intent                     → group Stories into sprints
+  → dedup ladder ↓                      → recommend run order
+     DUPLICATE / FOLD-IN /            /dp-build sprint-1
+     RELATED / UNRELATED                → one branch
+  → spec to git                         → frontend/backend/db/integration in parallel
+  → Epic→Story to Jira                  → QA every AC
+  (auto on high confidence,            → one PR → develop
+   asks only in the gray zone)         → Stories → Done
+
+/ceo "…"  = the whole column, autonomous.
 ```
 
-**Engine modes** (optional leading flag — defaults to `engines.coding` in `project.config.md`):
-
-```
-/ceo --claude   <description>   # all phases + coding on Claude subagents
-/ceo --opencode <description>   # Claude orchestrates; opencode writes all code
-/ceo --max      <description>   # race BOTH engines, judge, merge the winner
-```
+**Dedup brain:** `/dp-plan` matches each new item against `docs/backlog/index.md` (a small,
+always-loadable map), reading full specs of only the top 1–3 candidates. Merges are
+reversible Jira links + one Story with combined ACs.
 
 ---
 
-## How It Works
+## Token discipline (works in any repo)
 
-```
-/ceo "description"
-     ↓
-[Classify: feature / bug / hotfix]
-     ↓
-[BA] Reads codebase → writes requirements autonomously (no stop)
-     ↓
-[Team Lead] Jira ticket → branch → implementation plan
-     ↓
-[Parallel — only agents enabled in project.config.md]
-  ├── Frontend Dev   (if stack has frontend)
-  ├── Backend Dev    (if stack has backend)
-  ├── DB Agent       (if DB changes in plan)
-  └── Integration    (if messaging/services in plan)
-     ↓
-[QA] Tests + verification
-     ↓
-[Team Lead] Code review → PR
-     ↓
-Report: PR URL + DEV URL + promote commands
-```
+- **Scope via indexes** — read `docs/project-index.md` + `docs/backlog/index.md` first;
+  cap codebase reading to 3–8 files. Never broad-scan.
+- **Read-once core** — `.devpilot/skills/core-rules.md` replaces re-reading long skill files.
+- Pull a specific skill from `.devpilot/skills/` only when the task needs it.
 
 ---
 
-## Implementation Engine
+## Implementation engine
 
-**Default: `engine: claude`** — fully automatic end-to-end. Claude subagents handle every phase with no manual steps.
+- **`engine: claude`** (default) — Claude subagents handle every phase, fully automatic.
+- **`engine: opencode`** — Claude does PM/QA/review; opencode writes code (run via Bash directly,
+  never a manual handoff). Set in `project.config.md`. Change anytime: `/dp-config models`.
 
-**Optional: `engine: opencode`** — Claude does BA/planning/QA/review; you run opencode in your terminal for coding phases. Set this in `project.config.md` if you prefer opencode for implementation.
-
-Change anytime with `/binaa reconfig` or `/binaa-models`.
-
----
-
-## Commands
-
-| Command | When to use |
-|---------|-------------|
-| `/ceo <description>` | Primary entry point — any task (`--claude`/`--opencode`/`--max`) |
-| `/ceo resume` | After opencode fallback completes |
-| `/ceo-review-fix <PR>` | Address PR review comments → push |
-| `/team-task <description>` | Full team flow with more control |
-| `/team-ba` / `/team-lead` / `/team-frontend` / `/team-backend` / `/team-qa` | Individual agent |
-| `/binaa-doctor` / `/binaa-status` / `/binaa-metrics` | Health check / task dashboard / metrics |
-| `/binaa reconfig` | Re-run model configuration wizard |
-
-## Deploy Pipeline
-
-| Command | Stage | When |
-|---------|-------|------|
-| `/binaa-sit <version>` | SIT | After DEV testing passes |
-| `/binaa-uat` | UAT | After SIT QA passes |
-| `/binaa-prd <version>` | PRD | After UAT sign-off (assembles CHANGELOG) |
-| `/binaa-hotfix <n> <slug> <version>` | Emergency | Production issue |
-| `/binaa-rollback [version]` | Rollback | Revert to a previous release tag |
+3-tier model routing: Claude (primary) → Copilot-via-opencode (on limit) → OpenCode Zen (last resort).
 
 ---
 
-## Model Configuration (3-Tier)
+## Tech stack & rules
 
-| Tier | Models | Trigger |
-|------|--------|---------|
-| Tier 1 | Claude Pro (Sonnet 4.6, Haiku 4.5) | Primary — always |
-| Tier 2 | GitHub Copilot via opencode (GPT-5.4, Gemini 2.5 Pro, etc.) | Auto on Claude limit |
-| Tier 3 | OpenCode Zen Free (DeepSeek, Nemotron) | Last resort |
-
-Change anytime: `/binaa reconfig`
+- **Frontend:** Angular 21+ / React · **Backend:** .NET (C#), SQL Server (stack-aware: node/python/go/java).
+- **Rules:** `.devpilot/rules.md` (router) + `.devpilot/rules/<stack>.md`.
+- **Skills:** `.devpilot/skills/` — operating manual. Index: `.devpilot/skills/README.md`.
+- **Agents:** `.claude/agents/` — team-ba, team-lead, team-frontend, team-backend, team-dotnet, team-qa
+  (spawned by the workflow commands; no manual slash wrappers).
 
 ---
 
-## Tech Stack
-
-- **Frontend:** Angular 21+ / React
-- **Backend:** .NET (C#), SQL Server (stack-aware — adapts to node/python/go/java)
-- **Rules:** `.devpilot/rules.md` (router) + `.devpilot/rules/<stack>.md` snippets
-- **Skills:** `.devpilot/skills/` — the team's operating manual. Index: `.devpilot/skills/README.md`.
-  Execution: get-shit-done, self-heal, compact-context, core-rules.
-  Planning: spec-first, estimation-and-slicing.
-  Build: architecture-guard, test-strategy, observability, performance-review.
-  Quality/ship: code-review, security-scan, definition-of-done, release-discipline.
-  Cross-cutting: debug-method, tech-debt, status-reporting.
-
----
-
-## Docs Output per Task
+## Docs output per task
 
 | Document | Path |
 |----------|------|
+| Backlog index | `docs/backlog/index.md` |
 | Requirements + Domain Model | `docs/requirements/<slug>.md`, `docs/domain-models/<slug>.md` |
+| Sprint plan | `docs/sprints/plan.md` |
 | Implementation Plan + ADRs | `docs/plans/<slug>.md`, `docs/adrs/` |
 | QA Report | `docs/qa/<slug>.md` |
 | Review Report | `docs/reviews/<slug>.md` |
-| Fallback prompts (if limit hit) | `docs/fallback/<slug>-<phase>-prompt.md` |
