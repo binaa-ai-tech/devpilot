@@ -8,7 +8,9 @@ gray-zone dedup decision (Step 1). For the approve-first path instead, use
 `/dp-plan` → `/dp-sprint` → `/dp-build`.
 
 **Engine flag** (optional leading token, defaults to `engines.coding` in `project.config.md`):
-`--claude` (all Claude) · `--opencode` (Claude plans, opencode codes) · `--max` (race both, judge, merge).
+`--claude` (Claude models) · `--opencode` (Claude plans; opencode/GitHub Copilot codes).
+Within the chosen family, the model is picked **per task** — power vs token-saving — by
+`resolve-engine.sh`. opencode falls back to its own default model when Copilot is unavailable.
 
 ---
 

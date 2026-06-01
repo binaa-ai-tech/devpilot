@@ -2,15 +2,14 @@
 # =============================================================================
 # run-mode.sh — resolve the /ceo engine-mode flag from a task string.
 #
-# Modes:
-#   --claude   | -c   → all phases + all coding on Claude subagents
-#   --opencode | -o   → Claude orchestrates; opencode writes all code
-#   --max      | -m   → coding runs on BOTH Claude and opencode on isolated
-#                       branches; the better implementation is judged + merged
+# Modes (pick the model FAMILY; the model itself is chosen per-task by
+# resolve-engine.sh, balancing power vs token):
+#   --claude   | -c   → all phases + all coding on Claude models
+#   --opencode | -o   → Claude orchestrates; opencode (GitHub Copilot) writes code
 #
 # Usage (inside a command file):
 #   eval "$(bash scripts/run-mode.sh "$ARGUMENTS")"
-#   # now $RUN_MODE (claude|opencode|max) and $TASK (flag stripped) are set
+#   # now $RUN_MODE (claude|opencode) and $TASK (flag stripped) are set
 #
 # No flag → falls back to engines.coding in project.config.md, then "claude".
 # =============================================================================
@@ -23,10 +22,8 @@ MODE=""
 case "$RAW" in
   --claude|--claude\ *)     MODE="claude";   RAW="${RAW#--claude}"   ;;
   --opencode|--opencode\ *) MODE="opencode"; RAW="${RAW#--opencode}" ;;
-  --max|--max\ *)           MODE="max";      RAW="${RAW#--max}"      ;;
   -c|-c\ *)                 MODE="claude";   RAW="${RAW#-c}"         ;;
   -o|-o\ *)                 MODE="opencode"; RAW="${RAW#-o}"         ;;
-  -m|-m\ *)                 MODE="max";      RAW="${RAW#-m}"         ;;
 esac
 
 # Trim leading whitespace from the remaining task text.
@@ -44,8 +41,7 @@ fi
 
 # Normalise anything unexpected to a safe default.
 case "$MODE" in
-  claude|opencode|max) ;;
-  antigravity) ;;          # allowed single-engine value from config
+  claude|opencode|antigravity) ;;   # antigravity = allowed single-engine value from config
   *) MODE="claude" ;;
 esac
 

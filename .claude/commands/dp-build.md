@@ -14,9 +14,14 @@ Build **every Story in the sprint** on **one branch**, run QA, and open **one PR
 START_TIME=$(date '+%Y-%m-%d %H:%M:%S')
 BASE_BRANCH=$(grep '^base_branch:' project.config.md | head -1 | sed 's/base_branch:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
 
+# Task-balanced model tier: power for architectural/cross-cutting sprints, else
+# standard. Derive TIER from the sprint's combined story summaries.
+eval "$(bash scripts/resolve-engine.sh suggest "<sprint name + story summaries>")"   # sets COMPLEXITY + TIER
+
 # Per-layer engine + model — resolve-engine.sh is the single source of truth
-# (applies Claude-entry coupling + layer_overrides).
-_resolve() { eval "$(bash scripts/resolve-engine.sh layer "$1")"; printf '%s\t%s' "$LAYER_ENGINE" "$LAYER_MODEL"; }
+# (Claude-entry coupling + layer_overrides; model picked by $TIER; opencode falls
+# back to its default when GitHub Copilot is unavailable).
+_resolve() { eval "$(bash scripts/resolve-engine.sh layer "$1" "$TIER")"; printf '%s\t%s' "$LAYER_ENGINE" "$LAYER_MODEL"; }
 IFS=$'\t' read -r ENG_FE  IMPL_MODEL_FE  < <(_resolve frontend)
 IFS=$'\t' read -r ENG_BE  IMPL_MODEL_BE  < <(_resolve backend)
 IFS=$'\t' read -r ENG_DB  IMPL_MODEL_DB  < <(_resolve db)

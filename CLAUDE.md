@@ -10,7 +10,7 @@ Describe what you want — the AI team runs project management → code → QA �
 **Workflow**
 | Command | Does |
 |---------|------|
-| `/ceo <description>` | **Express** — plan → sprint → build, end to end. Walk away. Stops only on a gray-zone dedup question. Flags: `--claude` / `--opencode` / `--max`. |
+| `/ceo <description>` | **Express** — plan → sprint → build, end to end. Walk away. Stops only on a gray-zone dedup question. Flags: `--claude` / `--opencode`. |
 | `/dp-plan <feature\|issue\|task\|requirement>` | **Plan only** — PM dedups against the backlog (merges duplicates), writes Epic→Story in Jira. No code. Accepts raw text or a Jira key. |
 | `/dp-sprint` | Organize the backlog into sprints, recommend which to run first. |
 | `/dp-build [sprint]` | Build a whole sprint on one branch → one PR → `develop`. |
@@ -54,11 +54,15 @@ reversible Jira links + one Story with combined ACs.
 
 ## Implementation engine
 
-- **`engine: claude`** (default) — Claude subagents handle every phase, fully automatic.
-- **`engine: opencode`** — Claude does PM/QA/review; opencode writes code (run via Bash directly,
-  never a manual handoff). Set in `project.config.md`. Change anytime: `/dp-config models`.
+- **`engine: claude`** (default) — Claude models handle every phase. Model is balanced **per task**:
+  lite (Haiku) for simple/BA/QA work, standard (Sonnet) for normal implementation, power (Opus)
+  for architectural / cross-cutting / high-risk changes.
+- **`engine: opencode`** — Claude does PM/QA/review; opencode writes code with **GitHub Copilot**
+  models, balanced the same way (power/standard/lite). If Copilot isn't available in opencode, it
+  falls back to opencode's own default model. Run via Bash directly, never a manual handoff.
 
-3-tier model routing: Claude (primary) → Copilot-via-opencode (on limit) → OpenCode Zen (last resort).
+Set in `project.config.md` (`coding_models.*` tiers); change anytime via `/dp-config models`.
+`resolve-engine.sh` is the single source of truth for engine + model per task.
 
 ---
 

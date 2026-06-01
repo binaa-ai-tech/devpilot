@@ -293,44 +293,41 @@ info "Coding engine: $CODING_ENGINE  (fallback: $FALLBACK_ENGINE)"
 # ═════════════════════════════════════════════════════════════════════════════
 section "STEP 5 — Coding models..."
 
-OC_MODEL_FE="github-copilot/gpt-4o"
-OC_MODEL_BE="github-copilot/gpt-4o"
-OC_MODEL_DB="github-copilot/gpt-4o"
-OC_MODEL_INT="github-copilot/gpt-4o"
+# Models are chosen PER TASK by complexity tier (power / standard / lite),
+# balancing power against token cost — not pinned per layer.
+CL_POWER="claude-opus-4-8"
+CL_STANDARD="claude-sonnet-4-6"
+CL_LITE="claude-haiku-4-5-20251001"
 
-AG_MODEL_FE=""
-AG_MODEL_BE=""
-AG_MODEL_DB=""
-AG_MODEL_INT=""
+OC_POWER="github-copilot/gpt-5"
+OC_STANDARD="github-copilot/gpt-4o"
+OC_LITE="github-copilot/gpt-4o-mini"
+OC_FALLBACK=""    # used when GitHub Copilot is unavailable in opencode ("" = opencode default)
 
-# opencode models
+AG_POWER=""
+AG_STANDARD=""
+AG_LITE=""
+
+# opencode / GitHub Copilot tiers
 if [ "$CODING_ENGINE" = "opencode" ] || [ "$FALLBACK_ENGINE" = "opencode" ] || [ "$HAS_OPENCODE" = true ]; then
   echo ""
-  echo "  opencode / GitHub Copilot models:"
-  echo "    github-copilot/gpt-4o           — best all-round (default)"
-  echo "    github-copilot/gpt-3.5-codex    — fast and cheap"
-  echo "    github-copilot/claude-3.5-sonnet — strong reasoning"
-  echo "  Run: opencode model list — to see all available"
+  echo "  opencode / GitHub Copilot models — pick one per complexity tier."
+  echo "  Run: opencode model list — to see all available."
   echo ""
-  ask "  Frontend model [$OC_MODEL_FE]: "; read -r v; [ -n "$v" ] && OC_MODEL_FE="$v"
-  ask "  Backend model  [$OC_MODEL_BE]: "; read -r v; [ -n "$v" ] && OC_MODEL_BE="$v"
-  ask "  DB model       [$OC_MODEL_DB]: "; read -r v; [ -n "$v" ] && OC_MODEL_DB="$v"
-  if [ "$AGENT_INTEGRATION" = "true" ]; then
-    ask "  Integration    [$OC_MODEL_INT]: "; read -r v; [ -n "$v" ] && OC_MODEL_INT="$v"
-  fi
+  ask "  Power model    [$OC_POWER]: ";    read -r v; [ -n "$v" ] && OC_POWER="$v"
+  ask "  Standard model [$OC_STANDARD]: "; read -r v; [ -n "$v" ] && OC_STANDARD="$v"
+  ask "  Lite model     [$OC_LITE]: ";     read -r v; [ -n "$v" ] && OC_LITE="$v"
+  ask "  Fallback when Copilot unavailable [blank = opencode default]: "; read -r v; OC_FALLBACK="$v"
 fi
 
-# antigravity models
+# antigravity tiers
 if [ "$CODING_ENGINE" = "antigravity" ] || [ "$FALLBACK_ENGINE" = "antigravity" ] || [ "$HAS_ANTIGRAVITY" = true ]; then
   echo ""
   echo "  antigravity models (run: antigravity model list — to see all available):"
   echo ""
-  ask "  Frontend model [leave blank to set later]: "; read -r v; AG_MODEL_FE="$v"
-  ask "  Backend model  [leave blank to set later]: "; read -r v; AG_MODEL_BE="$v"
-  ask "  DB model       [leave blank to set later]: "; read -r v; AG_MODEL_DB="$v"
-  if [ "$AGENT_INTEGRATION" = "true" ]; then
-    ask "  Integration    [leave blank to set later]: "; read -r v; AG_MODEL_INT="$v"
-  fi
+  ask "  Power model    [blank to set later]: "; read -r v; AG_POWER="$v"
+  ask "  Standard model [blank to set later]: "; read -r v; AG_STANDARD="$v"
+  ask "  Lite model     [blank to set later]: "; read -r v; AG_LITE="$v"
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -637,22 +634,27 @@ engines:
   runner: $RUNNER_CLI
   fallback: $FALLBACK_ENGINE
 
-## Coding Engine Models
-# Run: opencode model list   or   antigravity model list   (to see available)
+## Coding Engine Models — task-balanced tiers (power / standard / lite)
+# Models are chosen per task by complexity (resolve-engine.sh), balancing power
+# against token cost. Run: opencode model list   or   antigravity model list.
 # Edit these anytime with: /dp-config models
 
 coding_models:
+  claude:
+    power:    "$CL_POWER"
+    standard: "$CL_STANDARD"
+    lite:     "$CL_LITE"
+
   opencode:
-    frontend:    "$OC_MODEL_FE"
-    backend:     "$OC_MODEL_BE"
-    db:          "$OC_MODEL_DB"
-    integration: "$OC_MODEL_INT"
+    power:    "$OC_POWER"
+    standard: "$OC_STANDARD"
+    lite:     "$OC_LITE"
+    fallback: "$OC_FALLBACK"   # used when GitHub Copilot is unavailable ("" = opencode default)
 
   antigravity:
-    frontend:    "$AG_MODEL_FE"
-    backend:     "$AG_MODEL_BE"
-    db:          "$AG_MODEL_DB"
-    integration: "$AG_MODEL_INT"
+    power:    "$AG_POWER"
+    standard: "$AG_STANDARD"
+    lite:     "$AG_LITE"
 
 ## Model Routing — Claude (orchestration phases: BA · Team Lead · QA)
 

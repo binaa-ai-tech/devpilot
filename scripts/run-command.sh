@@ -186,13 +186,14 @@ if [ "$RUNNER" = "claude" ] && grep -A 6 '^layer_overrides:' project.config.md 2
   LAYER_NOTE=" (+ active layer_overrides)"
 fi
 
-# Runner model — for opencode/antigravity, read from coding_models section
-# (runner uses same model as coding engine by default)
+# Runner model — for opencode/antigravity, read the standard tier from
+# coding_models (per-task tiers are resolved by resolve-engine.sh at build time;
+# this is just the informational default for the preamble).
 RUNNER_MODEL=""
 if [ "$RUNNER" = "opencode" ]; then
-  RUNNER_MODEL=$(_read_config "opencode" "backend")
+  RUNNER_MODEL=$(_read_config "opencode" "standard")
 elif [ "$RUNNER" = "antigravity" ]; then
-  RUNNER_MODEL=$(_read_config "antigravity" "backend")
+  RUNNER_MODEL=$(_read_config "antigravity" "standard")
 fi
 
 # ── Substitute $ARGUMENTS ──────────────────────────────────────────────────────

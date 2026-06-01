@@ -93,46 +93,52 @@ engines:
 # An explicit override here also wins over the runner=claude coupling above.
 
 layer_overrides:
-  frontend:    ""                # e.g. opencode  → FE code via coding_models.opencode.frontend
-  backend:     ""                # e.g. opencode  → BE code via coding_models.opencode.backend
+  frontend:    ""                # e.g. opencode → FE code via opencode (Copilot tiers)
+  backend:     ""                # e.g. opencode → BE code via opencode (Copilot tiers)
   db:          ""
   integration: ""
 
-## Coding Engine Models
+## Coding Engine Models — task-balanced tiers
 #
-# Per-agent model IDs for whichever coding engine is active.
+# Models are chosen PER TASK by complexity (resolve-engine.sh), balancing power
+# against token cost — not pinned per layer:
+#   power    → architectural / cross-cutting / high-risk / large changes
+#   standard → normal feature & bug implementation (the default)
+#   lite     → simple / mechanical / small changes
+#
 # Run: opencode model list   or   antigravity model list   (to see available models)
-#
-# Common opencode / GitHub Copilot models:
-#   github-copilot/gpt-4o           — best all-round
-#   github-copilot/gpt-3.5-codex    — fast and cheap
-#   github-copilot/claude-3.5-sonnet — strong reasoning + code quality
-#
-# antigravity models: use exact model name from `antigravity model list`
 
 coding_models:
-  # opencode models (used when engines.coding = opencode, or as fallback)
-  opencode:
-    frontend:    "github-copilot/gpt-4o"    # Angular / React / Vue
-    backend:     "github-copilot/gpt-4o"    # .NET / Node / Python
-    db:          "github-copilot/gpt-4o"    # DB migrations and SQL
-    integration: "github-copilot/gpt-4o"    # Messaging / Services
+  # Claude family — used when the run family is Claude. (Subagents also carry a
+  # role default in .claude/agents/*; these tiers are the orchestrator's balance
+  # and the escalation target for complex work.)
+  claude:
+    power:    "claude-opus-4-8"
+    standard: "claude-sonnet-4-6"
+    lite:     "claude-haiku-4-5-20251001"
 
-  # antigravity models (used when engines.coding = antigravity, or as fallback)
+  # GitHub Copilot via opencode — used when the run family is opencode.
+  opencode:
+    power:    "github-copilot/gpt-5"          # strongest Copilot model
+    standard: "github-copilot/gpt-4o"         # best all-round
+    lite:     "github-copilot/gpt-4o-mini"    # fast & cheap
+    # Fallback when GitHub Copilot is NOT available in opencode. Leave empty to
+    # let opencode use its own configured default model (no --model passed);
+    # or pin a specific non-Copilot model id (e.g. "opencode/grok-code").
+    fallback: ""
+
+  # antigravity models (used when engines.coding = antigravity)
   antigravity:
-    frontend:    ""                          # set model from: antigravity model list
-    backend:     ""
-    db:          ""
-    integration: ""
+    power:    ""                               # set from: antigravity model list
+    standard: ""
+    lite:     ""
 
   # Local models via Ollama (opencode/antigravity can target these — fully offline).
-  # Used when a layer's resolved model is empty and DEVPILOT_LOCAL=1, or when you
-  # set a layer override's model to one of these. Run: ollama list
+  # Used when the resolved tier model is empty and DEVPILOT_LOCAL=1. Run: ollama list
   ollama:
-    frontend:    "ollama/qwen2.5-coder:14b"
-    backend:     "ollama/deepseek-coder-v2:16b"
-    db:          "ollama/qwen2.5-coder:7b"
-    integration: "ollama/qwen2.5-coder:7b"
+    power:    "ollama/deepseek-coder-v2:16b"
+    standard: "ollama/qwen2.5-coder:14b"
+    lite:     "ollama/qwen2.5-coder:7b"
 
 ## Model Routing — Claude (orchestration phases only)
 #

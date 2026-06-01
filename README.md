@@ -49,7 +49,7 @@ It is built so a **one-person team can operate like a small company**:
 
 | | |
 |---|---|
-| 🧠 **Engine modes per task** | `/ceo --claude`, `--opencode`, or `--max` (race both engines, merge the winner). |
+| 🧠 **Task-balanced models** | `/ceo --claude` or `--opencode`; within each family the model is picked per task — power vs token-saving. |
 | ⚡ **Zero external setup** | Issue tracking defaults to a local file log; GitHub Issues / Jira are opt-in. `gh` is optional. |
 | 🪙 **Token-lean** | Agents retrieve only the files relevant to a task and route small work to a fast path — never scan the whole repo. |
 | 🧩 **Any stack** | One stack-aware backend agent + per-stack rule snippets for .NET, Node, Python, Go, Java, Angular, React/Vue, SQL Server, Postgres/MySQL. |
@@ -152,9 +152,12 @@ Per-run engine modes — pick how a task runs with a leading flag (no flag → `
 
 | Flag | Behaviour |
 |------|-----------|
-| `/ceo --claude <task>` | All phases + coding on Claude subagents |
-| `/ceo --opencode <task>` | Claude orchestrates; opencode writes all code |
-| `/ceo --max <task>` | Race **both** engines on isolated branches, judge, merge the winner |
+| `/ceo --claude <task>` | All phases + coding on Claude models (balanced per task: Haiku/Sonnet/Opus) |
+| `/ceo --opencode <task>` | Claude orchestrates; opencode writes code with GitHub Copilot models (balanced per task) |
+
+Within the chosen family the model is selected **per task** by `resolve-engine.sh` — power for
+architectural/cross-cutting work, lite for simple changes. With `--opencode`, if GitHub Copilot
+isn't available, opencode falls back to its own default model.
 
 ### Plan-only vs Express
 
@@ -178,7 +181,7 @@ classifies intent and routes it. Add several over time; the backlog stays dedupl
 
 | Command | Purpose |
 |---------|---------|
-| `/ceo [--claude \| --opencode \| --max] <description>` | Express — plan → sprint → build, end to end |
+| `/ceo [--claude \| --opencode] <description>` | Express — plan → sprint → build, end to end |
 | `/dp-plan <feature \| issue \| task \| requirement>` | PM brain: dedup against the backlog, write Epic→Story (no code). Accepts raw text or a Jira key |
 | `/dp-sprint` | Group the backlog into sprints, recommend which to run first |
 | `/dp-build [sprint]` | Build a whole sprint → one PR → develop |
@@ -415,7 +418,7 @@ install.sh           # One-command installer
 | `git` | Yes | Branch management |
 | [GitHub CLI (`gh`)](https://cli.github.com) | Optional | PR auto-merge; without it `open-pr.sh` prints a compare URL |
 | `jq` or `python3` | Optional | JSON operations in checkpoint/config scripts |
-| [OpenCode](https://opencode.ai) | Optional | If `engines.coding: opencode` or `/ceo --opencode` / `--max` |
+| [OpenCode](https://opencode.ai) | Optional | If `engines.coding: opencode` or `/ceo --opencode` |
 | Antigravity | Optional | If `engines.coding: antigravity` |
 
 ---

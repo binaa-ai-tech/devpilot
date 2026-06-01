@@ -22,6 +22,23 @@ Claude always handles: BA, planning, QA, code review, PR.
 
 ---
 
+## Task-balanced model tiers (power vs token)
+
+Within the active engine family, the **model is chosen per task** by complexity
+(`resolve-engine.sh`), balancing capability against token cost. Configure under
+`project.config.md → coding_models.<family>`:
+
+| Tier | When | Claude | opencode (GitHub Copilot) |
+|------|------|--------|----------------------------|
+| `power` | architectural / cross-cutting / high-risk | `claude-opus-4-8` | `github-copilot/gpt-5` |
+| `standard` | normal feature & bug work (default) | `claude-sonnet-4-6` | `github-copilot/gpt-4o` |
+| `lite` | simple / mechanical / BA / QA | `claude-haiku-4-5` | `github-copilot/gpt-4o-mini` |
+
+**opencode + no Copilot:** if GitHub Copilot isn't available in opencode, devpilot
+uses `coding_models.opencode.fallback`, or opencode's own default model when that's empty.
+
+---
+
 ## Recommended Routing (Normal Projects — No Opus)
 
 | Agent | Tier 1 (Claude Pro) | Tier 2 (Copilot/opencode) | Tier 3 (Free) |
