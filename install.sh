@@ -224,7 +224,11 @@ elif [ -f "go.mod" ];   then DETECT_BACKEND="go";   echo "  ✅ Go"
 elif [ -f "pom.xml" ];  then DETECT_BACKEND="java"; echo "  ✅ Java"
 fi
 
-if find . -maxdepth 4 \( -name "*.sql" -o -name "*migration*" -o -name "*Migration*" \) 2>/dev/null | grep -q .; then
+# Scan deeper than the backend probe: EF Core / monorepo migrations often nest
+# (e.g. apps/api/Infrastructure/Data/Migrations = depth 5). Skip build/dep noise.
+if find . -maxdepth 7 \
+     -not -path '*/node_modules/*' -not -path '*/bin/*' -not -path '*/obj/*' -not -path '*/.git/*' \
+     \( -iname "*.sql" -o -iname "*migration*" \) 2>/dev/null | grep -q .; then
   DETECT_DB="sqlserver"; echo "  ✅ Database migrations detected"
 fi
 
