@@ -70,10 +70,18 @@ or other AI tool can pick up a sprint and build from Jira alone.
 
 ## Quick Start
 
-**1. Install** — run from the root of your project:
+**1. Install** — run from the root of your project. The installer is interactive, so it needs a real terminal (it prompts for engine, agents, stack, etc.).
+
+**Recommended — download, then run** (works everywhere; lets you inspect the script first):
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/binaa-ai-tech/devpilot/main/install.sh -o /tmp/devpilot-install.sh && bash /tmp/devpilot-install.sh
+```
+
+**Or — one-liner** (the script re-execs itself from `/dev/tty` so the prompts still work when piped):
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/binaa-ai-tech/devpilot/main/install.sh | bash
 ```
 
 <details>
