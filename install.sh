@@ -22,11 +22,18 @@
 set -euo pipefail
 
 # When piped via curl | bash, stdin IS the script — bash and read() both fight over it.
-# Fix: download a clean copy to a temp file and re-exec from disk so stdin is the terminal.
+# Fix: download a clean copy to a temp file and re-exec from disk, redirecting stdin
+# from the controlling terminal so every `read` prompt gets the keyboard, not the pipe.
 if [ ! -t 0 ] && [ -z "${DEVPILOT_REEXEC:-}" ]; then
+  if [ ! -e /dev/tty ]; then
+    echo "Error: no terminal available for interactive prompts." >&2
+    echo "Download and run instead:" >&2
+    echo "  curl -fsSL ${REPO:-https://raw.githubusercontent.com/binaa-ai-tech/devpilot/main}/install.sh -o /tmp/devpilot-install.sh && bash /tmp/devpilot-install.sh" >&2
+    exit 1
+  fi
   TMPFILE=$(mktemp /tmp/devpilot-install.XXXXXX.sh)
   curl -fsSL "https://raw.githubusercontent.com/binaa-ai-tech/devpilot/main/install.sh" -o "$TMPFILE"
-  DEVPILOT_REEXEC=1 bash "$TMPFILE" "$@"
+  DEVPILOT_REEXEC=1 bash "$TMPFILE" "$@" < /dev/tty
   rm -f "$TMPFILE"
   exit $?
 fi
