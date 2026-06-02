@@ -1,4 +1,4 @@
-# Skill: Observability
+# Observability — code that can't be observed can't be operated
 
 Code that can't be observed can't be operated. Every feature ships with the
 logging, metrics, and error handling needed to debug it in production.

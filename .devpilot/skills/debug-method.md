@@ -1,4 +1,4 @@
-# Skill: Debugging Method
+# Debugging Method — find the root cause before touching code
 
 Used in bug and issue tracks. Debugging is a search, not a guess. Find the root
 cause before you touch code.

@@ -1,4 +1,4 @@
-# Skill: Code Review (Review Gate)
+# Code Review — the gate a defect must not pass
 
 Used by the **Team Lead** in the review phase, and on demand via `/code-review`.
 A review that rubber-stamps a defect is itself a defect.

@@ -1,4 +1,4 @@
-# Skill: Architecture Guardrails
+# Architecture Guardrails — keep every change in the right layer
 
 Enforce these patterns. Flag violations in the review doc.
 

@@ -1,4 +1,4 @@
-# Skill: Release Discipline
+# Release Discipline — ship safely through DEV → SIT → UAT → PRD
 
 How the team ships safely through DEV → SIT → UAT → PRD. Speed comes from a
 repeatable, reversible process — not from skipping steps.

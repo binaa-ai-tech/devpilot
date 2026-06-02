@@ -1,4 +1,4 @@
-# Skill: Spec-First (Spec Driven Development)
+# Spec-First — the spec is the source of truth (Spec-Driven Development)
 
 ## Principle
 

@@ -1,4 +1,4 @@
-# Skill: Estimation & Vertical Slicing
+# Estimation & Vertical Slicing — ship big things in thin slices
 
 Used by the **Team Lead / BA** in planning. How a small team ships big things:
 cut the work into thin slices that each deliver value and can be verified.

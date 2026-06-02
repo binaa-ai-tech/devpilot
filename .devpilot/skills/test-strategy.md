@@ -1,4 +1,4 @@
-# Skill: Test Strategy
+# Test Strategy — untested behavior is unfinished behavior
 
 Used by developers and QA. Tests are the contract that lets the team move fast
 without breaking things. Untested behavior is unfinished behavior.

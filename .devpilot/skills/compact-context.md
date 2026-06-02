@@ -1,4 +1,4 @@
-# Skill: Context Compaction
+# Context Compaction — hand off summaries, not raw document dumps
 
 Apply this skill before passing context between phases to avoid bloating the token budget
 with raw document dumps. Instead of passing full files, pass a structured compact summary.

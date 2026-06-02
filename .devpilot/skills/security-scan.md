@@ -1,4 +1,4 @@
-# Skill: Security Scan
+# Security Scan — a security checklist over the diff
 
 Run this checklist before every commit and during code review.
 

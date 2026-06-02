@@ -1,4 +1,4 @@
-# Skill: Tech Debt Management
+# Tech Debt — take on debt deliberately, pay it down
 
 A professional team takes on debt deliberately and pays it down — it never
 pretends debt doesn't exist. Sustainable pace beats heroics.

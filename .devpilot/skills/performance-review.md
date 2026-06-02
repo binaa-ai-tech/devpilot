@@ -1,4 +1,4 @@
-# Skill: Performance Review
+# Performance Review — a performance checklist for new code
 
 Check before every commit. Flag issues in the review doc.
 

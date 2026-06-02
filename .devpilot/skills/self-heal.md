@@ -1,4 +1,4 @@
-# Skill: Self-Healing (Error Recovery + Model Fallback)
+# Self-Healing — 3-attempt recovery + model fallback
 
 Apply this skill in every agent. It covers two scenarios:
 build/lint/test failures and Claude limit fallback to the configured fallback engine.

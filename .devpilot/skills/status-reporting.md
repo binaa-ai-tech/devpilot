@@ -1,4 +1,4 @@
-# Skill: Status Reporting (Team Communication)
+# Status Reporting — clear, honest status at every phase boundary
 
 A one-person-plus-AI team still communicates like a team: clear, timely, honest
 status at every phase boundary, logged where the work lives.

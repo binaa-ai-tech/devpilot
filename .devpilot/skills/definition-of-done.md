@@ -1,4 +1,4 @@
-# Skill: Definition of Done (DoD Gate)
+# Definition of Done — the exit gate every phase must pass
 
 Every agent MUST pass ALL applicable items before handing off to the next phase.
 A handoff with a failing DoD item is a defect.
@@ -27,7 +27,7 @@ All universal items, plus:
 - [ ] `ng build --configuration=production` passes / `npm run build` passes
 - [ ] `ng test --watch=false` passes / `npm test -- --watchAll=false` passes
 - [ ] All new components use `ChangeDetectionStrategy.OnPush`
-- [ ] WCAG 2.1 AA checklist reviewed (see `frontend-agent.md` accessibility section)
+- [ ] WCAG 2.1 AA checklist reviewed (see `accessibility.md`)
 - [ ] Performance checklist completed (from `performance-review.md`)
 - [ ] Self-heal protocol applied on any failures (from `self-heal.md`)
 
