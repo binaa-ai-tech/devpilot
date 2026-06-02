@@ -379,7 +379,7 @@ claude_profile_apply "$CODING_PROFILE"
 info "Claude profile: $CODING_PROFILE  (per-task routing still applies)"
 
 # ── opencode profile — populated from the live model list when opencode exists ──
-if [ "$CODING_ENGINE" = "opencode" ] || [ "$FALLBACK_ENGINE" = "opencode" ] || [ "$HAS_OPENCODE" = true ]; then
+if [ "$CODING_ENGINE" = "opencode" ] || [ "$FALLBACK_ENGINE" = "opencode" ]; then
   echo ""
   echo "  opencode — GitHub Copilot models:"
   OC_AVAIL=""
@@ -393,7 +393,7 @@ if [ "$CODING_ENGINE" = "opencode" ] || [ "$FALLBACK_ENGINE" = "opencode" ] || [
   fi
   [ -z "$OC_AVAIL" ] && echo "  (opencode not detected — using recommended Copilot defaults; re-run /dp-config models later)"
   # oc_pick <fallback-literal> <preferred-substring...> → first available match, else fallback
-  oc_pick() { local fb="$1"; shift; local p hit; for p in "$@"; do hit=$(printf '%s\n' "$OC_AVAIL" | grep -iF "$p" | head -1 || true); [ -n "$hit" ] && { echo "$hit"; return; }; done; echo "$fb"; }
+  oc_pick() { local fb="$1"; shift; local p hit; for p in "$@"; do hit=$(printf '%s\n' "$OC_AVAIL" | grep -iF -e "$p" | head -1 || true); [ -n "$hit" ] && { echo "$hit"; return; }; done; echo "$fb"; }
   echo "    [1] recommended — strongest coder / solid / fast-cheap  (recommended)"
   echo "    [2] balanced    — solid all-round everywhere"
   echo "    [3] save        — fast & cheap everywhere"
@@ -401,15 +401,15 @@ if [ "$CODING_ENGINE" = "opencode" ] || [ "$FALLBACK_ENGINE" = "opencode" ] || [
   ask "  Choice [1]: "; read -r OP_CHOICE
   case "${OP_CHOICE:-1}" in
     2) OC_PROFILE="balanced"
-       OC_POWER=$(oc_pick "github-copilot/gpt-4o" gpt-4o gpt-4.1); OC_STANDARD=$(oc_pick "github-copilot/gpt-4o" gpt-4o gpt-4.1); OC_LITE=$(oc_pick "github-copilot/gpt-4o-mini" mini flash) ;;
+       OC_POWER=$(oc_pick "github-copilot/gpt-4o" gpt-4o gpt-4.1); OC_STANDARD=$(oc_pick "github-copilot/gpt-4o" gpt-4o gpt-4.1); OC_LITE=$(oc_pick "github-copilot/gpt-4o-mini" -mini flash) ;;
     3) OC_PROFILE="save"
-       OC_POWER=$(oc_pick "github-copilot/gpt-4o-mini" mini flash); OC_STANDARD=$(oc_pick "github-copilot/gpt-4o-mini" mini flash); OC_LITE=$(oc_pick "github-copilot/gpt-4o-mini" mini flash) ;;
+       OC_POWER=$(oc_pick "github-copilot/gpt-4o-mini" -mini flash); OC_STANDARD=$(oc_pick "github-copilot/gpt-4o-mini" -mini flash); OC_LITE=$(oc_pick "github-copilot/gpt-4o-mini" -mini flash) ;;
     4) OC_PROFILE="custom"
        ask "  Power model    [$OC_POWER]: ";    read -r v; [ -n "$v" ] && OC_POWER="$v"
        ask "  Standard model [$OC_STANDARD]: "; read -r v; [ -n "$v" ] && OC_STANDARD="$v"
        ask "  Lite model     [$OC_LITE]: ";     read -r v; [ -n "$v" ] && OC_LITE="$v" ;;
     *) OC_PROFILE="recommended"
-       OC_POWER=$(oc_pick "github-copilot/gpt-5" gpt-5.4 gpt-5); OC_STANDARD=$(oc_pick "github-copilot/gpt-4o" gpt-4o gpt-4.1); OC_LITE=$(oc_pick "github-copilot/gpt-4o-mini" mini flash) ;;
+       OC_POWER=$(oc_pick "github-copilot/gpt-5" gpt-5.4 gpt-5); OC_STANDARD=$(oc_pick "github-copilot/gpt-4o" gpt-4o gpt-4.1); OC_LITE=$(oc_pick "github-copilot/gpt-4o-mini" -mini flash) ;;
   esac
   ask "  Fallback when Copilot unavailable [blank = opencode default]: "; read -r v; OC_FALLBACK="$v"
   info "opencode profile: $OC_PROFILE  (power=$OC_POWER  standard=$OC_STANDARD  lite=$OC_LITE)"
@@ -417,7 +417,7 @@ fi
 
 # ── antigravity profile — populated from the live model list when present ──
 AG_PROFILE="recommended"
-if [ "$CODING_ENGINE" = "antigravity" ] || [ "$FALLBACK_ENGINE" = "antigravity" ] || [ "$HAS_ANTIGRAVITY" = true ]; then
+if [ "$CODING_ENGINE" = "antigravity" ] || [ "$FALLBACK_ENGINE" = "antigravity" ]; then
   echo ""
   echo "  antigravity — models:"
   AG_AVAIL=""
@@ -431,7 +431,7 @@ if [ "$CODING_ENGINE" = "antigravity" ] || [ "$FALLBACK_ENGINE" = "antigravity" 
   fi
   [ -z "$AG_AVAIL" ] && echo "  (antigravity not detected — leaving tiers blank; set them with /dp-config models after install)"
   # ag_pick <fallback> <preferred-substring...> → first available match, else fallback (blank = no guessed id)
-  ag_pick() { local fb="$1"; shift; local p hit; for p in "$@"; do hit=$(printf '%s\n' "$AG_AVAIL" | grep -iF "$p" | head -1 || true); [ -n "$hit" ] && { echo "$hit"; return; }; done; echo "$fb"; }
+  ag_pick() { local fb="$1"; shift; local p hit; for p in "$@"; do hit=$(printf '%s\n' "$AG_AVAIL" | grep -iF -e "$p" | head -1 || true); [ -n "$hit" ] && { echo "$hit"; return; }; done; echo "$fb"; }
   echo "    [1] recommended — strongest reasoning / solid / fast  (recommended)"
   echo "    [2] balanced    — solid all-round everywhere"
   echo "    [3] save        — fast & cheap everywhere"
@@ -439,15 +439,15 @@ if [ "$CODING_ENGINE" = "antigravity" ] || [ "$FALLBACK_ENGINE" = "antigravity" 
   ask "  Choice [1]: "; read -r AGP_CHOICE
   case "${AGP_CHOICE:-1}" in
     2) AG_PROFILE="balanced"
-       AG_POWER=$(ag_pick "" pro flash); AG_STANDARD=$(ag_pick "" pro flash); AG_LITE=$(ag_pick "" flash mini lite nano) ;;
+       AG_POWER=$(ag_pick "" pro flash); AG_STANDARD=$(ag_pick "" pro flash); AG_LITE=$(ag_pick "" flash -mini lite nano) ;;
     3) AG_PROFILE="save"
-       AG_POWER=$(ag_pick "" flash mini lite nano); AG_STANDARD=$(ag_pick "" flash mini lite nano); AG_LITE=$(ag_pick "" flash mini lite nano) ;;
+       AG_POWER=$(ag_pick "" flash -mini lite nano); AG_STANDARD=$(ag_pick "" flash -mini lite nano); AG_LITE=$(ag_pick "" flash -mini lite nano) ;;
     4) AG_PROFILE="custom"
        ask "  Power model    [$AG_POWER]: ";    read -r v; [ -n "$v" ] && AG_POWER="$v"
        ask "  Standard model [$AG_STANDARD]: "; read -r v; [ -n "$v" ] && AG_STANDARD="$v"
        ask "  Lite model     [$AG_LITE]: ";     read -r v; [ -n "$v" ] && AG_LITE="$v" ;;
     *) AG_PROFILE="recommended"
-       AG_POWER=$(ag_pick "" ultra pro opus large); AG_STANDARD=$(ag_pick "" pro flash); AG_LITE=$(ag_pick "" flash mini lite nano) ;;
+       AG_POWER=$(ag_pick "" ultra pro opus large); AG_STANDARD=$(ag_pick "" pro flash); AG_LITE=$(ag_pick "" flash -mini lite nano) ;;
   esac
   info "antigravity profile: $AG_PROFILE  (power=${AG_POWER:-<set later>}  standard=${AG_STANDARD:-<set later>}  lite=${AG_LITE:-<set later>})"
 fi
@@ -881,7 +881,7 @@ fi
 # ═════════════════════════════════════════════════════════════════════════════
 # STEP 12 — SYNC AGENT FRONTMATTER
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 12 — Syncing Claude agent models..."
+section "STEP 11 — Syncing Claude agent models..."
 
 sync_model() {
   local file="$1" model="$2"
@@ -895,7 +895,7 @@ sync_model ".claude/agents/team-qa.md"   "$T1_QA"
 # ═════════════════════════════════════════════════════════════════════════════
 # STEP 13 — GIT BRANCH SETUP
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 13 — Git branch setup..."
+section "STEP 12 — Git branch setup..."
 
 if git rev-parse --git-dir > /dev/null 2>&1; then
   CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "main")
