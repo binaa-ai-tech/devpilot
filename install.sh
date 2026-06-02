@@ -385,7 +385,7 @@ if [ "$CODING_ENGINE" = "opencode" ] || [ "$FALLBACK_ENGINE" = "opencode" ] || [
   OC_AVAIL=""
   if command -v opencode >/dev/null 2>&1; then
     OC_AVAIL=$( { opencode models 2>/dev/null; opencode model list 2>/dev/null; } \
-      | grep -oE '[A-Za-z0-9._-]+/[A-Za-z0-9._:-]+' | sort -u )
+      | grep -oE '[A-Za-z0-9._-]+/[A-Za-z0-9._:-]+' | sort -u || true )
     if [ -n "$OC_AVAIL" ]; then
       echo "  Detected in your opencode:"
       printf '%s\n' "$OC_AVAIL" | head -20 | sed 's/^/    • /'
@@ -393,7 +393,7 @@ if [ "$CODING_ENGINE" = "opencode" ] || [ "$FALLBACK_ENGINE" = "opencode" ] || [
   fi
   [ -z "$OC_AVAIL" ] && echo "  (opencode not detected — using recommended Copilot defaults; re-run /dp-config models later)"
   # oc_pick <fallback-literal> <preferred-substring...> → first available match, else fallback
-  oc_pick() { local fb="$1"; shift; local p hit; for p in "$@"; do hit=$(printf '%s\n' "$OC_AVAIL" | grep -iF "$p" | head -1); [ -n "$hit" ] && { echo "$hit"; return; }; done; echo "$fb"; }
+  oc_pick() { local fb="$1"; shift; local p hit; for p in "$@"; do hit=$(printf '%s\n' "$OC_AVAIL" | grep -iF "$p" | head -1 || true); [ -n "$hit" ] && { echo "$hit"; return; }; done; echo "$fb"; }
   echo "    [1] recommended — strongest coder / solid / fast-cheap  (recommended)"
   echo "    [2] balanced    — solid all-round everywhere"
   echo "    [3] save        — fast & cheap everywhere"
@@ -423,7 +423,7 @@ if [ "$CODING_ENGINE" = "antigravity" ] || [ "$FALLBACK_ENGINE" = "antigravity" 
   AG_AVAIL=""
   if command -v antigravity >/dev/null 2>&1; then
     AG_AVAIL=$( { antigravity model list 2>/dev/null; antigravity models 2>/dev/null; } \
-      | grep -oE '[A-Za-z0-9._-]+/[A-Za-z0-9._:-]+|(gemini|claude|gpt|o[0-9])[A-Za-z0-9._:-]*' | sort -u )
+      | grep -oE '[A-Za-z0-9._-]+/[A-Za-z0-9._:-]+|(gemini|claude|gpt|o[0-9])[A-Za-z0-9._:-]*' | sort -u || true )
     if [ -n "$AG_AVAIL" ]; then
       echo "  Detected in your antigravity:"
       printf '%s\n' "$AG_AVAIL" | head -20 | sed 's/^/    • /'
@@ -431,7 +431,7 @@ if [ "$CODING_ENGINE" = "antigravity" ] || [ "$FALLBACK_ENGINE" = "antigravity" 
   fi
   [ -z "$AG_AVAIL" ] && echo "  (antigravity not detected — leaving tiers blank; set them with /dp-config models after install)"
   # ag_pick <fallback> <preferred-substring...> → first available match, else fallback (blank = no guessed id)
-  ag_pick() { local fb="$1"; shift; local p hit; for p in "$@"; do hit=$(printf '%s\n' "$AG_AVAIL" | grep -iF "$p" | head -1); [ -n "$hit" ] && { echo "$hit"; return; }; done; echo "$fb"; }
+  ag_pick() { local fb="$1"; shift; local p hit; for p in "$@"; do hit=$(printf '%s\n' "$AG_AVAIL" | grep -iF "$p" | head -1 || true); [ -n "$hit" ] && { echo "$hit"; return; }; done; echo "$fb"; }
   echo "    [1] recommended — strongest reasoning / solid / fast  (recommended)"
   echo "    [2] balanced    — solid all-round everywhere"
   echo "    [3] save        — fast & cheap everywhere"
