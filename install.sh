@@ -31,7 +31,9 @@ if [ ! -t 0 ] && [ -z "${DEVPILOT_REEXEC:-}" ]; then
     echo "  curl -fsSL ${REPO:-https://raw.githubusercontent.com/binaa-ai-tech/devpilot/main}/install.sh -o /tmp/devpilot-install.sh && bash /tmp/devpilot-install.sh" >&2
     exit 1
   fi
-  TMPFILE=$(mktemp /tmp/devpilot-install.XXXXXX.sh)
+  # Trailing X's only — macOS BSD mktemp won't randomize when a suffix (.sh)
+  # follows the X's; it would create a literal file that collides on re-run.
+  TMPFILE=$(mktemp "${TMPDIR:-/tmp}/devpilot-install.XXXXXX")
   curl -fsSL "https://raw.githubusercontent.com/binaa-ai-tech/devpilot/main/install.sh" -o "$TMPFILE"
   DEVPILOT_REEXEC=1 bash "$TMPFILE" "$@" < /dev/tty
   rm -f "$TMPFILE"
