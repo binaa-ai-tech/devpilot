@@ -221,6 +221,29 @@ assert_eq "$(grep -c 'coding_profile:' "$D/project.config.md")" "1" "apply antig
 assert_contains "$(cat "$D/project.config.md")" "coding_profile: recommended" "apply antigravity records the profile"
 rm -rf "$D"
 
+echo "== testing & auto-merge wiring (round 4) =="
+# New skills exist, are indexed, and the installer ships them (update + fresh lists).
+for SK in test-case-design e2e-testing performance-testing auto-merge; do
+  [ -f "$REPO/.devpilot/skills/$SK.md" ] && ok "skill $SK.md exists" || no "skill $SK.md exists"
+  assert_contains "$(cat "$REPO/.devpilot/skills/README.md")" "$SK.md" "skills index lists $SK"
+  n=$(grep -c "$SK.md" "$REPO/install.sh"); n=${n:-0}
+  assert_eq "$([ "$n" -ge 2 ] && echo ok)" "ok" "installer ships $SK.md in both lists"
+done
+# New commands exist and the installer ships them.
+for C in dp-test dp-autofix; do
+  [ -f "$REPO/.claude/commands/$C.md" ] && ok "command $C.md exists" || no "command $C.md exists"
+  n=$(grep -c "$C.md" "$REPO/install.sh"); n=${n:-0}
+  assert_eq "$([ "$n" -ge 2 ] && echo ok)" "ok" "installer ships $C.md in both lists"
+done
+# The process contract exists, ships, and is referenced from project context.
+[ -f "$REPO/.devpilot/process.md" ] && ok "process.md exists" || no "process.md exists"
+n=$(grep -c '\.devpilot/process\.md' "$REPO/install.sh"); n=${n:-0}
+assert_eq "$([ "$n" -ge 2 ] && echo ok)" "ok" "installer fetches process.md (update + fresh)"
+assert_contains "$(cat "$REPO/CLAUDE.md")" ".devpilot/process.md" "CLAUDE.md points at the process contract"
+# QA agent derives cases before code; the build merge step honors the gate ladder.
+assert_contains "$(cat "$REPO/.devpilot/prompts/team/qa-agent.md")" "test-case-design.md" "qa-agent loads test-case-design"
+assert_contains "$(cat "$REPO/.claude/commands/dp-build.md")" "auto-merge.md" "dp-build merge step cites the gate ladder"
+
 echo ""
 echo "── Results: $PASS passed, $FAIL failed ──"
 [ "$FAIL" -eq 0 ]

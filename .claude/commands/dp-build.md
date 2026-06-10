@@ -106,8 +106,10 @@ then execute each that exists, blocking until done:
 ## Step 5 — QA (whole sprint)
 
 Spawn `subagent_type: "team-qa"`:
-> Sprint: `<SPRINT>`. Verify every acceptance criterion across all Stories. Apply
-> `.devpilot/skills/test-strategy.md` (what to test per AC) and gate on
+> Sprint: `<SPRINT>`. Verify every acceptance criterion across all Stories. Derive the
+> case matrix per AC with `.devpilot/skills/test-case-design.md`, apply
+> `.devpilot/skills/test-strategy.md` (what to test per AC; `e2e-testing.md` /
+> `performance-testing.md` only when a journey or perf AC is in scope) and gate on
 > `.devpilot/skills/definition-of-done.md`. Write `docs/qa/<SPRINT_SLUG>.md`.
 > Verdict per Story: PASS / BLOCKED.
 
@@ -120,6 +122,8 @@ If any Story is BLOCKED: fix and re-run QA before proceeding.
 Before opening the PR, the Team Lead runs the review gate: apply
 `.devpilot/skills/code-review.md`, plus `.devpilot/skills/security-scan.md` over auth/input
 changes and `.devpilot/skills/definition-of-done.md` — never merge around a 🔴 BLOCKER.
+The merge itself follows the `.devpilot/skills/auto-merge.md` gate ladder; if CI goes red
+after the PR opens, `/dp-autofix <PR>` drives it back to green within bounded fix cycles.
 
 ```bash
 git add docs/ && git commit -m "docs($SPRINT_SLUG): sprint plans, qa, review"

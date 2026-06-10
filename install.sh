@@ -107,14 +107,15 @@ run_update() {
   RULE_SNIPPETS="angular.md react-vue.md dotnet.md node.md python.md go.md java.md sqlserver.md postgres-mysql.md"
   PROMPT_TEAM="ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md backend-agent.md qa-agent.md"
   TEMPLATE_TEAM="requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md jira-brief.md"
-  SKILLS="get-shit-done.md spec-first.md security-scan.md performance-review.md architecture-guard.md self-heal.md definition-of-done.md compact-context.md core-rules.md code-review.md test-strategy.md debug-method.md estimation-and-slicing.md tech-debt.md observability.md release-discipline.md status-reporting.md definition-of-ready.md incident-postmortem.md data-migration-safety.md api-design.md accessibility.md threat-modeling.md secrets-management.md data-privacy.md clean-code.md version-control.md refactoring.md ci-cd.md feature-flags.md reliability-slo.md dependency-management.md documentation.md i18n.md cost-awareness.md database-performance.md README.md"
+  SKILLS="get-shit-done.md spec-first.md security-scan.md performance-review.md architecture-guard.md self-heal.md definition-of-done.md compact-context.md core-rules.md code-review.md test-strategy.md debug-method.md estimation-and-slicing.md tech-debt.md observability.md release-discipline.md status-reporting.md definition-of-ready.md incident-postmortem.md data-migration-safety.md api-design.md accessibility.md threat-modeling.md secrets-management.md data-privacy.md clean-code.md version-control.md refactoring.md ci-cd.md feature-flags.md reliability-slo.md dependency-management.md documentation.md i18n.md cost-awareness.md database-performance.md test-case-design.md e2e-testing.md performance-testing.md auto-merge.md README.md"
   CHECKLISTS="feature.md bugfix.md hotfix.md"
-  CMDS="ceo.md dp-plan.md dp-sprint.md dp-build.md dp-release.md dp-rollback.md dp-hotfix.md dp-status.md dp-config.md dp-review-fix.md"
+  CMDS="ceo.md dp-plan.md dp-sprint.md dp-build.md dp-release.md dp-rollback.md dp-hotfix.md dp-status.md dp-config.md dp-review-fix.md dp-test.md dp-autofix.md"
   AGENTS_LIST="team-lead.md team-ba.md team-frontend.md team-dotnet.md team-backend.md team-qa.md"
   SCRIPTS="git-flow.sh new-feature.sh run-command.sh resolve-engine.sh model-profiles.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh create-jira-ticket.sh create-jira-epic.sh update-jira-status.sh update-jira-description.sh add-jira-comment.sh generate-project-index.sh generate-backlog-index.sh jira-sprint.sh link-jira-issues.sh md-to-adf.sh jira-describe.sh ceo.sh dp-plan.sh dp-sprint.sh dp-build.sh dp-release.sh dp-status.sh dp-config.sh"
 
   info "Refreshing .devpilot/rules..."
   fetch ".devpilot/rules.md" ".devpilot/rules.md"
+  fetch ".devpilot/process.md" ".devpilot/process.md"
   for f in $RULE_SNIPPETS;   do fetch ".devpilot/rules/$f"        ".devpilot/rules/$f";        done
   for f in $PROMPT_TEAM;     do fetch ".devpilot/prompts/team/$f" ".devpilot/prompts/team/$f"; done
   for f in 6-env-diff.md 6-generate-tests.md; do fetch ".devpilot/prompts/$f" ".devpilot/prompts/$f"; done
@@ -565,6 +566,7 @@ mkdir -p docs/{requirements,plans,qa,reviews,adrs,domain-models,fallback,impleme
 # .devpilot — shared rules, prompts, templates, skills
 info "Installing .devpilot/..."
 fetch ".devpilot/rules.md" ".devpilot/rules.md"
+fetch ".devpilot/process.md" ".devpilot/process.md"
 # .devpilot/config.sh holds per-project credentials and is gitignored, so it is
 # NEVER fetched from the repo (a remote fetch would 404 and silently skip it,
 # leaving the project with no config). We generate it locally instead, pre-filled
@@ -665,6 +667,7 @@ for f in get-shit-done.md spec-first.md security-scan.md performance-review.md a
          definition-of-ready.md incident-postmortem.md data-migration-safety.md api-design.md accessibility.md \
          threat-modeling.md secrets-management.md data-privacy.md clean-code.md version-control.md refactoring.md ci-cd.md feature-flags.md reliability-slo.md dependency-management.md documentation.md \
          i18n.md cost-awareness.md database-performance.md \
+         test-case-design.md e2e-testing.md performance-testing.md auto-merge.md \
          README.md; do
   fetch ".devpilot/skills/$f" ".devpilot/skills/$f"
 done
@@ -675,7 +678,7 @@ fetch ".devpilot/config/models.md" ".devpilot/config/models.md"
 info "Installing .claude/..."
 for f in ceo.md dp-plan.md dp-sprint.md dp-build.md \
          dp-release.md dp-rollback.md dp-hotfix.md \
-         dp-status.md dp-config.md dp-review-fix.md; do
+         dp-status.md dp-config.md dp-review-fix.md dp-test.md dp-autofix.md; do
   fetch ".claude/commands/$f" ".claude/commands/$f"
 done
 

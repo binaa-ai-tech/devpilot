@@ -60,7 +60,7 @@ It is built so a **one-person team can operate like a small company**:
 | 🪙 **Token-lean** | Agents read `core-rules` once + load heavier skills only on demand — a **75–89% cut** in per-spawn skill load, in any repo. |
 | 🛡 **Professional gates** | Definition of Ready → sized/sliced → built → tested (DoD) → security/code review → released → postmortem. |
 | 🧩 **Any stack** | One stack-aware backend agent + per-stack rule snippets for .NET, Node, Python, Go, Java, Angular, React/Vue, SQL Server, Postgres/MySQL. |
-| 📚 **A real operating manual** | 36 process skills: spec-first, definition-of-ready/done, api-design, data-migration-safety, accessibility, i18n, code-review, security-scan, threat-modeling, secrets-management, data-privacy, clean-code, version-control, refactoring, ci-cd, feature-flags, reliability-slo, dependency-management, documentation, test-strategy, database-performance, cost-awareness, debug-method, incident-postmortem, release-discipline, and more. |
+| 📚 **A real operating manual** | 40 process skills: spec-first, definition-of-ready/done, api-design, data-migration-safety, accessibility, i18n, code-review, security-scan, threat-modeling, secrets-management, data-privacy, clean-code, version-control, refactoring, ci-cd, feature-flags, reliability-slo, dependency-management, documentation, test-strategy, test-case-design, e2e-testing, performance-testing, auto-merge, database-performance, cost-awareness, debug-method, incident-postmortem, release-discipline, and more. The SDLC contract that ties them together: `.devpilot/process.md`. |
 
 **Engines run the same workflow.** Claude uses subagents; opencode (GitHub Copilot) runs the
 identical steps as a single-agent loop. Jira Stories are self-contained, so any session, opencode,
@@ -192,6 +192,8 @@ opencode falls back to its own default model.
 | `/dp-plan <feature \| issue \| task \| requirement>` | PM brain: dedup against the backlog, write Epic→Story (no code). Accepts raw text or a Jira key |
 | `/dp-sprint` | Group the backlog into sprints, recommend which to run first |
 | `/dp-build [sprint]` | Build a whole sprint → one PR → develop |
+| `/dp-test [perf] [story \| PR \| diff]` | Derive test cases from ACs → write the missing tests → run the suite |
+| `/dp-autofix [PR]` | Drive a PR's CI to green (bounded fix loop) and merge per the `auto-merge` gate ladder |
 | `/dp-review-fix <PR>` | Read PR review comments → apply fixes → push |
 
 The six team agents (`team-ba`, `team-lead`, `team-frontend`, `team-backend`, `team-dotnet`,
@@ -317,7 +319,12 @@ The lifecycle is gated end to end — **Ready → built → tested → reviewed 
   (npm/pip/dotnet/go); new high/critical CVEs block the PR.
 - **Layer disciplines** — `api-design` (contracts), `data-migration-safety` (zero-downtime DB),
   `accessibility` (WCAG AA) load on demand for the layers they apply to.
-- **QA verdict** — every acceptance criterion has a test; PASS or BLOCKED.
+- **QA verdict** — test cases derived per AC (`test-case-design.md`, traceability matrix in the QA
+  report); every acceptance criterion has a test; perf budgets proven when in scope
+  (`performance-testing.md`); PASS or BLOCKED.
+- **Auto-merge ladder** — `auto-merge.md`: build/tests/audit/review/QA/CI all green **on the PR head**
+  before a robot merges; `/dp-autofix` fixes red CI within a bounded loop (max 3 push-fix cycles),
+  then escalates instead of looping forever.
 - **Scope guard** — `scripts/scope-guard.sh` + a real-time `PreToolUse` hook (`scripts/scope-hook.sh`)
   block out-of-layer writes, keeping each agent inside its layer.
 - **Conventional commits** — a `commit-msg` git hook enforces the format locally.
@@ -428,9 +435,10 @@ bash scripts/checkpoint.sh latest          # find the most recent in-progress ta
 .opencode/
   config.json        # OpenCode project config — points to AGENTS.md and .devpilot/rules.md
 .devpilot/
+  process.md         # The standard dev process — phases, gates, roles (the SDLC contract)
   rules.md           # Router → core-rules + the snippet for your stack
   rules/             # angular, react-vue, dotnet, node, python, go, java, sqlserver, postgres-mysql
-  skills/            # Operating manual (README.md index + 36 process skills)
+  skills/            # Operating manual (README.md index + 40 process skills)
   config/            # models.md — model tier reference
   templates/         # requirements, plan, qa-report, review-report, adr, jira-brief, ticket
 scripts/             # Orchestration: engine/model routing, backlog+sprint, Jira (md→ADF), deploy …

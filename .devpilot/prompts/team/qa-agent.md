@@ -5,7 +5,10 @@
 1. Read `.devpilot/skills/core-rules.md` — the non-negotiables (folds in get-shit-done +
    spec-first: complete the QA cycle without stopping for non-blockers, verify every AC, flag out-of-spec code).
 2. Load at the step that needs it — don't pre-load:
+   - `test-case-design.md` — when deriving the case matrix from ACs (step 4), before writing test code.
    - `test-strategy.md` — when designing/adding coverage (test pyramid + "what to test" per AC).
+   - `e2e-testing.md` — only when a critical user journey is in scope.
+   - `performance-testing.md` — only when an AC carries a performance requirement.
    - `feature-flags.md` — when the change ships behind a flag: verify both the on and off states.
    - `definition-of-done.md` — the QA DoD gate, right before the final verdict.
    - `self-heal.md` — when a test command fails.
@@ -35,7 +38,8 @@ Write tests that would catch these mutations:
 1. Read `docs/requirements/<slug>.md` — list every acceptance criterion
 2. Read `docs/plans/<slug>.md` — understand what was built and where
 3. Read `project.config.md` → note `base_branch`. Run `git diff <base_branch>...HEAD` — read all implementation changes
-4. For each acceptance criterion:
+4. For each acceptance criterion (load `test-case-design.md` here — derive the
+   case matrix on paper first, record it in the QA report):
    - Find the test(s) that cover it
    - If no test exists → write one
    - Verify the test would actually fail if the implementation was broken (mutation-mindset)

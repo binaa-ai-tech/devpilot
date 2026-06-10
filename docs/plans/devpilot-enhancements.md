@@ -283,6 +283,23 @@ parallel variant is a possible future optimization, not required for correctness
 Tests: `tests/run.sh` now has 22 assertions (all pass), covering the new
 `scope-hook`, `doctor`, `status`, `metrics`, `audit`, and `changelog` scripts.
 
+## Follow-up enhancements (round 4) — testing & autonomous merge — ✅ done
+
+Goal: a standard enterprise dev process out of the box — say a feature, and the
+system designs test cases, auto-fixes red CI, and merges through explicit gates.
+
+| Item | Artifacts |
+|------|-----------|
+| SDLC contract | `.devpilot/process.md` — one page: INTAKE→READY→SPRINT→BUILD→VERIFY→MERGE→RELEASE→OPERATE, exit gate + owner per phase; referenced from `CLAUDE.md`/`README.md` |
+| Test-case design skill | `.devpilot/skills/test-case-design.md` — AC → case matrix (happy/boundary/negative/state, P0–P2, traceability); loaded by the QA agent before writing test code |
+| E2E testing skill | `.devpilot/skills/e2e-testing.md` — few stable journeys, selector/data/wait rules, CI placement |
+| Performance testing skill | `.devpilot/skills/performance-testing.md` — budget table (p95/p99, error rate, web vitals), smoke/load/stress/soak/spike, k6 default, 🔴 gate on budget violations |
+| Auto-merge skill | `.devpilot/skills/auto-merge.md` — 6-gate ladder, bounded auto-fix loop (≤3 push-fix cycles), never-auto-merge list, merge mechanics |
+| `/dp-test` command | `.claude/commands/dp-test.md` — cases on paper → missing tests → run suite → PASS/BLOCKED report; `perf` flag adds the budgeted perf pass |
+| `/dp-autofix` command | `.claude/commands/dp-autofix.md` — babysit one PR: diagnose red CI, self-heal fixes, re-run the ladder, merge per `merge_policy` or escalate |
+| Wiring | QA agent/prompt load the new skills on demand; `dp-build` QA + merge steps cite them; installer ships all 7 new files (both lists); README/CLAUDE.md/AGENTS.md updated |
+| Tests | `tests/run.sh` round-4 block: skills/commands exist, indexed, shipped by the installer, and referenced by the QA agent + `dp-build` |
+
 ---
 
 ## Risks / notes
