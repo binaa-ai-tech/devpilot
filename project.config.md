@@ -80,6 +80,9 @@ agents:
 engines:
   orchestrator: claude
   coding: claude                 # claude | opencode | antigravity
+  model_mode: recommended        # recommended (task-balanced tiers) | single (one model
+                                 # everywhere: model-profiles.sh single <family> <model>) |
+                                 # per-team (edit models.* / layer_models.*, then sync-agents)
   runner: claude                 # claude | opencode | antigravity | custom
   fallback: opencode             # opencode | antigravity | none
 
@@ -95,6 +98,18 @@ engines:
 layer_overrides:
   frontend:    ""                # e.g. opencode → FE code via opencode (Copilot tiers)
   backend:     ""                # e.g. opencode → BE code via opencode (Copilot tiers)
+  db:          ""
+  integration: ""
+
+## Layer-Specific Model Pins (model_mode: per-team)
+#
+# Pin a model id per layer — read by resolve-engine.sh and wins over the tier
+# system below. Claude-family per-team picks live in .claude/agents/*.md
+# frontmatter (and models.frontend_dev / models.backend_dev) instead.
+
+layer_models:
+  frontend:    ""
+  backend:     ""
   db:          ""
   integration: ""
 
@@ -161,6 +176,14 @@ models:
     tier1: claude-haiku-4-5-20251001
     tier2: "copilot: GPT-5-mini"
     tier3: "free: Nemotron 3 Super Free"
+
+  # Dev agent role models — synced into .claude/agents/*.md frontmatter by
+  # model-profiles.sh (apply | single | sync-agents).
+  frontend_dev:
+    tier1: claude-sonnet-4-6
+
+  backend_dev:
+    tier1: claude-sonnet-4-6
 
 ## Fallback Behavior
 

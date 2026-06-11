@@ -116,6 +116,7 @@ run_update() {
   info "Refreshing .devpilot/rules..."
   fetch ".devpilot/rules.md" ".devpilot/rules.md"
   fetch ".devpilot/process.md" ".devpilot/process.md"
+  fetch "docs/setup-guide.md" "docs/setup-guide.md"
   for f in $RULE_SNIPPETS;   do fetch ".devpilot/rules/$f"        ".devpilot/rules/$f";        done
   for f in $PROMPT_TEAM;     do fetch ".devpilot/prompts/team/$f" ".devpilot/prompts/team/$f"; done
   for f in 6-env-diff.md 6-generate-tests.md; do fetch ".devpilot/prompts/$f" ".devpilot/prompts/$f"; done
@@ -330,27 +331,44 @@ fi
 info "Coding engine: $CODING_ENGINE  (fallback: $FALLBACK_ENGINE)"
 
 # ═════════════════════════════════════════════════════════════════════════════
-# STEP 5 — MODEL PROFILE (powerful + easy: pick one word, not a tier matrix)
+# STEP 5 — MODEL ASSIGNMENT (recommended tiers · one model · per-team)
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 5 — Model profile..."
+section "STEP 5 — Model assignment..."
 
-# A profile is a preset over the power/standard/lite tiers. Per-task routing
-# (resolve-engine.sh + skills) still picks the tier per task; the profile only
-# decides which model each tier maps to. Re-run anytime: /dp-config models <profile>.
-# NOTE: these mappings mirror scripts/model-profiles.sh — keep them in sync.
-
+# NOTE: profile mappings mirror scripts/model-profiles.sh — keep them in sync.
 CL_OPUS="claude-opus-4-8"; CL_SONNET="claude-sonnet-4-6"; CL_HAIKU="claude-haiku-4-5-20251001"
 
 CL_POWER="$CL_OPUS"; CL_STANDARD="$CL_SONNET"; CL_LITE="$CL_HAIKU"
 OC_POWER="github-copilot/gpt-5"; OC_STANDARD="github-copilot/gpt-4o"; OC_LITE="github-copilot/gpt-4o-mini"; OC_FALLBACK=""
 AG_POWER=""; AG_STANDARD=""; AG_LITE=""
-CODING_PROFILE="auto"; OC_PROFILE="recommended"
+CODING_PROFILE="auto"; OC_PROFILE="recommended"; AG_PROFILE="recommended"
+MODEL_MODE="recommended"
 
-# Orchestrator tiers — tier1 is derived from the Claude profile below; tier2/tier3
-# are sensible Copilot/free fallbacks the user rarely needs to edit by hand.
+# Orchestrator tiers — tier1 follows the choices below; tier2/tier3 are
+# sensible Copilot/free fallbacks the user rarely needs to edit by hand.
 T1_BA="$CL_HAIKU";   T2_BA="copilot: Gemini 3.5 Flash"; T3_BA="free: DeepSeek V4 Flash Free"
 T1_LEAD="$CL_SONNET"; T2_LEAD="copilot: Gemini 2.5 Pro"; T3_LEAD="free: DeepSeek V4 Flash Free"
 T1_QA="$CL_HAIKU";   T2_QA="copilot: GPT-5-mini";        T3_QA="free: Nemotron 3 Super Free"
+# Dev agent role models (synced into .claude/agents/*.md frontmatter in STEP 12)
+T1_FE_DEV="$CL_SONNET"; T1_BE_DEV="$CL_SONNET"
+# Per-layer model pins (written to layer_models; used by per-team mode with a
+# non-claude coding engine — resolve-engine.sh honors them over the tier system)
+LM_FE=""; LM_BE=""; LM_DB=""; LM_INT=""
+
+# Live model lists (used by every mode when opencode/antigravity is in play)
+OC_AVAIL=""
+if command -v opencode >/dev/null 2>&1; then
+  OC_AVAIL=$( { opencode models 2>/dev/null; opencode model list 2>/dev/null; } \
+    | grep -oE '[A-Za-z0-9._-]+/[A-Za-z0-9._:-]+' | sort -u || true )
+fi
+AG_AVAIL=""
+if command -v antigravity >/dev/null 2>&1; then
+  AG_AVAIL=$( { antigravity model list 2>/dev/null; antigravity models 2>/dev/null; } \
+    | grep -oE '[A-Za-z0-9._-]+/[A-Za-z0-9._:-]+|(gemini|claude|gpt|o[0-9])[A-Za-z0-9._:-]*' | sort -u || true )
+fi
+# *_pick <fallback-literal> <preferred-substring...> → first available match, else fallback
+oc_pick() { local fb="$1"; shift; local p hit; for p in "$@"; do hit=$(printf '%s\n' "$OC_AVAIL" | grep -iF -e "$p" | head -1 || true); [ -n "$hit" ] && { echo "$hit"; return; }; done; echo "$fb"; }
+ag_pick() { local fb="$1"; shift; local p hit; for p in "$@"; do hit=$(printf '%s\n' "$AG_AVAIL" | grep -iF -e "$p" | head -1 || true); [ -n "$hit" ] && { echo "$hit"; return; }; done; echo "$fb"; }
 
 # Map a Claude profile → coding tiers + orchestrator tier1 (mirrors model-profiles.sh).
 claude_profile_apply() {
@@ -362,95 +380,196 @@ claude_profile_apply() {
     *)        CL_POWER="$CL_OPUS"; CL_STANDARD="$CL_SONNET"; CL_LITE="$CL_HAIKU"
               T1_BA="$CL_HAIKU"; T1_LEAD="$CL_SONNET"; T1_QA="$CL_HAIKU" ;;
   esac
+  T1_FE_DEV="$CL_STANDARD"; T1_BE_DEV="$CL_STANDARD"
 }
 
-# ── Claude profile (Claude always runs orchestration, so this always applies) ──
-echo ""
-echo "  Claude — how should it balance power vs. tokens?"
-echo "    [1] auto      — Opus for hard work, Sonnet normal, Haiku for light tasks  (recommended)"
-echo "    [2] balanced  — Sonnet for real work, Haiku for light tasks (no Opus)"
-echo "    [3] save      — token-saving: Haiku by default, Sonnet only when complex"
-ask "  Choice [1]: "; read -r CP_CHOICE
-case "${CP_CHOICE:-1}" in
-  2) CODING_PROFILE="balanced" ;;
-  3) CODING_PROFILE="save" ;;
-  *) CODING_PROFILE="auto" ;;
-esac
-claude_profile_apply "$CODING_PROFILE"
-info "Claude profile: $CODING_PROFILE  (per-task routing still applies)"
+# Claude model menu (printed once) + per-role picker → sets PICKED_MODEL
+claude_model_menu() {
+  echo "    [1] Sonnet — strong all-round coder (recommended for most roles)"
+  echo "    [2] Opus   — highest quality, most tokens (architecture / hard problems)"
+  echo "    [3] Haiku  — fastest & cheapest (light tasks: BA, QA, simple changes)"
+  echo "    [4] other  — type a model id"
+}
+pick_claude_model() {
+  local role="$1" def="$2" defnum=1 choice
+  case "$def" in
+    "$CL_OPUS")  defnum=2 ;;
+    "$CL_HAIKU") defnum=3 ;;
+  esac
+  ask "  $role [$defnum]: "; read -r choice
+  case "${choice:-$defnum}" in
+    2) PICKED_MODEL="$CL_OPUS" ;;
+    3) PICKED_MODEL="$CL_HAIKU" ;;
+    4) ask "    Model id: "; read -r PICKED_MODEL; [ -z "$PICKED_MODEL" ] && PICKED_MODEL="$def" ;;
+    *) PICKED_MODEL="$CL_SONNET" ;;
+  esac
+}
 
-# ── opencode profile — populated from the live model list when opencode exists ──
-if [ "$CODING_ENGINE" = "opencode" ] || [ "$FALLBACK_ENGINE" = "opencode" ]; then
+echo ""
+echo "  How should models be assigned to the team?"
+echo "    [1] recommended — task-balanced tiers: a strong model for hard work, a light"
+echo "                      model for simple work — best cost ↔ quality  (recommended)"
+echo "    [2] single      — ONE model for the whole team (simplest, predictable cost)"
+echo "    [3] per-team    — pick a model for each role (BA, Team Lead, Frontend, Backend, QA)"
+ask "  Choice [1]: "; read -r MM_CHOICE
+case "${MM_CHOICE:-1}" in
+  2) MODEL_MODE="single" ;;
+  3) MODEL_MODE="per-team" ;;
+  *) MODEL_MODE="recommended" ;;
+esac
+info "Model mode: $MODEL_MODE"
+
+# ── Mode: recommended — named profile per engine family ───────────────────────
+if [ "$MODEL_MODE" = "recommended" ]; then
+  # Claude profile (Claude always runs orchestration, so this always applies)
   echo ""
-  echo "  opencode — GitHub Copilot models:"
-  OC_AVAIL=""
-  if command -v opencode >/dev/null 2>&1; then
-    OC_AVAIL=$( { opencode models 2>/dev/null; opencode model list 2>/dev/null; } \
-      | grep -oE '[A-Za-z0-9._-]+/[A-Za-z0-9._:-]+' | sort -u || true )
+  echo "  Claude — how should it balance power vs. tokens?"
+  echo "    [1] auto      — Opus for hard work, Sonnet normal, Haiku for light tasks  (recommended)"
+  echo "    [2] balanced  — Sonnet for real work, Haiku for light tasks (no Opus)"
+  echo "    [3] save      — token-saving: Haiku by default, Sonnet only when complex"
+  ask "  Choice [1]: "; read -r CP_CHOICE
+  case "${CP_CHOICE:-1}" in
+    2) CODING_PROFILE="balanced" ;;
+    3) CODING_PROFILE="save" ;;
+    *) CODING_PROFILE="auto" ;;
+  esac
+  claude_profile_apply "$CODING_PROFILE"
+  info "Claude profile: $CODING_PROFILE  (per-task routing still applies)"
+
+  # opencode profile — populated from the live model list when opencode exists
+  if [ "$CODING_ENGINE" = "opencode" ] || [ "$FALLBACK_ENGINE" = "opencode" ]; then
+    echo ""
+    echo "  opencode — GitHub Copilot models:"
     if [ -n "$OC_AVAIL" ]; then
       echo "  Detected in your opencode:"
       printf '%s\n' "$OC_AVAIL" | head -20 | sed 's/^/    • /'
+    else
+      echo "  (opencode not detected — using recommended Copilot defaults; re-run /dp-config models later)"
     fi
+    echo "    [1] recommended — strongest coder / solid / fast-cheap  (recommended)"
+    echo "    [2] balanced    — solid all-round everywhere"
+    echo "    [3] save        — fast & cheap everywhere"
+    echo "    [4] custom      — pick each tier yourself"
+    ask "  Choice [1]: "; read -r OP_CHOICE
+    case "${OP_CHOICE:-1}" in
+      2) OC_PROFILE="balanced"
+         OC_POWER=$(oc_pick "github-copilot/gpt-4o" gpt-4o gpt-4.1); OC_STANDARD=$(oc_pick "github-copilot/gpt-4o" gpt-4o gpt-4.1); OC_LITE=$(oc_pick "github-copilot/gpt-4o-mini" -mini flash) ;;
+      3) OC_PROFILE="save"
+         OC_POWER=$(oc_pick "github-copilot/gpt-4o-mini" -mini flash); OC_STANDARD=$(oc_pick "github-copilot/gpt-4o-mini" -mini flash); OC_LITE=$(oc_pick "github-copilot/gpt-4o-mini" -mini flash) ;;
+      4) OC_PROFILE="custom"
+         ask "  Power model    [$OC_POWER]: ";    read -r v; [ -n "$v" ] && OC_POWER="$v"
+         ask "  Standard model [$OC_STANDARD]: "; read -r v; [ -n "$v" ] && OC_STANDARD="$v"
+         ask "  Lite model     [$OC_LITE]: ";     read -r v; [ -n "$v" ] && OC_LITE="$v" ;;
+      *) OC_PROFILE="recommended"
+         OC_POWER=$(oc_pick "github-copilot/gpt-5" gpt-5.4 gpt-5); OC_STANDARD=$(oc_pick "github-copilot/gpt-4o" gpt-4o gpt-4.1); OC_LITE=$(oc_pick "github-copilot/gpt-4o-mini" -mini flash) ;;
+    esac
+    ask "  Fallback when Copilot unavailable [blank = opencode default]: "; read -r v; OC_FALLBACK="$v"
+    info "opencode profile: $OC_PROFILE  (power=$OC_POWER  standard=$OC_STANDARD  lite=$OC_LITE)"
   fi
-  [ -z "$OC_AVAIL" ] && echo "  (opencode not detected — using recommended Copilot defaults; re-run /dp-config models later)"
-  # oc_pick <fallback-literal> <preferred-substring...> → first available match, else fallback
-  oc_pick() { local fb="$1"; shift; local p hit; for p in "$@"; do hit=$(printf '%s\n' "$OC_AVAIL" | grep -iF -e "$p" | head -1 || true); [ -n "$hit" ] && { echo "$hit"; return; }; done; echo "$fb"; }
-  echo "    [1] recommended — strongest coder / solid / fast-cheap  (recommended)"
-  echo "    [2] balanced    — solid all-round everywhere"
-  echo "    [3] save        — fast & cheap everywhere"
-  echo "    [4] custom      — pick each tier yourself"
-  ask "  Choice [1]: "; read -r OP_CHOICE
-  case "${OP_CHOICE:-1}" in
-    2) OC_PROFILE="balanced"
-       OC_POWER=$(oc_pick "github-copilot/gpt-4o" gpt-4o gpt-4.1); OC_STANDARD=$(oc_pick "github-copilot/gpt-4o" gpt-4o gpt-4.1); OC_LITE=$(oc_pick "github-copilot/gpt-4o-mini" -mini flash) ;;
-    3) OC_PROFILE="save"
-       OC_POWER=$(oc_pick "github-copilot/gpt-4o-mini" -mini flash); OC_STANDARD=$(oc_pick "github-copilot/gpt-4o-mini" -mini flash); OC_LITE=$(oc_pick "github-copilot/gpt-4o-mini" -mini flash) ;;
-    4) OC_PROFILE="custom"
-       ask "  Power model    [$OC_POWER]: ";    read -r v; [ -n "$v" ] && OC_POWER="$v"
-       ask "  Standard model [$OC_STANDARD]: "; read -r v; [ -n "$v" ] && OC_STANDARD="$v"
-       ask "  Lite model     [$OC_LITE]: ";     read -r v; [ -n "$v" ] && OC_LITE="$v" ;;
-    *) OC_PROFILE="recommended"
-       OC_POWER=$(oc_pick "github-copilot/gpt-5" gpt-5.4 gpt-5); OC_STANDARD=$(oc_pick "github-copilot/gpt-4o" gpt-4o gpt-4.1); OC_LITE=$(oc_pick "github-copilot/gpt-4o-mini" -mini flash) ;;
-  esac
-  ask "  Fallback when Copilot unavailable [blank = opencode default]: "; read -r v; OC_FALLBACK="$v"
-  info "opencode profile: $OC_PROFILE  (power=$OC_POWER  standard=$OC_STANDARD  lite=$OC_LITE)"
-fi
 
-# ── antigravity profile — populated from the live model list when present ──
-AG_PROFILE="recommended"
-if [ "$CODING_ENGINE" = "antigravity" ] || [ "$FALLBACK_ENGINE" = "antigravity" ]; then
-  echo ""
-  echo "  antigravity — models:"
-  AG_AVAIL=""
-  if command -v antigravity >/dev/null 2>&1; then
-    AG_AVAIL=$( { antigravity model list 2>/dev/null; antigravity models 2>/dev/null; } \
-      | grep -oE '[A-Za-z0-9._-]+/[A-Za-z0-9._:-]+|(gemini|claude|gpt|o[0-9])[A-Za-z0-9._:-]*' | sort -u || true )
+  # antigravity profile — populated from the live model list when present
+  if [ "$CODING_ENGINE" = "antigravity" ] || [ "$FALLBACK_ENGINE" = "antigravity" ]; then
+    echo ""
+    echo "  antigravity — models:"
     if [ -n "$AG_AVAIL" ]; then
       echo "  Detected in your antigravity:"
       printf '%s\n' "$AG_AVAIL" | head -20 | sed 's/^/    • /'
+    else
+      echo "  (antigravity not detected — leaving tiers blank; set them with /dp-config models after install)"
     fi
+    echo "    [1] recommended — strongest reasoning / solid / fast  (recommended)"
+    echo "    [2] balanced    — solid all-round everywhere"
+    echo "    [3] save        — fast & cheap everywhere"
+    echo "    [4] custom      — pick each tier yourself"
+    ask "  Choice [1]: "; read -r AGP_CHOICE
+    case "${AGP_CHOICE:-1}" in
+      2) AG_PROFILE="balanced"
+         AG_POWER=$(ag_pick "" pro flash); AG_STANDARD=$(ag_pick "" pro flash); AG_LITE=$(ag_pick "" flash -mini lite nano) ;;
+      3) AG_PROFILE="save"
+         AG_POWER=$(ag_pick "" flash -mini lite nano); AG_STANDARD=$(ag_pick "" flash -mini lite nano); AG_LITE=$(ag_pick "" flash -mini lite nano) ;;
+      4) AG_PROFILE="custom"
+         ask "  Power model    [$AG_POWER]: ";    read -r v; [ -n "$v" ] && AG_POWER="$v"
+         ask "  Standard model [$AG_STANDARD]: "; read -r v; [ -n "$v" ] && AG_STANDARD="$v"
+         ask "  Lite model     [$AG_LITE]: ";     read -r v; [ -n "$v" ] && AG_LITE="$v" ;;
+      *) AG_PROFILE="recommended"
+         AG_POWER=$(ag_pick "" ultra pro opus large); AG_STANDARD=$(ag_pick "" pro flash); AG_LITE=$(ag_pick "" flash -mini lite nano) ;;
+    esac
+    info "antigravity profile: $AG_PROFILE  (power=${AG_POWER:-<set later>}  standard=${AG_STANDARD:-<set later>}  lite=${AG_LITE:-<set later>})"
   fi
-  [ -z "$AG_AVAIL" ] && echo "  (antigravity not detected — leaving tiers blank; set them with /dp-config models after install)"
-  # ag_pick <fallback> <preferred-substring...> → first available match, else fallback (blank = no guessed id)
-  ag_pick() { local fb="$1"; shift; local p hit; for p in "$@"; do hit=$(printf '%s\n' "$AG_AVAIL" | grep -iF -e "$p" | head -1 || true); [ -n "$hit" ] && { echo "$hit"; return; }; done; echo "$fb"; }
-  echo "    [1] recommended — strongest reasoning / solid / fast  (recommended)"
-  echo "    [2] balanced    — solid all-round everywhere"
-  echo "    [3] save        — fast & cheap everywhere"
-  echo "    [4] custom      — pick each tier yourself"
-  ask "  Choice [1]: "; read -r AGP_CHOICE
-  case "${AGP_CHOICE:-1}" in
-    2) AG_PROFILE="balanced"
-       AG_POWER=$(ag_pick "" pro flash); AG_STANDARD=$(ag_pick "" pro flash); AG_LITE=$(ag_pick "" flash -mini lite nano) ;;
-    3) AG_PROFILE="save"
-       AG_POWER=$(ag_pick "" flash -mini lite nano); AG_STANDARD=$(ag_pick "" flash -mini lite nano); AG_LITE=$(ag_pick "" flash -mini lite nano) ;;
-    4) AG_PROFILE="custom"
-       ask "  Power model    [$AG_POWER]: ";    read -r v; [ -n "$v" ] && AG_POWER="$v"
-       ask "  Standard model [$AG_STANDARD]: "; read -r v; [ -n "$v" ] && AG_STANDARD="$v"
-       ask "  Lite model     [$AG_LITE]: ";     read -r v; [ -n "$v" ] && AG_LITE="$v" ;;
-    *) AG_PROFILE="recommended"
-       AG_POWER=$(ag_pick "" ultra pro opus large); AG_STANDARD=$(ag_pick "" pro flash); AG_LITE=$(ag_pick "" flash -mini lite nano) ;;
-  esac
-  info "antigravity profile: $AG_PROFILE  (power=${AG_POWER:-<set later>}  standard=${AG_STANDARD:-<set later>}  lite=${AG_LITE:-<set later>})"
+
+# ── Mode: single — one model for the whole team ────────────────────────────────
+elif [ "$MODEL_MODE" = "single" ]; then
+  echo ""
+  if [ "$CODING_ENGINE" = "claude" ]; then
+    echo "  One Claude model for the whole team (orchestration + all coding):"
+  else
+    echo "  One Claude model for orchestration (BA · Team Lead · QA · review):"
+  fi
+  claude_model_menu
+  pick_claude_model "Model" "$CL_SONNET"
+  M="$PICKED_MODEL"
+  CL_POWER="$M"; CL_STANDARD="$M"; CL_LITE="$M"
+  T1_BA="$M"; T1_LEAD="$M"; T1_QA="$M"; T1_FE_DEV="$M"; T1_BE_DEV="$M"
+  CODING_PROFILE="single"
+  info "Claude: every role → $M"
+  [ "$M" = "$CL_OPUS" ] && warn "Opus everywhere is the highest-cost choice — 'recommended' mode gives Opus only to hard tasks."
+
+  if [ "$CODING_ENGINE" = "opencode" ] || [ "$FALLBACK_ENGINE" = "opencode" ]; then
+    echo ""
+    [ -n "$OC_AVAIL" ] && { echo "  Detected in your opencode:"; printf '%s\n' "$OC_AVAIL" | head -20 | sed 's/^/    • /'; }
+    OC_DEF=$(oc_pick "github-copilot/gpt-4o" gpt-4o gpt-4.1)
+    ask "  One opencode model for coding [$OC_DEF]: "; read -r v; OCM="${v:-$OC_DEF}"
+    OC_POWER="$OCM"; OC_STANDARD="$OCM"; OC_LITE="$OCM"; OC_PROFILE="single"
+    ask "  Fallback when Copilot unavailable [blank = opencode default]: "; read -r v; OC_FALLBACK="$v"
+    info "opencode: every layer → $OCM"
+  fi
+  if [ "$CODING_ENGINE" = "antigravity" ] || [ "$FALLBACK_ENGINE" = "antigravity" ]; then
+    echo ""
+    [ -n "$AG_AVAIL" ] && { echo "  Detected in your antigravity:"; printf '%s\n' "$AG_AVAIL" | head -20 | sed 's/^/    • /'; }
+    AG_DEF=$(ag_pick "" pro flash)
+    ask "  One antigravity model for coding [${AG_DEF:-set later}]: "; read -r v; AGM="${v:-$AG_DEF}"
+    AG_POWER="$AGM"; AG_STANDARD="$AGM"; AG_LITE="$AGM"; AG_PROFILE="single"
+    info "antigravity: every layer → ${AGM:-<set later>}"
+  fi
+
+# ── Mode: per-team — a model per role ──────────────────────────────────────────
+else
+  echo ""
+  echo "  Pick a model per role. Orchestration roles are always Claude;"
+  echo "  dev roles run on your coding engine ($CODING_ENGINE)."
+  echo ""
+  claude_model_menu
+  pick_claude_model "BA (requirements, dedup)     " "$CL_HAIKU";  T1_BA="$PICKED_MODEL"
+  pick_claude_model "Team Lead (plans, review)    " "$CL_SONNET"; T1_LEAD="$PICKED_MODEL"
+  pick_claude_model "QA (test design, verdict)    " "$CL_HAIKU";  T1_QA="$PICKED_MODEL"
+
+  if [ "$CODING_ENGINE" = "claude" ]; then
+    pick_claude_model "Frontend developer           " "$CL_SONNET"; T1_FE_DEV="$PICKED_MODEL"
+    pick_claude_model "Backend developer (BE/DB/INT)" "$CL_SONNET"; T1_BE_DEV="$PICKED_MODEL"
+    # Escalation tiers still exist for cross-cutting work; keep the auto defaults.
+  else
+    echo ""
+    echo "  Dev layers run on $CODING_ENGINE — pin a model per layer"
+    echo "  (written to layer_models; wins over the tier system):"
+    if [ "$CODING_ENGINE" = "opencode" ]; then
+      [ -n "$OC_AVAIL" ] && { echo "  Detected in your opencode:"; printf '%s\n' "$OC_AVAIL" | head -20 | sed 's/^/    • /'; }
+      LAYER_DEF=$(oc_pick "github-copilot/gpt-4o" gpt-4o gpt-4.1)
+    else
+      [ -n "$AG_AVAIL" ] && { echo "  Detected in your antigravity:"; printf '%s\n' "$AG_AVAIL" | head -20 | sed 's/^/    • /'; }
+      LAYER_DEF=$(ag_pick "" pro flash)
+    fi
+    if [ "$AGENT_FRONTEND" = "true" ]; then
+      ask "  Frontend layer model [${LAYER_DEF:-set later}]: "; read -r v; LM_FE="${v:-$LAYER_DEF}"
+    fi
+    if [ "$AGENT_BACKEND" = "true" ]; then
+      ask "  Backend layer model  [${LAYER_DEF:-set later}]: "; read -r v; LM_BE="${v:-$LAYER_DEF}"
+    fi
+    [ "$AGENT_DB" = "true" ]          && { ask "  DB layer model       [${LM_BE:-${LAYER_DEF:-set later}}]: "; read -r v; LM_DB="${v:-${LM_BE:-$LAYER_DEF}}"; }
+    [ "$AGENT_INTEGRATION" = "true" ] && { ask "  Integration model    [${LM_BE:-${LAYER_DEF:-set later}}]: "; read -r v; LM_INT="${v:-${LM_BE:-$LAYER_DEF}}"; }
+    [ "$CODING_ENGINE" = "opencode" ] && { ask "  Fallback when Copilot unavailable [blank = opencode default]: "; read -r v; OC_FALLBACK="$v"; }
+  fi
+  CODING_PROFILE="per-team"; OC_PROFILE="per-team"; AG_PROFILE="per-team"
+  info "Per-team models: BA=$T1_BA · Lead=$T1_LEAD · QA=$T1_QA · FE=${LM_FE:-$T1_FE_DEV} · BE=${LM_BE:-$T1_BE_DEV}"
 fi
 
 # The profile recorded in project.config.md = the ACTIVE coding engine's profile.
@@ -492,15 +611,16 @@ esac
 info "Runner: $RUNNER_CLI"
 
 # ═════════════════════════════════════════════════════════════════════════════
-# STEP 7 — CLAUDE ORCHESTRATOR MODELS (derived from the profile chosen in STEP 5)
+# STEP 7 — TEAM MODELS (derived from the model assignment in STEP 5)
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 7 — Claude orchestrator models..."
+section "STEP 7 — Team models..."
 
-# BA / Team Lead / QA tier-1 models follow the Claude profile from STEP 5;
 # tier2/tier3 stay as Copilot/free fallbacks. Fine-tune later: /dp-config wizard.
 info "BA        → $T1_BA"
 info "Team Lead → $T1_LEAD"
 info "QA        → $T1_QA"
+info "Frontend  → ${LM_FE:-$T1_FE_DEV}"
+info "Backend   → ${LM_BE:-$T1_BE_DEV}"
 
 # ═════════════════════════════════════════════════════════════════════════════
 # STEP 8 — PROJECT IDENTITY
@@ -567,6 +687,7 @@ mkdir -p docs/{requirements,plans,qa,reviews,adrs,domain-models,fallback,impleme
 info "Installing .devpilot/..."
 fetch ".devpilot/rules.md" ".devpilot/rules.md"
 fetch ".devpilot/process.md" ".devpilot/process.md"
+fetch "docs/setup-guide.md" "docs/setup-guide.md"
 # .devpilot/config.sh holds per-project credentials and is gitignored, so it is
 # NEVER fetched from the repo (a remote fetch would 404 and silently skip it,
 # leaving the project with no config). We generate it locally instead, pre-filled
@@ -809,15 +930,31 @@ agents:
 #
 # orchestrator — always Claude (BA · planning · QA · review)
 # coding       — who writes implementation code: claude | opencode | antigravity
+# model_mode   — how models map to the team:
+#                  recommended — task-balanced tiers via a named profile (default)
+#                  single      — one model everywhere (model-profiles.sh single <family> <model>)
+#                  per-team    — per-role models (models.* + layer_models.*; then model-profiles.sh sync-agents)
 # runner       — which AI CLI runs /ceo from bash scripts
 # fallback     — coding engine fallback when primary hits limits
 
 engines:
   orchestrator: claude
   coding: $CODING_ENGINE
-  coding_profile: $ACTIVE_PROFILE   # auto|balanced|save (claude) · recommended|balanced|save|custom (opencode/antigravity) — change: /dp-config models <profile>
+  model_mode: $MODEL_MODE
+  coding_profile: $ACTIVE_PROFILE   # auto|balanced|save (claude) · recommended|balanced|save|custom (opencode/antigravity) · single|per-team — change: /dp-config models <profile>
   runner: $RUNNER_CLI
   fallback: $FALLBACK_ENGINE
+
+## Layer-Specific Model Pins (model_mode: per-team)
+# Pin a model id per layer — read by resolve-engine.sh, wins over the tier
+# system below. Claude-family per-team picks live in .claude/agents/*.md
+# frontmatter (and models.frontend_dev / models.backend_dev) instead.
+
+layer_models:
+  frontend:    "$LM_FE"
+  backend:     "$LM_BE"
+  db:          "$LM_DB"
+  integration: "$LM_INT"
 
 ## Coding Engine Models — task-balanced tiers (power / standard / lite)
 # Models are chosen per task by complexity (resolve-engine.sh), balancing power
@@ -841,7 +978,8 @@ coding_models:
     standard: "$AG_STANDARD"
     lite:     "$AG_LITE"
 
-## Model Routing — Claude (orchestration phases: BA · Team Lead · QA)
+## Model Routing — Claude team roles (tier1 syncs to .claude/agents frontmatter
+## via: bash scripts/model-profiles.sh sync-agents)
 
 models:
   ba:
@@ -858,6 +996,12 @@ models:
     tier1: $T1_QA
     tier2: "$T2_QA"
     tier3: "$T3_QA"
+
+  frontend_dev:
+    tier1: $T1_FE_DEV
+
+  backend_dev:
+    tier1: $T1_BE_DEV
 
 ## Fallback Behavior
 
@@ -891,9 +1035,12 @@ sync_model() {
   [ -f "$file" ] && sed -i.bak "s/^model: .*/model: $model/" "$file" && rm -f "$file.bak" && info "$(basename $file) → $model"
 }
 
-sync_model ".claude/agents/team-lead.md" "$T1_LEAD"
-sync_model ".claude/agents/team-ba.md"   "$T1_BA"
-sync_model ".claude/agents/team-qa.md"   "$T1_QA"
+sync_model ".claude/agents/team-lead.md"     "$T1_LEAD"
+sync_model ".claude/agents/team-ba.md"       "$T1_BA"
+sync_model ".claude/agents/team-qa.md"       "$T1_QA"
+sync_model ".claude/agents/team-frontend.md" "$T1_FE_DEV"
+sync_model ".claude/agents/team-backend.md"  "$T1_BE_DEV"
+sync_model ".claude/agents/team-dotnet.md"   "$T1_BE_DEV"
 
 # ═════════════════════════════════════════════════════════════════════════════
 # STEP 13 — GIT BRANCH SETUP
@@ -938,12 +1085,28 @@ echo "    .devpilot/           — rules, templates, skills"
 echo "    scripts/             — git-flow, Jira, deploy helpers"
 echo "    project.config.md    — engine + model config"
 echo ""
-echo "  ── Required setup ──────────────────────────────────────"
+echo "  ── Next steps ──────────────────────────────────────────"
 echo ""
-echo "  1. Edit .devpilot/config.sh"
-echo "     → JIRA_BASE_URL, JIRA_EMAIL, JIRA_API_TOKEN"
-echo "     → GITHUB_ORG, GITHUB_REPO"
-echo "     → DEV/SIT/UAT/PRD environment URLs"
+STEP_N=1
+if [ "$TRACKER_TYPE" = "jira" ]; then
+echo "  $STEP_N. Set Jira credentials (required for tracker: jira):"
+echo "     bash scripts/devpilot-config.sh set jira_base_url=https://your-org.atlassian.net"
+echo "     bash scripts/devpilot-config.sh set jira_api_token=<token>   # validates live"
+echo ""
+STEP_N=$((STEP_N + 1))
+elif [ "$TRACKER_TYPE" = "github" ]; then
+echo "  $STEP_N. Authenticate the GitHub CLI (required for tracker: github):"
+echo "     gh auth login"
+echo ""
+STEP_N=$((STEP_N + 1))
+fi
+echo "  $STEP_N. Verify the install:    /dp-status health    (or: bash scripts/doctor.sh)"
+STEP_N=$((STEP_N + 1))
+echo "  $STEP_N. Commit the setup:      git add -A && git commit -m \"chore: install devpilot\""
+STEP_N=$((STEP_N + 1))
+echo "  $STEP_N. Optional (deploys):    edit .devpilot/config.sh → DEV/SIT/UAT/PRD URLs + GitHub secrets"
+echo ""
+echo "  Full walkthrough + recommendations: docs/setup-guide.md"
 echo ""
 echo "  ── Start working ───────────────────────────────────────"
 echo ""

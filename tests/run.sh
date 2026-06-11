@@ -143,6 +143,12 @@ coding_models:
     power:    "ollama/deepseek-coder-v2:16b"
     standard: "ollama/deepseek-coder-v2:16b"
     lite:     "ollama/qwen2.5-coder:7b"
+
+layer_models:
+  frontend:    ""
+  backend:     ""
+  db:          "pinned/model-x"
+  integration: ""
 EOF
 # runner=claude couples coding back to claude
 EFF=$( cd "$D" && bash scripts/resolve-engine.sh effective )
@@ -157,6 +163,9 @@ assert_contains "$BE" "opencode/grok-code" "override resolves opencode backend m
 # local routing swaps in the ollama model
 BL=$( cd "$D" && DEVPILOT_LOCAL=1 bash scripts/resolve-engine.sh layer backend )
 assert_contains "$BL" "ollama/deepseek-coder-v2:16b" "DEVPILOT_LOCAL=1 → ollama model"
+# per-layer model pin (model_mode: per-team) wins over the tier system
+DBP=$( cd "$D" && bash scripts/resolve-engine.sh layer db )
+assert_contains "$DBP" "pinned/model-x" "layer_models pin wins over tier lookup"
 # complexity suggestion
 SG=$( cd "$D" && bash scripts/resolve-engine.sh suggest "refactor the auth schema across services" )
 assert_contains "$SG" "COMPLEXITY=high" "architectural task → high complexity"
@@ -206,12 +215,24 @@ assert_contains "$(bash "$MP" antigravity-map recommended)" "POWER=" "antigravit
 assert_code "$(bash "$MP" antigravity-map bogus >/dev/null 2>&1; echo $?)" "1" "antigravity-map rejects an unknown profile"
 # apply writes coding_profile + tiers + syncs agent frontmatter, idempotently
 D=$(sandbox); cp "$REPO"/project.config.md "$D/"; mkdir -p "$D/.claude/agents"
-cp "$REPO"/.claude/agents/team-ba.md "$REPO"/.claude/agents/team-lead.md "$REPO"/.claude/agents/team-qa.md "$D/.claude/agents/" 2>/dev/null
+cp "$REPO"/.claude/agents/team-ba.md "$REPO"/.claude/agents/team-lead.md "$REPO"/.claude/agents/team-qa.md \
+   "$REPO"/.claude/agents/team-frontend.md "$REPO"/.claude/agents/team-backend.md "$D/.claude/agents/" 2>/dev/null
 ( cd "$D" && bash scripts/model-profiles.sh apply claude save >/dev/null 2>&1 )
 ( cd "$D" && bash scripts/model-profiles.sh apply claude save >/dev/null 2>&1 )   # twice → must stay single line
 assert_eq "$(grep -c 'coding_profile:' "$D/project.config.md")" "1" "apply is idempotent (one coding_profile line)"
+assert_eq "$(grep -cE '^[[:space:]]+model_mode:' "$D/project.config.md")" "1" "apply keeps one model_mode line"
 assert_contains "$(cat "$D/project.config.md")" "coding_profile: save" "apply records the profile"
+assert_contains "$(cat "$D/project.config.md")" "model_mode: recommended" "apply records model_mode recommended"
 assert_contains "$(grep '^model:' "$D/.claude/agents/team-lead.md")" "claude-haiku-4-5-20251001" "apply syncs agent frontmatter (save → Haiku lead)"
+assert_contains "$(grep '^model:' "$D/.claude/agents/team-frontend.md")" "claude-haiku-4-5-20251001" "apply syncs dev agents to the standard tier (save → Haiku FE)"
+# single-model mode: one model everywhere (tiers + every agent + model_mode)
+( cd "$D" && bash scripts/model-profiles.sh single claude test-model-x >/dev/null 2>&1 )
+assert_contains "$(cat "$D/project.config.md")" "model_mode: single" "single records model_mode"
+assert_eq "$(grep -cE '^[[:space:]]+model_mode:' "$D/project.config.md")" "1" "single keeps one model_mode line"
+assert_contains "$(grep '^model:' "$D/.claude/agents/team-backend.md")" "test-model-x" "single syncs dev agent frontmatter"
+assert_contains "$(grep '^model:' "$D/.claude/agents/team-ba.md")" "test-model-x" "single syncs orchestrator frontmatter"
+assert_eq "$(grep -c '"test-model-x"' "$D/project.config.md")" "3" "single sets all three claude tiers"
+( cd "$D" && bash scripts/model-profiles.sh apply claude save >/dev/null 2>&1 )   # back to a profile
 # sync-agents re-applies frontmatter from project.config.md (the --update repair path)
 ( cd "$D" && sed -i 's/^model: .*/model: claude-sonnet-4-6/' .claude/agents/team-lead.md && bash scripts/model-profiles.sh sync-agents >/dev/null 2>&1 )
 assert_contains "$(grep '^model:' "$D/.claude/agents/team-lead.md")" "claude-haiku-4-5-20251001" "sync-agents restores frontmatter from config"
@@ -243,6 +264,19 @@ assert_contains "$(cat "$REPO/CLAUDE.md")" ".devpilot/process.md" "CLAUDE.md poi
 # QA agent derives cases before code; the build merge step honors the gate ladder.
 assert_contains "$(cat "$REPO/.devpilot/prompts/team/qa-agent.md")" "test-case-design.md" "qa-agent loads test-case-design"
 assert_contains "$(cat "$REPO/.claude/commands/dp-build.md")" "auto-merge.md" "dp-build merge step cites the gate ladder"
+
+echo "== setup wizard: model assignment + guide (round 5) =="
+[ -f "$REPO/docs/setup-guide.md" ] && ok "setup-guide.md exists" || no "setup-guide.md exists"
+n=$(grep -c 'docs/setup-guide.md' "$REPO/install.sh"); n=${n:-0}
+assert_eq "$([ "$n" -ge 2 ] && echo ok)" "ok" "installer ships the setup guide (update + fresh)"
+INSTALL=$(cat "$REPO/install.sh")
+assert_contains "$INSTALL" 'MODEL_MODE="single"' "wizard offers single-model mode"
+assert_contains "$INSTALL" 'MODEL_MODE="per-team"' "wizard offers per-team mode"
+assert_contains "$INSTALL" "layer_models:" "generated config includes layer_models"
+assert_contains "$INSTALL" "frontend_dev:" "generated config includes dev role models"
+assert_contains "$INSTALL" 'sync_model ".claude/agents/team-frontend.md"' "installer syncs dev agent frontmatter"
+assert_contains "$(cat "$REPO/project.config.md")" "model_mode:" "repo config documents model_mode"
+assert_contains "$(cat "$REPO/.claude/commands/dp-config.md")" "single <family>" "dp-config documents single-model switch"
 
 echo ""
 echo "── Results: $PASS passed, $FAIL failed ──"

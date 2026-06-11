@@ -300,6 +300,21 @@ system designs test cases, auto-fixes red CI, and merges through explicit gates.
 | Wiring | QA agent/prompt load the new skills on demand; `dp-build` QA + merge steps cite them; installer ships all 7 new files (both lists); README/CLAUDE.md/AGENTS.md updated |
 | Tests | `tests/run.sh` round-4 block: skills/commands exist, indexed, shipped by the installer, and referenced by the QA agent + `dp-build` |
 
+## Follow-up enhancements (round 5) — setup experience & model assignment — ✅ done
+
+Goal: a guided, recommendation-rich setup for any project, with full control over
+how models map to the team.
+
+| Item | Artifacts |
+|------|-----------|
+| Setup guide | `docs/setup-guide.md` — every wizard step with a recommendation, scenario presets (solo/team/enterprise/Copilot/budget), change-later table; shipped by the installer, linked from README |
+| Model assignment modes | install STEP 5 now asks **recommended** (task-balanced tiers, prior behavior) / **single** (one model for the whole team) / **per-team** (a model per role; per layer on non-claude engines); recorded as `engines.model_mode` |
+| Per-layer model pins | `layer_models.*` in config, honored by `resolve-engine.sh` over the tier system |
+| Dev role models | `models.frontend_dev` / `models.backend_dev` in config; installer + `model-profiles.sh` sync them to `.claude/agents/*` frontmatter (survives `--update`) |
+| `single` subcommand | `model-profiles.sh single <family> <model>` — one model everywhere, one command; `apply` now also records `model_mode` and aligns dev agents to the standard tier |
+| Post-install UX | "Next steps" replaces the unconditional Jira block — credentials only for the chosen tracker, then verify (`/dp-status health`) → commit → optional deploy URLs |
+| Tests | `tests/run.sh`: layer-model pin, `single` mode, dev-agent sync, model_mode idempotence, wizard/guide wiring (109 assertions) |
+
 ---
 
 ## Risks / notes

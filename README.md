@@ -94,8 +94,11 @@ bash devpilot/install.sh
 </details>
 
 The installer (~5 minutes) detects your AI engines, scans your stack, enables only the agents you
-need, configures engine routing / issue tracker / merge policy, and copies the managed files
+need, configures engine routing / **model assignment** (recommended tiers · one model for the whole
+team · a model per team role) / issue tracker / merge policy, and copies the managed files
 (`.claude/`, `.opencode/`, `.devpilot/`, `scripts/`, `AGENTS.md`, `CLAUDE.md`).
+
+**📖 Step-by-step walkthrough with a recommendation at every prompt: [docs/setup-guide.md](docs/setup-guide.md).**
 
 **2. Run your first task:**
 
@@ -234,6 +237,8 @@ stack:
 engines:
   orchestrator: claude # always claude — Claude Code drives orchestration
   coding: claude       # claude | opencode | antigravity
+  model_mode: recommended  # recommended (task-balanced tiers) | single (one model for
+                           # the whole team) | per-team (a model per role/layer)
   runner: claude       # claude | opencode | antigravity | custom
   fallback: opencode   # engine to use when the primary hits a limit
 
@@ -280,17 +285,17 @@ agents:                                     # enable only the layers your stack 
 - **Layer override** → keep orchestration + most coding on Claude, but generate one layer via, e.g.,
   opencode + GitHub Copilot.
 
-Change models by switching the **profile** — no file editing, one word:
+**Three model modes** (chosen in the install wizard, switchable anytime):
 
-```bash
-/dp-config models save          # claude:      auto | balanced | save
-/dp-config models recommended   # opencode:    recommended | balanced | save  (uses your live model list)
-/dp-config models recommended   # antigravity: recommended | balanced | save  (uses your live model list)
-/dp-config           # show current config  ·  /dp-config wizard  re-runs the full setup
-```
+| `model_mode` | Meaning | Switch with |
+|--------------|---------|-------------|
+| `recommended` *(default)* | task-balanced tiers via a one-word profile | `/dp-config models save` (claude: `auto \| balanced \| save` · opencode/antigravity: `recommended \| balanced \| save`) |
+| `single` | one model for the whole team | `bash scripts/model-profiles.sh single claude claude-sonnet-4-6` |
+| `per-team` | a model per role (BA, Team Lead, QA, Frontend, Backend) — or per layer on a non-claude engine | edit `models.*` / `layer_models.*` → `bash scripts/model-profiles.sh sync-agents` |
 
 Profiles are presets over `power / standard / lite`; edit those tiers directly for fine control.
 Under the hood: `bash scripts/model-profiles.sh apply claude save` (and `… show` / `… opencode-list`).
+Full guidance per scenario: [docs/setup-guide.md](docs/setup-guide.md).
 
 ---
 
