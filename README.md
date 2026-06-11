@@ -4,7 +4,7 @@
 
 **Describe the work. An AI team plans it into a deduplicated Jira backlog, sprints it, and ships it — from idea to merged PR.**
 
-[![Version](https://img.shields.io/badge/version-3.0.0-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-4.0.0-blue.svg)](VERSION)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#license)
 [![Engines](https://img.shields.io/badge/engines-Claude%20%7C%20OpenCode%20%7C%20Antigravity-7c3aed.svg)](#configuration)
 [![Stacks](https://img.shields.io/badge/stacks-.NET%20%7C%20Node%20%7C%20Python%20%7C%20Go%20%7C%20Java%20%7C%20Angular%20%7C%20React-orange.svg)](#stack-support)
