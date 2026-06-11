@@ -244,6 +244,7 @@ process under the hood — you never manage the steps yourself.
 | **Something misconfigured** | `/dp-config fix` — doctor finds it, fixes it interactively |
 | **Switch models / engine / spend** | `/dp-config models <profile>` · one model: `bash scripts/model-profiles.sh single claude <model>` |
 | **Update devpilot itself** | `bash install.sh --update` — config and credentials untouched |
+| **Update devpilot across a whole org** | `bash scripts/update-org.sh <org> [--merge] [--install-missing]` — one PR per repo, base branches only |
 
 ---
 

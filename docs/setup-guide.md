@@ -184,5 +184,6 @@ The standard process the team follows lives in `.devpilot/process.md`.
 | Per-team models | edit `models.*` / `layer_models.*` in `project.config.md` → `bash scripts/model-profiles.sh sync-agents` |
 | Coding engine, agents, tracker, merge policy | edit `project.config.md` (one line each) or `/dp-config wizard` |
 | Update DevPilot itself | `bash install.sh --update` — never touches `project.config.md` or credentials |
+| Update every repo in your org | `bash scripts/update-org.sh <org> --merge` (from the devpilot clone) — clones each repo, runs `--update` on the base branch, opens/merges one PR per repo; `--install-missing` fresh-installs with defaults where devpilot isn't present. **Never delete + re-install** — that loses per-project config; `--update` exists precisely so you don't have to. |
 
 Every routing decision is read from `project.config.md` at run time — no reinstall needed.
