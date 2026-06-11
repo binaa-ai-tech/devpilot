@@ -97,6 +97,8 @@ Apply `.devpilot/skills/core-rules.md` throughout (it folds in get-shit-done).
 | `.claude/commands/dp-plan.md` | PM brain: dedup against the backlog, write Epic→Story (no code) |
 | `.claude/commands/dp-sprint.md` | Group the backlog into sprints, recommend run order |
 | `.claude/commands/dp-build.md` | Build a whole sprint → one PR → develop |
+| `.claude/commands/dp-test.md` | Derive test cases from ACs → write the missing tests → run the suite |
+| `.claude/commands/dp-autofix.md` | Drive a PR's CI to green (bounded fix loop) → merge per `auto-merge.md` |
 | `.claude/commands/dp-review-fix.md` | Read PR review comments → apply fixes → push |
 
 Run any command:

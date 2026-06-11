@@ -33,10 +33,14 @@ branch names in English regardless.
 **Do not scan the whole codebase. Use the project index.**
 
 1. Read the task description carefully — extract user story, goals, and signals about scope
-2. **Run `bash scripts/scope.sh "<task>"`** — it reads the project index and returns a ranked shortlist of the files most relevant to this task (regenerating the index first if needed)
+2. **Run `bash scripts/scope.sh --save <slug> "<task>"`** — it greps the index shards
+   (docs/index/*.md) and returns a ranked shortlist, saved to `docs/tasks/<slug>-scope.md`
+   so later phases reuse it instead of re-deriving (the index auto-refreshes, hash-gated)
 3. Take the top 3-8 entries from that shortlist
 4. Read only those specific files. Do not read files outside the shortlist
-5. If `scripts/scope.sh` returns nothing useful, read `docs/project-index.md` directly and pick the 3-8 closest entries by name/path
+5. If `scope.sh` returns nothing useful, read `docs/project-index.md` (the small map) to
+   pick the right area, then grep the matching `docs/index/<area>.md` shard for your
+   keywords — never load a shard wholesale into context
 6. Identify what already exists vs what must be built
 7. Infer the tech stack scope: frontend only / backend only / full-stack / DB changes / integration?
 8. Map all domain entities mentioned or implied — relationships and key attributes

@@ -6,8 +6,10 @@
 #   1. layer_overrides.<layer>      — explicit per-layer engine, wins over all
 #   2. engines.coding               — the project default coding engine
 #   3. Claude entry-point coupling  — runner=claude forces claude (unless 1)
-# Then picks the MODEL by task complexity from coding_models.<engine>.<tier>
-# (power | standard | lite), balancing power against token cost.
+# Then picks the MODEL:
+#   a. layer_models.<layer>         — explicit per-layer model pin (model_mode:
+#                                     per-team), wins over the tier system
+#   b. coding_models.<engine>.<tier> by task complexity (power | standard | lite)
 #
 # Engine families:
 #   claude   → Claude models (subagents also carry a role default; tiers are the
@@ -94,7 +96,7 @@ resolve_layer() {
     *) echo "Usage: resolve-engine.sh layer <frontend|backend|db|integration> [power|standard|lite]" >&2; exit 1 ;;
   esac
 
-  local runner coding override engine model
+  local runner coding override engine model pinned
   runner="$(cfg_under engines runner)";  [ -z "$runner" ] && runner="claude"
   coding="$(cfg_under engines coding)";  [ -z "$coding" ] && coding="claude"
   override="$(cfg_under layer_overrides "$layer" 6)"
@@ -105,6 +107,15 @@ resolve_layer() {
     engine="claude"                         # Claude entry-point coupling
   else
     engine="$coding"
+  fi
+
+  # Per-layer model pin (model_mode: per-team) — wins over the tier system.
+  # For the claude family the same pin lives in .claude/agents/*.md frontmatter;
+  # printing it here too keeps non-subagent paths (briefs, fallback) consistent.
+  pinned="$(cfg_under layer_models "$layer" 6)"
+  if [ -n "$pinned" ]; then
+    printf 'LAYER_ENGINE=%q\nLAYER_MODEL=%q\n' "$engine" "$pinned"
+    return
   fi
 
   if [ "$engine" = "claude" ]; then

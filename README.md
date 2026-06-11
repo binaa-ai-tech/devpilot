@@ -20,8 +20,11 @@ A portable, zero-config multi-agent orchestration layer that installs into any p
 - [What is devpilot?](#what-is-devpilot)
 - [Quick Start](#quick-start)
 - [How It Works](#how-it-works)
+- [The Standard Process](#the-standard-process)
 - [Driving the Team](#driving-the-team)
+- [Daily Playbook](#daily-playbook)
 - [Command Reference](#command-reference)
+- [Adoption Guide](#adoption-guide)
 - [Configuration](#configuration)
 - [Stack Support](#stack-support)
 - [Quality Gates](#quality-gates)
@@ -33,6 +36,7 @@ A portable, zero-config multi-agent orchestration layer that installs into any p
 - [Project Structure](#project-structure)
 - [Requirements](#requirements)
 - [Testing & CI](#testing--ci)
+- [Troubleshooting](#troubleshooting)
 - [Contributing](#contributing)
 - [License](#license)
 
@@ -60,7 +64,8 @@ It is built so a **one-person team can operate like a small company**:
 | 🪙 **Token-lean** | Agents read `core-rules` once + load heavier skills only on demand — a **75–89% cut** in per-spawn skill load, in any repo. |
 | 🛡 **Professional gates** | Definition of Ready → sized/sliced → built → tested (DoD) → security/code review → released → postmortem. |
 | 🧩 **Any stack** | One stack-aware backend agent + per-stack rule snippets for .NET, Node, Python, Go, Java, Angular, React/Vue, SQL Server, Postgres/MySQL. |
-| 📚 **A real operating manual** | 36 process skills: spec-first, definition-of-ready/done, api-design, data-migration-safety, accessibility, i18n, code-review, security-scan, threat-modeling, secrets-management, data-privacy, clean-code, version-control, refactoring, ci-cd, feature-flags, reliability-slo, dependency-management, documentation, test-strategy, database-performance, cost-awareness, debug-method, incident-postmortem, release-discipline, and more. |
+| 📚 **A real operating manual** | 41 process skills: spec-first, definition-of-ready/done, api-design, data-migration-safety, accessibility, i18n, code-review, security-scan, threat-modeling, secrets-management, data-privacy, clean-code, version-control, refactoring, ci-cd, feature-flags, reliability-slo, dependency-management, documentation, test-strategy, test-case-design, test-guard, e2e-testing, performance-testing, auto-merge, database-performance, cost-awareness, debug-method, incident-postmortem, release-discipline, and more. The SDLC contract that ties them together: `.devpilot/process.md`. |
+| 🔔 **Operations built in** | Generated per-project CI (`devpilot-ci`) enforcing the gate ladder, one-command branch protection, and webhook/email notifications on sprint DONE / QA BLOCKED (`scripts/notify.sh`). |
 
 **Engines run the same workflow.** Claude uses subagents; opencode (GitHub Copilot) runs the
 identical steps as a single-agent loop. Jira Stories are self-contained, so any session, opencode,
@@ -93,9 +98,18 @@ bash devpilot/install.sh
 ```
 </details>
 
+**Non-interactive** (CI, devcontainers, many repos at once) — accept every recommended default:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/binaa-ai-tech/devpilot/main/install.sh | bash -s -- --defaults
+```
+
 The installer (~5 minutes) detects your AI engines, scans your stack, enables only the agents you
-need, configures engine routing / issue tracker / merge policy, and copies the managed files
+need, configures engine routing / **model assignment** (recommended tiers · one model for the whole
+team · a model per team role) / issue tracker / merge policy, and copies the managed files
 (`.claude/`, `.opencode/`, `.devpilot/`, `scripts/`, `AGENTS.md`, `CLAUDE.md`).
+
+**📖 Step-by-step walkthrough with a recommendation at every prompt: [docs/setup-guide.md](docs/setup-guide.md).**
 
 **2. Run your first task:**
 
@@ -137,6 +151,33 @@ PLAN                                    BUILD
   (ACs, scope, repo/branch, DoD), rendered as structured ADF, so any tool can build from Jira alone.
 - **Engine + model** — resolved per task by `scripts/resolve-engine.sh`; state persists in
   `docs/tasks/` so any engine can resume where another left off.
+
+---
+
+## The Standard Process
+
+devpilot is an opinionated SDLC, not just a set of commands. Every project it's installed
+into follows the same eight phases with explicit exit gates — a one-person team runs the
+same process as a software company. The full contract lives in **`.devpilot/process.md`**
+(installed into your repo); this is the shape:
+
+```
+INTAKE → READY → SPRINT → BUILD → VERIFY → MERGE → RELEASE → OPERATE
+```
+
+| Phase | Driven by | You may advance only when … |
+|-------|-----------|------------------------------|
+| **Intake** | `/dp-plan` (or `/ceo`) | the item is classified, deduped, and written as Epic→Story with a self-contained brief |
+| **Ready** | BA | ACs are clear & testable, the Story is sized and sliced (Definition of Ready) |
+| **Sprint** | `/dp-sprint` | only READY Stories are in; the sprint has a goal and run order |
+| **Build** | `/dp-build` | one branch per sprint; agents stay in their layer; build never left red |
+| **Verify** | QA, `/dp-test` | test cases derived per AC, suite green, test-guard clean, perf budgets proven when in scope; verdict **PASS** per Story |
+| **Merge** | `/dp-build` · `/dp-autofix` | the `auto-merge` gate ladder is green **on the PR head**; bounded auto-fix, never an endless loop |
+| **Release** | `/dp-release` | build once, promote the same artifact DEV→SIT→UAT→PRD; **production always gets a human** |
+| **Operate** | `/dp-hotfix` · `/dp-status` | incidents get a blameless postmortem; action items return to Intake |
+
+A failed gate sends work **back one phase — never forward with a TODO**. The gates are
+enforced by skills and scripts (`.devpilot/skills/`, `scripts/`), not by discipline alone.
 
 ---
 
@@ -182,6 +223,30 @@ opencode falls back to its own default model.
 
 ---
 
+## Daily Playbook
+
+What to type for every situation a development team meets. Each entry runs the standard
+process under the hood — you never manage the steps yourself.
+
+| Situation | Do this |
+|-----------|---------|
+| **New feature / requirement / idea** | `/ceo "describe it"` — or `/dp-plan "…"` if you want to approve the plan first |
+| **A bug** | `/ceo "users get a 500 when …"` — intent is classified automatically; bugs get a failing-test-first flow |
+| **Many ideas at once** | several `/dp-plan "…"` calls (dedup merges overlaps) → `/dp-sprint` → `/dp-build sprint-1` |
+| **"Is this already in the backlog?"** | just `/dp-plan` it — the dedup ladder answers DUPLICATE / FOLD-IN / RELATED / UNRELATED |
+| **Tests are thin / write test cases** | `/dp-test <story \| PR \| diff>` — derives a case matrix from the ACs, writes the missing tests, runs the suite |
+| **Performance worry** | `/dp-test perf <scope>` — budgeted load/stress pass; violations are blockers with numbers |
+| **PR is red in CI** | `/dp-autofix <PR>` — diagnoses logs, fixes within 3 bounded cycles, merges when green or escalates with the diagnosis |
+| **Reviewer left comments** | `/dp-review-fix <PR>` — applies each comment, replies on the threads, re-requests review |
+| **Ship to test/UAT/production** | `/dp-release sit <ver>` → `/dp-release uat` → `/dp-release prd <ver>` (prod requires your approval) |
+| **Production incident** | `/dp-hotfix <ticket> <slug> <ver>` — emergency path + blameless postmortem; `/dp-rollback [ver]` to revert |
+| **"Where is everything?"** | `/dp-status` (board) · `/dp-status health` (doctor) · `/dp-status metrics` (throughput) |
+| **Something misconfigured** | `/dp-config fix` — doctor finds it, fixes it interactively |
+| **Switch models / engine / spend** | `/dp-config models <profile>` · one model: `bash scripts/model-profiles.sh single claude <model>` |
+| **Update devpilot itself** | `bash install.sh --update` — config and credentials untouched |
+
+---
+
 ## Command Reference
 
 **Workflow**
@@ -192,6 +257,8 @@ opencode falls back to its own default model.
 | `/dp-plan <feature \| issue \| task \| requirement>` | PM brain: dedup against the backlog, write Epic→Story (no code). Accepts raw text or a Jira key |
 | `/dp-sprint` | Group the backlog into sprints, recommend which to run first |
 | `/dp-build [sprint]` | Build a whole sprint → one PR → develop |
+| `/dp-test [perf] [story \| PR \| diff]` | Derive test cases from ACs → write the missing tests → run the suite |
+| `/dp-autofix [PR]` | Drive a PR's CI to green (bounded fix loop) and merge per the `auto-merge` gate ladder |
 | `/dp-review-fix <PR>` | Read PR review comments → apply fixes → push |
 
 The six team agents (`team-ba`, `team-lead`, `team-frontend`, `team-backend`, `team-dotnet`,
@@ -206,6 +273,31 @@ The six team agents (`team-ba`, `team-lead`, `team-frontend`, `team-backend`, `t
 | `/dp-release <sit \| uat \| prd> [version]` | Promote DEV→SIT→UAT→PRD |
 | `/dp-hotfix <ticket> <slug> <version>` · `/dp-rollback [version]` | Emergency fix · roll back |
 | `bash install.sh --update` | Refresh devpilot itself (config preserved) |
+
+---
+
+## Adoption Guide
+
+How to roll devpilot into real teams — start safe, earn autonomy. Full setup detail with a
+recommendation at every prompt: **[docs/setup-guide.md](docs/setup-guide.md)**.
+
+**Stage 1 — Solo / first project (day 1).** Install with defaults (`local` tracker, `auto`
+merge). Run one small real feature through `/ceo` end to end and read the PR it produces.
+Everything is auditable: `docs/tasks/` (step log), `docs/qa/` (verdicts), the PR diff.
+
+**Stage 2 — Small team (week 1).** Switch `tracker: github` (or `jira` — guided wizard),
+generate the CI workflow and apply branch protection (the installer offers both), set
+`NOTIFY_WEBHOOK`. Keep `merge_policy: pr-only` until the team trusts the gates, then go `auto`.
+
+**Stage 3 — Enterprise / regulated.** `tracker: jira`, `merge_policy: pr-only` (1 human
+review enforced via branch protection), `balanced` or per-team models for predictable spend,
+docs `language:` for your locale. The audit trail (task logs + QA reports + two-comment
+ticket policy) is designed for compliance reviews; production releases always require a human.
+
+**Non-negotiables at every stage** — these are what make the output trustworthy:
+- Never weaken a gate to get a change through (`test-guard`, review 🔴s, `auto-merge` ladder).
+- Production (`/dp-release prd`) is always human-approved.
+- A failed gate sends work back a phase, never forward with a TODO.
 
 ---
 
@@ -232,6 +324,8 @@ stack:
 engines:
   orchestrator: claude # always claude — Claude Code drives orchestration
   coding: claude       # claude | opencode | antigravity
+  model_mode: recommended  # recommended (task-balanced tiers) | single (one model for
+                           # the whole team) | per-team (a model per role/layer)
   runner: claude       # claude | opencode | antigravity | custom
   fallback: opencode   # engine to use when the primary hits a limit
 
@@ -278,17 +372,17 @@ agents:                                     # enable only the layers your stack 
 - **Layer override** → keep orchestration + most coding on Claude, but generate one layer via, e.g.,
   opencode + GitHub Copilot.
 
-Change models by switching the **profile** — no file editing, one word:
+**Three model modes** (chosen in the install wizard, switchable anytime):
 
-```bash
-/dp-config models save          # claude:      auto | balanced | save
-/dp-config models recommended   # opencode:    recommended | balanced | save  (uses your live model list)
-/dp-config models recommended   # antigravity: recommended | balanced | save  (uses your live model list)
-/dp-config           # show current config  ·  /dp-config wizard  re-runs the full setup
-```
+| `model_mode` | Meaning | Switch with |
+|--------------|---------|-------------|
+| `recommended` *(default)* | task-balanced tiers via a one-word profile | `/dp-config models save` (claude: `auto \| balanced \| save` · opencode/antigravity: `recommended \| balanced \| save`) |
+| `single` | one model for the whole team | `bash scripts/model-profiles.sh single claude claude-sonnet-4-6` |
+| `per-team` | a model per role (BA, Team Lead, QA, Frontend, Backend) — or per layer on a non-claude engine | edit `models.*` / `layer_models.*` → `bash scripts/model-profiles.sh sync-agents` |
 
 Profiles are presets over `power / standard / lite`; edit those tiers directly for fine control.
 Under the hood: `bash scripts/model-profiles.sh apply claude save` (and `… show` / `… opencode-list`).
+Full guidance per scenario: [docs/setup-guide.md](docs/setup-guide.md).
 
 ---
 
@@ -317,9 +411,23 @@ The lifecycle is gated end to end — **Ready → built → tested → reviewed 
   (npm/pip/dotnet/go); new high/critical CVEs block the PR.
 - **Layer disciplines** — `api-design` (contracts), `data-migration-safety` (zero-downtime DB),
   `accessibility` (WCAG AA) load on demand for the layers they apply to.
-- **QA verdict** — every acceptance criterion has a test; PASS or BLOCKED.
+- **QA verdict** — test cases derived per AC (`test-case-design.md`, traceability matrix in the QA
+  report); every acceptance criterion has a test; perf budgets proven when in scope
+  (`performance-testing.md`); PASS or BLOCKED.
+- **Test guard** — `scripts/test-guard.sh` (skill: `test-guard.md`): every changed source file has
+  a covering test or a justified exemption; merge gates run it strict (`STRICT=1`) — a gap blocks the PR.
+- **Auto-merge ladder** — `auto-merge.md`: build/tests/audit/review/QA/CI all green **on the PR head**
+  before a robot merges; `/dp-autofix` fixes red CI within a bounded loop (max 3 push-fix cycles),
+  then escalates instead of looping forever.
 - **Scope guard** — `scripts/scope-guard.sh` + a real-time `PreToolUse` hook (`scripts/scope-hook.sh`)
   block out-of-layer writes, keeping each agent inside its layer.
+- **Server-side enforcement** — the installer generates `.github/workflows/devpilot-ci.yml`
+  (stack-aware: build → tests → test-guard → audit, regenerate with `scripts/generate-ci.sh --force`)
+  and `scripts/protect-branches.sh` requires that check on `develop`/`main` and blocks force-pushes
+  (`merge_policy: pr-only` additionally requires 1 human review).
+- **Notifications** — `scripts/notify.sh` pings your webhook (Slack/Teams/Discord-compatible) or
+  email on sprint DONE, QA BLOCKED, and autofix escalation; every event also lands in
+  `docs/tasks/notifications.log`. Never blocks a flow.
 - **Conventional commits** — a `commit-msg` git hook enforces the format locally.
 - **Incident postmortem** — `/dp-hotfix` writes a blameless postmortem; action items return to the backlog.
 
@@ -334,8 +442,15 @@ Designed to stay cheap in **any** repo it's installed into:
 - **On-demand skills** — agents read `core-rules.md` once and pull heavier skills only at the step
   that needs them (per core-rules rule #10). That's a **75–89% cut** in per-spawn skill load
   vs. pre-loading; the 838-word `self-heal` loads only on a real failure, not every spawn.
-- **Index-scoped reading** — `docs/project-index.md` + `docs/backlog/index.md` cap reading to the
-  3–8 relevant files; agents never scan the whole repo. The dedup brain reads only the top 1–3 candidate specs.
+- **Two-tier index** — `docs/project-index.md` is a small bounded map; per-file detail lives in
+  `docs/index/*.md` shards that `scope.sh` greps (deterministic bash, zero AI tokens) — agents read
+  the map + the top-8 ranked results, never the whole index. Context cost per task is O(1) at any repo size.
+- **Scope once, reuse everywhere** — `scope.sh --save <slug>` persists the ranked file list to
+  `docs/tasks/<slug>-scope.md` at plan time; lead/dev/QA phases reuse it instead of re-deriving.
+- **Hash-gated index freshness** — regeneration is keyed on git content (HEAD + file-list checksum),
+  refreshed automatically by post-merge/post-checkout hooks and the SessionStart hook: a free no-op
+  when nothing changed, always trustworthy so agents never broad-scan "just in case".
+- The dedup brain reads only `docs/backlog/index.md` + the top 1–3 candidate specs.
 - **Task-balanced models** — lite tiers (Haiku / gpt-4o-mini) handle simple work so tokens go to the hard parts.
 - **Compact handoffs** — agents get a brief (ACs + files to touch), not raw document dumps.
 
@@ -428,9 +543,10 @@ bash scripts/checkpoint.sh latest          # find the most recent in-progress ta
 .opencode/
   config.json        # OpenCode project config — points to AGENTS.md and .devpilot/rules.md
 .devpilot/
+  process.md         # The standard dev process — phases, gates, roles (the SDLC contract)
   rules.md           # Router → core-rules + the snippet for your stack
   rules/             # angular, react-vue, dotnet, node, python, go, java, sqlserver, postgres-mysql
-  skills/            # Operating manual (README.md index + 36 process skills)
+  skills/            # Operating manual (README.md index + 41 process skills)
   config/            # models.md — model tier reference
   templates/         # requirements, plan, qa-report, review-report, adr, jira-brief, ticket
 scripts/             # Orchestration: engine/model routing, backlog+sprint, Jira (md→ADF), deploy …
@@ -459,7 +575,11 @@ install.sh           # One-command installer
 
 ## Testing & CI
 
-devpilot ships its own test suite:
+**For your project** — the installer generates a stack-aware `devpilot-ci` workflow (Node, .NET,
+Python, Go, Java) that runs the gate ladder on every PR, and can apply branch protection so the
+check is required. `/dp-autofix` drives that same check to green and merges.
+
+**For devpilot itself** — it ships its own test suite:
 
 ```bash
 bash tests/run.sh    # exercises run-mode, track, scope, scope-guard, open-pr, resolve-engine, …
@@ -468,6 +588,26 @@ bash tests/run.sh    # exercises run-mode, track, scope, scope-guard, open-pr, r
 `.github/workflows/ci.yml` is cost-tiered: pull requests run only the cheap gate (`shellcheck` +
 bash syntax checks + the suite), while the full pipeline runs on push to `base_branch` after a PR
 merges — so PR iterations stay fast and expensive workflows fire once per merge.
+
+---
+
+## Troubleshooting
+
+First move for anything odd: `/dp-status health` — every warning prints its exact fix, and
+`/dp-config fix` applies them interactively.
+
+| Symptom | Fix |
+|---------|-----|
+| "ready to run /ceo" but warnings listed | `/dp-config fix` — repairs missing config values one by one |
+| Jira tickets not created / 401 | `bash scripts/devpilot-config.sh validate` → rotate token: `… set jira_api_token=<token>` (tracker falls back to local logs meanwhile — nothing is lost) |
+| Agent model ≠ config (drift after update) | `bash scripts/model-profiles.sh sync-agents` |
+| Scope results look wrong / stale index | `bash scripts/generate-project-index.sh --force` (normally auto-refreshed, hash-gated) |
+| test-guard blocks a file that truly needs no test | write the one-line justified exemption in the PR description — never weaken `STRICT=1` |
+| PR can't merge, `gh` missing | install GitHub CLI + `gh auth login`; without it `open-pr.sh` prints the compare URL to merge manually |
+| Claude hit a rate limit mid-task | nothing to do — checkpoint saved, fallback engine prompt printed; resume with `/ceo resume` |
+| CI red on a devpilot-generated workflow | `/dp-autofix <PR>` — it reads the failed logs and drives it green within bounded cycles |
+| Wrong stack detected at install | edit `stack:` in `project.config.md`, then `bash scripts/generate-ci.sh --force` |
+| Want to see what it's costing | `/dp-status metrics` · switch spend: `/dp-config models save` |
 
 ---
 

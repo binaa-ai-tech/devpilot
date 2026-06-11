@@ -283,6 +283,80 @@ parallel variant is a possible future optimization, not required for correctness
 Tests: `tests/run.sh` now has 22 assertions (all pass), covering the new
 `scope-hook`, `doctor`, `status`, `metrics`, `audit`, and `changelog` scripts.
 
+## Follow-up enhancements (round 4) — testing & autonomous merge — ✅ done
+
+Goal: a standard enterprise dev process out of the box — say a feature, and the
+system designs test cases, auto-fixes red CI, and merges through explicit gates.
+
+| Item | Artifacts |
+|------|-----------|
+| SDLC contract | `.devpilot/process.md` — one page: INTAKE→READY→SPRINT→BUILD→VERIFY→MERGE→RELEASE→OPERATE, exit gate + owner per phase; referenced from `CLAUDE.md`/`README.md` |
+| Test-case design skill | `.devpilot/skills/test-case-design.md` — AC → case matrix (happy/boundary/negative/state, P0–P2, traceability); loaded by the QA agent before writing test code |
+| E2E testing skill | `.devpilot/skills/e2e-testing.md` — few stable journeys, selector/data/wait rules, CI placement |
+| Performance testing skill | `.devpilot/skills/performance-testing.md` — budget table (p95/p99, error rate, web vitals), smoke/load/stress/soak/spike, k6 default, 🔴 gate on budget violations |
+| Auto-merge skill | `.devpilot/skills/auto-merge.md` — 6-gate ladder, bounded auto-fix loop (≤3 push-fix cycles), never-auto-merge list, merge mechanics |
+| `/dp-test` command | `.claude/commands/dp-test.md` — cases on paper → missing tests → run suite → PASS/BLOCKED report; `perf` flag adds the budgeted perf pass |
+| `/dp-autofix` command | `.claude/commands/dp-autofix.md` — babysit one PR: diagnose red CI, self-heal fixes, re-run the ladder, merge per `merge_policy` or escalate |
+| Wiring | QA agent/prompt load the new skills on demand; `dp-build` QA + merge steps cite them; installer ships all 7 new files (both lists); README/CLAUDE.md/AGENTS.md updated |
+| Tests | `tests/run.sh` round-4 block: skills/commands exist, indexed, shipped by the installer, and referenced by the QA agent + `dp-build` |
+
+## Follow-up enhancements (round 5) — setup experience & model assignment — ✅ done
+
+Goal: a guided, recommendation-rich setup for any project, with full control over
+how models map to the team.
+
+| Item | Artifacts |
+|------|-----------|
+| Setup guide | `docs/setup-guide.md` — every wizard step with a recommendation, scenario presets (solo/team/enterprise/Copilot/budget), change-later table; shipped by the installer, linked from README |
+| Model assignment modes | install STEP 5 now asks **recommended** (task-balanced tiers, prior behavior) / **single** (one model for the whole team) / **per-team** (a model per role; per layer on non-claude engines); recorded as `engines.model_mode` |
+| Per-layer model pins | `layer_models.*` in config, honored by `resolve-engine.sh` over the tier system |
+| Dev role models | `models.frontend_dev` / `models.backend_dev` in config; installer + `model-profiles.sh` sync them to `.claude/agents/*` frontmatter (survives `--update`) |
+| `single` subcommand | `model-profiles.sh single <family> <model>` — one model everywhere, one command; `apply` now also records `model_mode` and aligns dev agents to the standard tier |
+| Post-install UX | "Next steps" replaces the unconditional Jira block — credentials only for the chosen tracker, then verify (`/dp-status health`) → commit → optional deploy URLs |
+| Tests | `tests/run.sh`: layer-model pin, `single` mode, dev-agent sync, model_mode idempotence, wizard/guide wiring (109 assertions) |
+
+## Follow-up enhancements (round 6) — test guard, Jira clarity, reconfig, pro setup — ✅ done
+
+| Item | Artifacts |
+|------|-----------|
+| Test guard (highly recommended) | `scripts/test-guard.sh` + `.devpilot/skills/test-guard.md` — every changed source file needs a covering test (stack-aware mapping, explicit exemptions); strict mode wired into the `auto-merge` ladder, `dp-build` review gate, `dp-autofix` local ladder, and the QA steps |
+| Model validation in doctor | `doctor.sh` checks `model_mode` validity, Claude tier id plausibility, agent-frontmatter drift (suggests `sync-agents`), and live opencode tier availability |
+| Config completeness + reconfig | `doctor.sh` flags missing identity values and incomplete Jira credentials with exact fix commands; new `/dp-config fix` repairs everything interactively and re-runs the doctor |
+| Jira clarity | wizard walks token creation (URL → email → hidden token) at tracker selection, stores to `.devpilot/config.sh`, validates the connection live post-install; setup guide gains a "Jira setup" section incl. what Jira looks like during implementation |
+| Professional setup design | branded banner, boxed step headers with progress (1/8…8/8), and a full **Review & confirm** summary before any file is written (cancel = nothing touched); tracker-aware next steps |
+| Tests | 129 assertions — test-guard behavior (gap → strict fail, spec → pass, docs exempt), doctor/dp-config/installer wiring |
+
+## Follow-up enhancements (round 7) — production-ready operations — ✅ done
+
+| Item | Artifacts |
+|------|-----------|
+| Generated host-project CI | `scripts/generate-ci.sh` → `.github/workflows/devpilot-ci.yml` — stack-aware (Node/.NET/Python/Go/Java) gate ladder on every PR: build → tests → **test-guard strict** → dependency audit; offered by the wizard, `--force` to regenerate |
+| Branch protection | `scripts/protect-branches.sh` — requires the `devpilot-ci` check, blocks force-pushes/deletions on `base_branch` + `main`; `merge_policy: pr-only` adds 1 required review; graceful without gh |
+| Non-interactive install | `install.sh --defaults` / `-y` — accepts every recommendation (works piped or from disk); answers-file piping (`bash install.sh < answers.txt`) now works without env tricks; re-exec guard fixed to never re-download over a local run |
+| Notifications | `scripts/notify.sh <event> <msg>` — webhook (Slack/Teams/Discord-shape) + optional email, always logs to `docs/tasks/notifications.log`, never blocks; `NOTIFY_WEBHOOK` in config template; wired into `dp-build` (DONE/BLOCKED) and `dp-autofix` (merged/escalated) |
+| Harness fix | `assert_contains` switched to pure-bash substring — `printf big \| grep -q` died of SIGPIPE under pipefail when the match was early (source of two transient test failures) |
+| README | non-interactive install, generated CI + protection, notifications, 41 skills |
+
+Tests: 151 assertions ×3 consecutive green runs.
+
+## Follow-up enhancements (round 8) — O(1) token scoping per task — ✅ done
+
+Problem: every task/plan loaded the whole `docs/project-index.md` into context
+(grows with repo size), freshness was time-based (2h) so post-merge staleness
+pushed agents back to broad scanning, and every phase re-derived the same scope.
+
+| Item | Artifacts |
+|------|-----------|
+| Two-tier index | `generate-project-index.sh` now writes a **small bounded map** (`docs/project-index.md`: top-level layout, shard counts, entry points — <100 lines at any repo size) + **detail shards** (`docs/index/*.md`) that are grep targets for `scope.sh`, never context |
+| Hash-gated freshness | regeneration keyed on HEAD + tracked-file checksum + untracked-source count (`docs/index/.state`, gitignored); unchanged repo → free no-op; `--force` to override; SessionStart hook simplified; new post-merge/post-checkout git hooks refresh in background |
+| Scope once, reuse everywhere | `scope.sh --save <slug>` greps map+shards, saves the ranked list to `docs/tasks/<slug>-scope.md`; a cached scope newer than the index is a pure cache hit; hand-maintained indexes (no `.state`) are never clobbered |
+| Consumer wiring | `dp-plan` Step 2 computes scope once (`--save $SLUG`), `dp-build` lead phase reuses the saved file, BA agent fallback = grep one shard (never wholesale); CLAUDE.md + README token discipline rewritten around the O(1) contract |
+| Tests | 167 assertions — map size bound, shard creation, skip-on-unchanged, regen-on-change, scope ranking from shards, per-task cache hit, all consumer wiring |
+
+Net effect: per-task index context cost goes from O(repo files) to O(1)
+(~40-line map + top-8 scope lines), and the scope derivation is paid once per
+task instead of once per phase.
+
 ---
 
 ## Risks / notes

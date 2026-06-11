@@ -30,6 +30,7 @@ Each skill is a short, principle-driven playbook. **Token discipline: agents rea
 | `clean-code.md` | Naming, small functions, readability — write for the next reader. |
 | `refactoring.md` | Change structure without changing behavior; tests-first, small steps. |
 | `test-strategy.md` | What to test and how (the test pyramid). |
+| `performance-testing.md` | Load/stress/soak budgets — prove the running system, not just the code. |
 | `observability.md` | Logging, metrics, and error handling ship with the feature. |
 | `performance-review.md` | Performance checklist for new code. |
 | `database-performance.md` | Indexes, query plans, N+1, pagination — make the schema fast. |
@@ -49,10 +50,14 @@ Each skill is a short, principle-driven playbook. **Token discipline: agents rea
 ## Quality & shipping (QA / Team Lead)
 | Skill | Purpose |
 |-------|---------|
+| `test-case-design.md` | Derive test cases from ACs (boundaries, negatives, traceability) before code. |
+| `test-guard.md` | **Highly recommended** enforcement gate — no changed source file ships without a test (`scripts/test-guard.sh`). |
+| `e2e-testing.md` | A few critical journeys, made stable enough to gate a merge. |
 | `code-review.md` | Structured review gate with severity tags. |
 | `version-control.md` | Atomic commits + small, single-purpose, CI-green PRs. |
 | `definition-of-done.md` | Per-role DoD gate before handoff. |
 | `ci-cd.md` | Pipeline-as-code, quality gates, build-once/promote, reversible deploys. |
+| `auto-merge.md` | The gate ladder + bounded fix loop a robot must pass to merge a PR. |
 | `release-discipline.md` | SemVer, changelog, DEV→SIT→UAT→PRD gates, rollback. |
 
 ## Across the whole process

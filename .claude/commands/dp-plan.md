@@ -34,14 +34,18 @@ Derive `SLUG` (lowercase, hyphens, ≤6 words). Carry `INTENT` forward.
 ## Step 2 — Scope reading via indexes (token-lean — do NOT broad-scan)
 
 ```bash
-# Project index: caps codebase reading to 3–8 files.
-find docs/project-index.md -mmin -120 2>/dev/null | grep -q . \
-  || bash scripts/generate-project-index.sh
+# Project index: hash-gated — free no-op when the repo is unchanged.
+bash scripts/generate-project-index.sh
 # Backlog index: the dedup brain. Refresh so matching is against current state.
 bash scripts/generate-backlog-index.sh
+# Compute the file scope ONCE and save it — every later phase (lead, devs, QA)
+# reuses docs/tasks/<SLUG>-scope.md instead of re-deriving it.
+bash scripts/scope.sh --save "$SLUG" "<task description>"
 ```
 
-Read `docs/project-index.md` and `docs/backlog/index.md`.
+Read **only**: `docs/project-index.md` (the small map), `docs/backlog/index.md`, and
+the scope output above. Never read the `docs/index/*.md` shards wholesale — they are
+grep targets for `scope.sh`, not context. Then read just the top 3–8 scoped files.
 
 ---
 
