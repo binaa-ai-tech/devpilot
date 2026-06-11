@@ -36,7 +36,13 @@ curl -fsSL https://raw.githubusercontent.com/binaa-ai-tech/devpilot/main/install
 
 # Or from a local clone:
 bash /path/to/devpilot/install.sh
+
+# Non-interactive (CI, devcontainers, rolling out to many repos):
+curl -fsSL https://raw.githubusercontent.com/binaa-ai-tech/devpilot/main/install.sh | bash -s -- --defaults
 ```
+
+`--defaults` accepts every recommendation in this guide (claude engine, recommended
+model tiers, local tracker, auto merge) — change anything later per §6.
 
 ## 3 · The wizard, step by step
 
@@ -95,6 +101,14 @@ How `bash scripts/ceo.sh` runs commands outside Claude Code.
   PR needs human eyes — e.g. a regulated codebase or a team new to DevPilot.
 - **Docs language** — BA/QA docs in your language (`en`, `ar`, …); code stays English.
 
+### Final steps — CI workflow & branch protection (after the confirm screen)
+> **Recommendation: accept both.** The installer generates
+> `.github/workflows/devpilot-ci.yml` — a stack-aware pipeline running the gate ladder
+> (build → tests → test-guard strict → dependency audit) on every PR — and, when `gh` is
+> authenticated, applies **branch protection** so that check is required and force-pushes
+> are blocked on `develop`/`main`. This is what makes `merge_policy: auto` safe.
+> Later: `bash scripts/generate-ci.sh --force` · `bash scripts/protect-branches.sh`.
+
 ### Jira setup (tracker: `jira`) — exactly these steps
 
 1. **Create an API token** — https://id.atlassian.com/manage-profile/security/api-tokens
@@ -130,6 +144,10 @@ local logs — nothing is lost; `/dp-status` shows the live board either way.
 /dp-config fix           # interactively repairs anything the doctor flagged
 git add -A && git commit -m "chore: install devpilot"
 ```
+
+Optional but worth 60 seconds — **notifications**: set `NOTIFY_WEBHOOK` (Slack/Teams/
+Discord-compatible) in `.devpilot/config.sh` and the team pings you on sprint DONE,
+QA BLOCKED, and autofix escalation. That's what makes "walk away" after `/ceo` real.
 
 Two gates you should know from day one:
 - **Test guard** (highly recommended, on by default in the merge ladder) —

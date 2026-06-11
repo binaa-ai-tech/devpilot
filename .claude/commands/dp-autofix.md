@@ -53,8 +53,12 @@ else
 fi
 ```
 
-On merge: move the PR's Stories to Done and post the single DONE comment
-(`core-rules.md` #11).
+On merge: move the PR's Stories to Done, post the single DONE comment
+(`core-rules.md` #11), and notify:
+```bash
+bash scripts/notify.sh done "PR #<n> green and merged into $BASE_BRANCH (<cycles> fix cycles)"
+```
+On escalation: `bash scripts/notify.sh blocked "PR #<n> still red after 3 fix cycles: <diagnosis>"`.
 
 ## Report
 

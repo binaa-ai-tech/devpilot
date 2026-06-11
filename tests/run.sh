@@ -12,7 +12,9 @@ PASS=0; FAIL=0
 ok() { echo "  ✅ $1"; PASS=$((PASS + 1)); }
 no() { echo "  ❌ $1"; FAIL=$((FAIL + 1)); }
 assert_eq()       { if [ "$1" = "$2" ]; then ok "$3"; else no "$3 (got '$1', want '$2')"; fi; }
-assert_contains() { if printf '%s' "$1" | grep -qF -- "$2"; then ok "$3"; else no "$3 (missing '$2')"; fi; }
+# Pure-bash substring test: `printf big | grep -q` dies of SIGPIPE under pipefail
+# when the match is early in a large haystack (grep exits first → printf killed → 141).
+assert_contains() { if [[ "$1" == *"$2"* ]]; then ok "$3"; else no "$3 (missing '$2')"; fi; }
 assert_code()     { if [ "$1" = "$2" ]; then ok "$3"; else no "$3 (exit $1, want $2)"; fi; }
 
 # A throwaway git repo with the scripts + a minimal config.
@@ -118,6 +120,30 @@ assert_code "$RC" "0" "STRICT=1 passes once the spec exists"
 ( cd "$D" && echo 'x' > notes.md && git add notes.md && git -c commit.gpgsign=false commit -qm "docs: notes" )
 ( cd "$D" && STRICT=1 bash scripts/test-guard.sh >/dev/null 2>&1 ); RC=$?
 assert_code "$RC" "0" "docs/config changes are exempt"
+rm -rf "$D"
+
+echo "== generate-ci.sh / protect-branches.sh / notify.sh =="
+D=$(sandbox)
+( cd "$D" && printf 'base_branch: develop\nstack:\n  frontend: react\n  backend: node\n' > project.config.md && touch package.json )
+( cd "$D" && bash scripts/generate-ci.sh >/dev/null 2>&1 )
+CI_FILE="$D/.github/workflows/devpilot-ci.yml"
+[ -f "$CI_FILE" ] && ok "generate-ci writes the workflow" || no "generate-ci writes the workflow"
+assert_contains "$(cat "$CI_FILE" 2>/dev/null)" "npm ci" "node stack → npm steps"
+assert_contains "$(cat "$CI_FILE" 2>/dev/null)" "test-guard.sh" "workflow runs the test guard"
+assert_contains "$(cat "$CI_FILE" 2>/dev/null)" "audit.sh" "workflow runs the dependency audit"
+assert_contains "$(cat "$CI_FILE" 2>/dev/null)" "name: devpilot-ci" "check is named devpilot-ci (for protection)"
+OUT=$( cd "$D" && bash scripts/generate-ci.sh 2>/dev/null ); RC=$?
+assert_code "$RC" "0" "second run without --force exits 0"
+assert_contains "$OUT" "already exists" "second run refuses to clobber"
+( cd "$D" && printf 'base_branch: main\nstack:\n  frontend: none\n  backend: dotnet\n' > project.config.md && bash scripts/generate-ci.sh --force >/dev/null 2>&1 )
+assert_contains "$(cat "$CI_FILE" 2>/dev/null)" "dotnet test" "--force regenerates for the new stack"
+# notify: unconfigured → silent success + durable log
+( cd "$D" && bash scripts/notify.sh done "sprint built" >/dev/null 2>&1 ); RC=$?
+assert_code "$RC" "0" "notify exits 0 when unconfigured"
+assert_contains "$(cat "$D/docs/tasks/notifications.log" 2>/dev/null)" "sprint built" "notify always logs the event"
+# protect-branches: degrades gracefully without gh auth
+OUT=$( cd "$D" && PATH=/usr/bin:/bin bash scripts/protect-branches.sh 2>/dev/null ); RC=$?
+assert_code "$RC" "0" "protect-branches exits 0 without gh"
 rm -rf "$D"
 
 echo "== doctor.sh / status.sh / metrics.sh / audit.sh run cleanly =="
@@ -317,6 +343,20 @@ assert_contains "$INSTALL" "Review — your configuration" "wizard shows a confi
 assert_contains "$INSTALL" "id.atlassian.com/manage-profile/security/api-tokens" "wizard walks Jira token creation"
 assert_contains "$INSTALL" "Validating Jira connection" "wizard validates Jira live"
 assert_contains "$(cat "$REPO/docs/setup-guide.md")" "Jira setup" "setup guide covers Jira steps"
+
+echo "== ops round: CI gen, protection, notify, --defaults (round 7) =="
+for SC in generate-ci protect-branches notify; do
+  n=$(grep -c "$SC\.sh" "$REPO/install.sh"); n=${n:-0}
+  assert_eq "$([ "$n" -ge 2 ] && echo ok)" "ok" "installer ships $SC.sh in both lists"
+done
+assert_contains "$INSTALL" "DEVPILOT_DEFAULTS" "installer supports --defaults"
+assert_contains "$INSTALL" "NOTIFY_WEBHOOK" "config template includes NOTIFY_WEBHOOK"
+assert_contains "$INSTALL" "generate-ci.sh" "wizard offers CI generation"
+assert_contains "$INSTALL" "protect-branches.sh" "wizard offers branch protection"
+assert_contains "$(cat "$REPO/.claude/commands/dp-build.md")" "notify.sh" "dp-build notifies on DONE/BLOCKED"
+assert_contains "$(cat "$REPO/.claude/commands/dp-autofix.md")" "notify.sh" "dp-autofix notifies on merge/escalation"
+assert_contains "$(cat "$REPO/README.md")" "--defaults" "README documents non-interactive install"
+assert_contains "$(cat "$REPO/README.md")" "devpilot-ci" "README documents the generated CI"
 
 echo ""
 echo "── Results: $PASS passed, $FAIL failed ──"

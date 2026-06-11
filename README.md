@@ -60,7 +60,8 @@ It is built so a **one-person team can operate like a small company**:
 | 🪙 **Token-lean** | Agents read `core-rules` once + load heavier skills only on demand — a **75–89% cut** in per-spawn skill load, in any repo. |
 | 🛡 **Professional gates** | Definition of Ready → sized/sliced → built → tested (DoD) → security/code review → released → postmortem. |
 | 🧩 **Any stack** | One stack-aware backend agent + per-stack rule snippets for .NET, Node, Python, Go, Java, Angular, React/Vue, SQL Server, Postgres/MySQL. |
-| 📚 **A real operating manual** | 40 process skills: spec-first, definition-of-ready/done, api-design, data-migration-safety, accessibility, i18n, code-review, security-scan, threat-modeling, secrets-management, data-privacy, clean-code, version-control, refactoring, ci-cd, feature-flags, reliability-slo, dependency-management, documentation, test-strategy, test-case-design, e2e-testing, performance-testing, auto-merge, database-performance, cost-awareness, debug-method, incident-postmortem, release-discipline, and more. The SDLC contract that ties them together: `.devpilot/process.md`. |
+| 📚 **A real operating manual** | 41 process skills: spec-first, definition-of-ready/done, api-design, data-migration-safety, accessibility, i18n, code-review, security-scan, threat-modeling, secrets-management, data-privacy, clean-code, version-control, refactoring, ci-cd, feature-flags, reliability-slo, dependency-management, documentation, test-strategy, test-case-design, test-guard, e2e-testing, performance-testing, auto-merge, database-performance, cost-awareness, debug-method, incident-postmortem, release-discipline, and more. The SDLC contract that ties them together: `.devpilot/process.md`. |
+| 🔔 **Operations built in** | Generated per-project CI (`devpilot-ci`) enforcing the gate ladder, one-command branch protection, and webhook/email notifications on sprint DONE / QA BLOCKED (`scripts/notify.sh`). |
 
 **Engines run the same workflow.** Claude uses subagents; opencode (GitHub Copilot) runs the
 identical steps as a single-agent loop. Jira Stories are self-contained, so any session, opencode,
@@ -92,6 +93,12 @@ git clone https://github.com/binaa-ai-tech/devpilot
 bash devpilot/install.sh
 ```
 </details>
+
+**Non-interactive** (CI, devcontainers, many repos at once) — accept every recommended default:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/binaa-ai-tech/devpilot/main/install.sh | bash -s -- --defaults
+```
 
 The installer (~5 minutes) detects your AI engines, scans your stack, enables only the agents you
 need, configures engine routing / **model assignment** (recommended tiers · one model for the whole
@@ -334,6 +341,13 @@ The lifecycle is gated end to end — **Ready → built → tested → reviewed 
   then escalates instead of looping forever.
 - **Scope guard** — `scripts/scope-guard.sh` + a real-time `PreToolUse` hook (`scripts/scope-hook.sh`)
   block out-of-layer writes, keeping each agent inside its layer.
+- **Server-side enforcement** — the installer generates `.github/workflows/devpilot-ci.yml`
+  (stack-aware: build → tests → test-guard → audit, regenerate with `scripts/generate-ci.sh --force`)
+  and `scripts/protect-branches.sh` requires that check on `develop`/`main` and blocks force-pushes
+  (`merge_policy: pr-only` additionally requires 1 human review).
+- **Notifications** — `scripts/notify.sh` pings your webhook (Slack/Teams/Discord-compatible) or
+  email on sprint DONE, QA BLOCKED, and autofix escalation; every event also lands in
+  `docs/tasks/notifications.log`. Never blocks a flow.
 - **Conventional commits** — a `commit-msg` git hook enforces the format locally.
 - **Incident postmortem** — `/dp-hotfix` writes a blameless postmortem; action items return to the backlog.
 
@@ -445,7 +459,7 @@ bash scripts/checkpoint.sh latest          # find the most recent in-progress ta
   process.md         # The standard dev process — phases, gates, roles (the SDLC contract)
   rules.md           # Router → core-rules + the snippet for your stack
   rules/             # angular, react-vue, dotnet, node, python, go, java, sqlserver, postgres-mysql
-  skills/            # Operating manual (README.md index + 40 process skills)
+  skills/            # Operating manual (README.md index + 41 process skills)
   config/            # models.md — model tier reference
   templates/         # requirements, plan, qa-report, review-report, adr, jira-brief, ticket
 scripts/             # Orchestration: engine/model routing, backlog+sprint, Jira (md→ADF), deploy …
@@ -474,7 +488,11 @@ install.sh           # One-command installer
 
 ## Testing & CI
 
-devpilot ships its own test suite:
+**For your project** — the installer generates a stack-aware `devpilot-ci` workflow (Node, .NET,
+Python, Go, Java) that runs the gate ladder on every PR, and can apply branch protection so the
+check is required. `/dp-autofix` drives that same check to green and merges.
+
+**For devpilot itself** — it ships its own test suite:
 
 ```bash
 bash tests/run.sh    # exercises run-mode, track, scope, scope-guard, open-pr, resolve-engine, …

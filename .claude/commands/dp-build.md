@@ -113,7 +113,10 @@ Spawn `subagent_type: "team-qa"`:
 > `.devpilot/skills/definition-of-done.md`. Write `docs/qa/<SPRINT_SLUG>.md`.
 > Verdict per Story: PASS / BLOCKED.
 
-If any Story is BLOCKED: fix and re-run QA before proceeding.
+If any Story is BLOCKED: notify (best-effort, never blocks) and fix, then re-run QA before proceeding:
+```bash
+bash scripts/notify.sh blocked "QA BLOCKED in $SPRINT: <story keys + one-line reason>"
+```
 
 ---
 
@@ -140,8 +143,10 @@ if [ $? -eq 0 ]; then
     bash scripts/update-jira-status.sh "$KEY" "Done"
     bash scripts/add-jira-comment.sh "$KEY" "✅ Built in sprint $SPRINT [$END_TIME] · PR: $PR_URL"
   done
+  bash scripts/notify.sh done "Sprint $SPRINT built — <N> stories · PR: $PR_URL"
 else
   echo "⚠️  Auto-merge failed — merge $PR_URL manually, then mark the sprint's Stories Done."
+  bash scripts/notify.sh blocked "Sprint $SPRINT: auto-merge failed — manual merge needed: $PR_URL"
 fi
 ```
 

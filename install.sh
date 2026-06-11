@@ -21,10 +21,25 @@
 # =============================================================================
 set -euo pipefail
 
+# Non-interactive mode: --defaults / -y accepts every recommended default.
+DEVPILOT_DEFAULTS=0
+for _arg in "$@"; do
+  case "$_arg" in --defaults|-y) DEVPILOT_DEFAULTS=1 ;; esac
+done
+
 # When piped via curl | bash, stdin IS the script — bash and read() both fight over it.
 # Fix: download a clean copy to a temp file and re-exec from disk, redirecting stdin
 # from the controlling terminal so every `read` prompt gets the keyboard, not the pipe.
-if [ ! -t 0 ] && [ -z "${DEVPILOT_REEXEC:-}" ]; then
+# Re-exec ONLY when actually piped ($0 isn't a file on disk) — a disk run with
+# non-tty stdin (CI, --defaults) must keep running THIS version, not re-download.
+if [ ! -t 0 ] && [ -z "${DEVPILOT_REEXEC:-}" ] && [ ! -f "$0" ]; then
+  if [ "$DEVPILOT_DEFAULTS" = 1 ]; then
+    TMPFILE=$(mktemp "${TMPDIR:-/tmp}/devpilot-install.XXXXXX")
+    curl -fsSL "https://raw.githubusercontent.com/binaa-ai-tech/devpilot/main/install.sh" -o "$TMPFILE"
+    DEVPILOT_REEXEC=1 bash "$TMPFILE" "$@" < /dev/null
+    rm -f "$TMPFILE"
+    exit $?
+  fi
   if [ ! -e /dev/tty ]; then
     echo "Error: no terminal available for interactive prompts." >&2
     echo "Download and run instead:" >&2
@@ -116,7 +131,7 @@ run_update() {
   CHECKLISTS="feature.md bugfix.md hotfix.md"
   CMDS="ceo.md dp-plan.md dp-sprint.md dp-build.md dp-release.md dp-rollback.md dp-hotfix.md dp-status.md dp-config.md dp-review-fix.md dp-test.md dp-autofix.md"
   AGENTS_LIST="team-lead.md team-ba.md team-frontend.md team-dotnet.md team-backend.md team-qa.md"
-  SCRIPTS="git-flow.sh new-feature.sh run-command.sh resolve-engine.sh model-profiles.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh create-jira-ticket.sh create-jira-epic.sh update-jira-status.sh update-jira-description.sh add-jira-comment.sh generate-project-index.sh generate-backlog-index.sh jira-sprint.sh link-jira-issues.sh md-to-adf.sh jira-describe.sh ceo.sh dp-plan.sh dp-sprint.sh dp-build.sh dp-release.sh dp-status.sh dp-config.sh"
+  SCRIPTS="git-flow.sh new-feature.sh run-command.sh resolve-engine.sh model-profiles.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh create-jira-ticket.sh create-jira-epic.sh update-jira-status.sh update-jira-description.sh add-jira-comment.sh generate-project-index.sh generate-backlog-index.sh jira-sprint.sh link-jira-issues.sh md-to-adf.sh jira-describe.sh ceo.sh dp-plan.sh dp-sprint.sh dp-build.sh dp-release.sh dp-status.sh dp-config.sh"
 
   info "Refreshing .devpilot/rules..."
   fetch ".devpilot/rules.md" ".devpilot/rules.md"
@@ -155,6 +170,12 @@ if [ "${1:-}" = "--update" ] || [ "${1:-}" = "update" ]; then
   run_update
 fi
 
+# --defaults: feed every prompt an empty answer → the recommended default wins.
+# (Placed after --update dispatch; the script itself runs from disk at this point.)
+if [ "$DEVPILOT_DEFAULTS" = 1 ]; then
+  exec < <(yes '')
+fi
+
 # ── Banner ─────────────────────────────────────────────────────────────────────
 echo ""
 DEVPILOT_VERSION=""
@@ -173,8 +194,12 @@ echo -e "${CYAN}${BOLD}║${RESET}                                              
 echo -e "${CYAN}${BOLD}╚══════════════════════════════════════════════════════════╝${RESET}"
 echo ""
 echo "  Project:  $PROJECT_ROOT"
-echo "  Setup:    8 short steps (~5 min) · Enter accepts the recommended default"
-echo "  Safety:   nothing is written until you confirm the summary at the end"
+if [ "$DEVPILOT_DEFAULTS" = 1 ]; then
+  echo "  Mode:     non-interactive (--defaults) — every recommendation accepted"
+else
+  echo "  Setup:    8 short steps (~5 min) · Enter accepts the recommended default"
+  echo "  Safety:   nothing is written until you confirm the summary at the end"
+fi
 echo ""
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -821,8 +846,9 @@ UAT_API_URL=""
 PRD_FRONTEND_URL=""
 PRD_API_URL=""
 
-# ── Notifications ─────────────────────────────────────────────────────────────
-NOTIFY_EMAIL="your-email@example.com"
+# ── Notifications (best-effort; scripts/notify.sh) ──────────────────────────
+NOTIFY_WEBHOOK=""                      # Slack/Teams/Discord-compatible webhook URL
+NOTIFY_EMAIL="your-email@example.com"  # used when a local 'mail' command exists
 DEVPILOT_CONFIG_UPDATED_AT='$CFG_NOW'
 CFGEOF
   info ".devpilot/config.sh created — set your Jira/GitHub credentials with: bash scripts/devpilot-config.sh set jira_api_token=<token>"
@@ -908,7 +934,7 @@ fi
 # scripts/
 info "Installing scripts/..."
 for f in git-flow.sh new-feature.sh run-command.sh resolve-engine.sh model-profiles.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh \
-          run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh session-start.sh \
+          run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh \
           doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh \
           deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh \
           create-jira-ticket.sh create-jira-epic.sh \
@@ -1134,6 +1160,41 @@ if git rev-parse --git-dir > /dev/null 2>&1; then
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════
+# STEP 13b — CI WORKFLOW + BRANCH PROTECTION (the gate ladder, server-side)
+# ═════════════════════════════════════════════════════════════════════════════
+section "CI workflow & branch protection..."
+
+CI_GENERATED=0
+if [ -f ".github/workflows/devpilot-ci.yml" ]; then
+  info "CI workflow exists — refresh anytime: bash scripts/generate-ci.sh --force"
+  CI_GENERATED=1
+else
+  echo ""
+  echo "  A GitHub Actions workflow enforces the gate ladder on every PR:"
+  echo "  build → tests → test-guard (strict) → dependency audit."
+  ask "  Generate .github/workflows/devpilot-ci.yml? [Y/n]: "; read -r CI_CHOICE
+  if [[ ! "${CI_CHOICE:-Y}" =~ ^[Nn] ]]; then
+    bash scripts/generate-ci.sh && CI_GENERATED=1
+  else
+    info "Skipped — generate later: bash scripts/generate-ci.sh"
+  fi
+fi
+
+if [ "$CI_GENERATED" = 1 ] && command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  echo ""
+  echo "  Branch protection makes the check non-bypassable (no force-push, devpilot-ci"
+  echo "  required$([ "$MERGE_POLICY" = "pr-only" ] && echo ', 1 review required'))."
+  ask "  Protect '$BASE_BRANCH'$([ "$BASE_BRANCH" != main ] && echo " and 'main'")? [Y/n]: "; read -r BP_CHOICE
+  if [[ ! "${BP_CHOICE:-Y}" =~ ^[Nn] ]]; then
+    bash scripts/protect-branches.sh || true
+  else
+    info "Skipped — protect later: bash scripts/protect-branches.sh"
+  fi
+else
+  [ "$CI_GENERATED" = 1 ] && info "Branch protection needs gh authenticated — later: gh auth login && bash scripts/protect-branches.sh"
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════
 # STEP 14 — JIRA VALIDATION (live, only when credentials were captured)
 # ═════════════════════════════════════════════════════════════════════════════
 if [ "$TRACKER_TYPE" = "jira" ] && [ -n "$JIRA_TOKEN_IN" ]; then
@@ -1195,6 +1256,8 @@ STEP_N=$((STEP_N + 1))
 echo "  $STEP_N. Commit the setup:      git add -A && git commit -m \"chore: install devpilot\""
 STEP_N=$((STEP_N + 1))
 echo "  $STEP_N. Optional (deploys):    edit .devpilot/config.sh → DEV/SIT/UAT/PRD URLs + GitHub secrets"
+STEP_N=$((STEP_N + 1))
+echo "  $STEP_N. Optional (alerts):     set NOTIFY_WEBHOOK in .devpilot/config.sh → pinged on sprint DONE / QA BLOCKED"
 echo ""
 echo "  Full walkthrough + recommendations: docs/setup-guide.md"
 echo ""

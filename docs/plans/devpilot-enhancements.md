@@ -326,6 +326,19 @@ how models map to the team.
 | Professional setup design | branded banner, boxed step headers with progress (1/8…8/8), and a full **Review & confirm** summary before any file is written (cancel = nothing touched); tracker-aware next steps |
 | Tests | 129 assertions — test-guard behavior (gap → strict fail, spec → pass, docs exempt), doctor/dp-config/installer wiring |
 
+## Follow-up enhancements (round 7) — production-ready operations — ✅ done
+
+| Item | Artifacts |
+|------|-----------|
+| Generated host-project CI | `scripts/generate-ci.sh` → `.github/workflows/devpilot-ci.yml` — stack-aware (Node/.NET/Python/Go/Java) gate ladder on every PR: build → tests → **test-guard strict** → dependency audit; offered by the wizard, `--force` to regenerate |
+| Branch protection | `scripts/protect-branches.sh` — requires the `devpilot-ci` check, blocks force-pushes/deletions on `base_branch` + `main`; `merge_policy: pr-only` adds 1 required review; graceful without gh |
+| Non-interactive install | `install.sh --defaults` / `-y` — accepts every recommendation (works piped or from disk); answers-file piping (`bash install.sh < answers.txt`) now works without env tricks; re-exec guard fixed to never re-download over a local run |
+| Notifications | `scripts/notify.sh <event> <msg>` — webhook (Slack/Teams/Discord-shape) + optional email, always logs to `docs/tasks/notifications.log`, never blocks; `NOTIFY_WEBHOOK` in config template; wired into `dp-build` (DONE/BLOCKED) and `dp-autofix` (merged/escalated) |
+| Harness fix | `assert_contains` switched to pure-bash substring — `printf big \| grep -q` died of SIGPIPE under pipefail when the match was early (source of two transient test failures) |
+| README | non-interactive install, generated CI + protection, notifications, 41 skills |
+
+Tests: 151 assertions ×3 consecutive green runs.
+
 ---
 
 ## Risks / notes
