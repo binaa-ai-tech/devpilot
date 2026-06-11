@@ -56,8 +56,13 @@ Write tests that would catch these mutations:
    # .NET
    dotnet test
    ```
-7. Write QA report to `docs/qa/<slug>.md` using `.devpilot/templates/team/qa-report.md`
-8. Verify `definition-of-done.md` QA DoD — all items checked
+7. Run the test guard — a PASS verdict requires it clean (or every gap exempted
+   with a justification recorded in the QA report):
+   ```bash
+   bash scripts/test-guard.sh
+   ```
+8. Write QA report to `docs/qa/<slug>.md` using `.devpilot/templates/team/qa-report.md`
+9. Verify `definition-of-done.md` QA DoD — all items checked
 
 ## Blocker Policy
 Mark as **BLOCKER** in the QA report when:

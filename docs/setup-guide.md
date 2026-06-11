@@ -88,18 +88,55 @@ How `bash scripts/ceo.sh` runs commands outside Claude Code.
 - **Ticket prefix** — e.g. `APP`; matches your Jira key if you use Jira.
 - **Base branch** — accept `develop` (created if missing). Use `main` only for trunk-based repos.
 - **Tracker** — **`local` (recommended to start)**: zero setup, full audit in `docs/tasks/`.
-  Switch to `github`/`jira` later by editing one config line.
+  Switch to `github`/`jira` later by editing one config line. Choosing `jira` starts the
+  guided Jira walkthrough below (skippable).
 - **Merge policy** — **`auto` (recommended)**: the team merges its own green PRs into
   `develop`; production (`/dp-release prd`) always requires you. Pick `pr-only` if every
   PR needs human eyes — e.g. a regulated codebase or a team new to DevPilot.
 - **Docs language** — BA/QA docs in your language (`en`, `ar`, …); code stays English.
 
+### Jira setup (tracker: `jira`) — exactly these steps
+
+1. **Create an API token** — https://id.atlassian.com/manage-profile/security/api-tokens
+   → *Create API token* → copy it (shown once).
+2. **Know your three values** — site URL (`https://<your-org>.atlassian.net`), your
+   Atlassian account **email**, and the token.
+3. **Enter them when the wizard asks** (after you choose tracker `jira`). The installer
+   stores them in `.devpilot/config.sh` (gitignored) and **validates the connection live**
+   at the end — HTTP 200 = working, 401 = wrong email/token, 403 = token lacks permission.
+4. **Ticket prefix = Jira project key.** The wizard's "ticket prefix" (e.g. `APP`) must
+   equal the key of the Jira project where Stories will be created
+   (Jira → Projects → your project → the short key).
+5. Skipped it, or rotating a token later? Same three values, anytime:
+   ```bash
+   bash scripts/devpilot-config.sh set jira_base_url=https://your-org.atlassian.net
+   bash scripts/devpilot-config.sh set jira_email=<email>
+   bash scripts/devpilot-config.sh set jira_api_token=<token>
+   bash scripts/devpilot-config.sh validate
+   ```
+
+**What Jira looks like during implementation** (so you know what to expect): `/dp-plan`
+writes Epic → Story with a self-contained brief; a build moves Stories
+`To Do → In Progress → Done` and posts exactly **two** comments per Story — a start
+comment and a DONE summary (detail lives in the PR and `docs/tasks/`). A QA **BLOCKED**
+comment is the only exception. Until credentials are valid, tracking falls back to
+local logs — nothing is lost; `/dp-status` shows the live board either way.
+
 ## 4 · After install — verify before first use
 
 ```bash
-/dp-status health        # or: bash scripts/doctor.sh — checks config, branches, engines
+/dp-status health        # or: bash scripts/doctor.sh — checks config, branches, engines,
+                         # model ids, agent sync, and missing values
+/dp-config fix           # interactively repairs anything the doctor flagged
 git add -A && git commit -m "chore: install devpilot"
 ```
+
+Two gates you should know from day one:
+- **Test guard** (highly recommended, on by default in the merge ladder) —
+  `bash scripts/test-guard.sh` proves every changed source file has a covering test;
+  merge gates run it strict. See `.devpilot/skills/test-guard.md`.
+- **Doctor** — run it whenever something feels off; every warning comes with the exact
+  fix command, and `/dp-config fix` applies them interactively.
 
 Then run your first task:
 

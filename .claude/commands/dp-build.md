@@ -122,6 +122,10 @@ If any Story is BLOCKED: fix and re-run QA before proceeding.
 Before opening the PR, the Team Lead runs the review gate: apply
 `.devpilot/skills/code-review.md`, plus `.devpilot/skills/security-scan.md` over auth/input
 changes and `.devpilot/skills/definition-of-done.md` — never merge around a 🔴 BLOCKER.
+Run the test guard strict — a gap blocks the PR (`.devpilot/skills/test-guard.md`):
+```bash
+STRICT=1 bash scripts/test-guard.sh
+```
 The merge itself follows the `.devpilot/skills/auto-merge.md` gate ladder; if CI goes red
 after the PR opens, `/dp-autofix <PR>` drives it back to green within bounded fix cycles.
 

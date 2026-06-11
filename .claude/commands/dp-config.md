@@ -1,8 +1,35 @@
 # /dp-config — Configure DevPilot
 
-Usage: **/dp-config [section]** — `models [profile]` · `wizard` · `index` · empty = show current config.
+Usage: **/dp-config [section]** — `fix` · `models [profile]` · `wizard` · `index` · empty = show current config.
 
 One place to tune the engine. Reads `project.config.md` as the source of truth.
+
+## fix — repair missing or invalid configuration (re-config without reinstalling)
+Run the doctor, then fix every ⚠️/❌ that is a configuration problem — interactively,
+one value at a time. Never touch values that are already valid.
+
+1. ```bash
+   bash scripts/doctor.sh
+   ```
+2. For each flagged item, resolve it with the user (AskUserQuestion when a choice is
+   needed; sensible default offered):
+   - **Missing identity values** (`project_name`, `ticket_prefix`, `base_branch`,
+     `merge_policy`, `tracker.type`, `language`) → ask, then edit `project.config.md` in place.
+   - **Invalid/empty model tiers or `model_mode`** → offer the three modes; apply with
+     `bash scripts/model-profiles.sh apply|single …` (never hand-edit tiers if a command exists).
+   - **Agent frontmatter drift** → `bash scripts/model-profiles.sh sync-agents`.
+   - **Jira credentials incomplete** (`tracker: jira`) → walk the 3 steps: API token from
+     https://id.atlassian.com/manage-profile/security/api-tokens, then
+     ```bash
+     bash scripts/devpilot-config.sh set jira_base_url=https://<org>.atlassian.net
+     bash scripts/devpilot-config.sh set jira_email=<email>
+     bash scripts/devpilot-config.sh set jira_api_token=<token>
+     bash scripts/devpilot-config.sh validate     # live connection check
+     ```
+   - **gh missing/unauthenticated** with `tracker: github` or `merge_policy: auto` →
+     tell the user to run `gh auth login` (can't be done for them).
+3. Re-run `bash scripts/doctor.sh` and report before/after. Stop when clean or when the
+   only remaining items need something outside the repo (an install, a login).
 
 ## (no arg) — show config
 Summarize `project.config.md`: project name, base branch, tracker, active agents,

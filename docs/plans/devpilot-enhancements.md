@@ -315,6 +315,17 @@ how models map to the team.
 | Post-install UX | "Next steps" replaces the unconditional Jira block — credentials only for the chosen tracker, then verify (`/dp-status health`) → commit → optional deploy URLs |
 | Tests | `tests/run.sh`: layer-model pin, `single` mode, dev-agent sync, model_mode idempotence, wizard/guide wiring (109 assertions) |
 
+## Follow-up enhancements (round 6) — test guard, Jira clarity, reconfig, pro setup — ✅ done
+
+| Item | Artifacts |
+|------|-----------|
+| Test guard (highly recommended) | `scripts/test-guard.sh` + `.devpilot/skills/test-guard.md` — every changed source file needs a covering test (stack-aware mapping, explicit exemptions); strict mode wired into the `auto-merge` ladder, `dp-build` review gate, `dp-autofix` local ladder, and the QA steps |
+| Model validation in doctor | `doctor.sh` checks `model_mode` validity, Claude tier id plausibility, agent-frontmatter drift (suggests `sync-agents`), and live opencode tier availability |
+| Config completeness + reconfig | `doctor.sh` flags missing identity values and incomplete Jira credentials with exact fix commands; new `/dp-config fix` repairs everything interactively and re-runs the doctor |
+| Jira clarity | wizard walks token creation (URL → email → hidden token) at tracker selection, stores to `.devpilot/config.sh`, validates the connection live post-install; setup guide gains a "Jira setup" section incl. what Jira looks like during implementation |
+| Professional setup design | branded banner, boxed step headers with progress (1/8…8/8), and a full **Review & confirm** summary before any file is written (cancel = nothing touched); tracker-aware next steps |
+| Tests | 129 assertions — test-guard behavior (gap → strict fail, spec → pass, docs exempt), doctor/dp-config/installer wiring |
+
 ---
 
 ## Risks / notes

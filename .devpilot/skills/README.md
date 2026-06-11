@@ -51,6 +51,7 @@ Each skill is a short, principle-driven playbook. **Token discipline: agents rea
 | Skill | Purpose |
 |-------|---------|
 | `test-case-design.md` | Derive test cases from ACs (boundaries, negatives, traceability) before code. |
+| `test-guard.md` | **Highly recommended** enforcement gate — no changed source file ships without a test (`scripts/test-guard.sh`). |
 | `e2e-testing.md` | A few critical journeys, made stable enough to gate a merge. |
 | `code-review.md` | Structured review gate with severity tags. |
 | `version-control.md` | Atomic commits + small, single-purpose, CI-green PRs. |

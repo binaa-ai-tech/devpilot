@@ -100,6 +100,26 @@ printf '{"tool_input":{"file_path":"anything.html"}}' | ( cd "$D" && bash script
 assert_code "$HN" "0" "no lock → allow"
 rm -rf "$D"
 
+echo "== test-guard.sh =="
+D=$(sandbox)
+( cd "$D" && git checkout -qb develop && echo base > base.txt && git add -A && git -c commit.gpgsign=false commit -qm base )
+( cd "$D" && git checkout -qb feature/x && printf 'export class FooService {}\n' > foo.service.ts \
+  && git add foo.service.ts && git -c commit.gpgsign=false commit -qm "feat: foo" )
+set +e
+OUT=$( cd "$D" && bash scripts/test-guard.sh 2>/dev/null ); RC=$?
+assert_code "$RC" "0" "report mode always exits 0"
+assert_contains "$OUT" "foo.service.ts" "guard flags the untested source file"
+( cd "$D" && STRICT=1 bash scripts/test-guard.sh >/dev/null 2>&1 ); RC=$?
+assert_code "$RC" "1" "STRICT=1 fails on a coverage gap"
+( cd "$D" && printf 'it("works")\n' > foo.service.spec.ts && git add foo.service.spec.ts \
+  && git -c commit.gpgsign=false commit -qm "test: foo" )
+( cd "$D" && STRICT=1 bash scripts/test-guard.sh >/dev/null 2>&1 ); RC=$?
+assert_code "$RC" "0" "STRICT=1 passes once the spec exists"
+( cd "$D" && echo 'x' > notes.md && git add notes.md && git -c commit.gpgsign=false commit -qm "docs: notes" )
+( cd "$D" && STRICT=1 bash scripts/test-guard.sh >/dev/null 2>&1 ); RC=$?
+assert_code "$RC" "0" "docs/config changes are exempt"
+rm -rf "$D"
+
 echo "== doctor.sh / status.sh / metrics.sh / audit.sh run cleanly =="
 D=$(sandbox)
 set +e
@@ -277,6 +297,26 @@ assert_contains "$INSTALL" "frontend_dev:" "generated config includes dev role m
 assert_contains "$INSTALL" 'sync_model ".claude/agents/team-frontend.md"' "installer syncs dev agent frontmatter"
 assert_contains "$(cat "$REPO/project.config.md")" "model_mode:" "repo config documents model_mode"
 assert_contains "$(cat "$REPO/.claude/commands/dp-config.md")" "single <family>" "dp-config documents single-model switch"
+
+echo "== test-guard + doctor + jira/reconfig wiring (round 6) =="
+[ -f "$REPO/.devpilot/skills/test-guard.md" ] && ok "test-guard skill exists" || no "test-guard skill exists"
+assert_contains "$(cat "$REPO/.devpilot/skills/README.md")" "test-guard.md" "skills index lists test-guard"
+n=$(grep -c 'test-guard\.md' "$REPO/install.sh"); n=${n:-0}
+assert_eq "$([ "$n" -ge 2 ] && echo ok)" "ok" "installer ships test-guard.md in both lists"
+n=$(grep -c 'test-guard\.sh' "$REPO/install.sh"); n=${n:-0}
+assert_eq "$([ "$n" -ge 2 ] && echo ok)" "ok" "installer ships test-guard.sh in both lists"
+assert_contains "$(cat "$REPO/.devpilot/skills/auto-merge.md")" "test-guard" "auto-merge ladder runs the test guard"
+assert_contains "$(cat "$REPO/.claude/commands/dp-build.md")" "test-guard.sh" "dp-build review gate runs the test guard"
+assert_contains "$(cat "$REPO/.claude/commands/dp-autofix.md")" "test-guard.sh" "dp-autofix ladder runs the test guard"
+assert_contains "$(cat "$REPO/scripts/doctor.sh")" "model_mode" "doctor validates model_mode"
+assert_contains "$(cat "$REPO/scripts/doctor.sh")" "sync-agents" "doctor detects agent frontmatter drift"
+assert_contains "$(cat "$REPO/scripts/doctor.sh")" "/dp-config fix" "doctor points at the reconfig path"
+assert_contains "$(cat "$REPO/.claude/commands/dp-config.md")" "## fix" "dp-config has a fix mode"
+INSTALL=$(cat "$REPO/install.sh")
+assert_contains "$INSTALL" "Review — your configuration" "wizard shows a confirm summary before writing"
+assert_contains "$INSTALL" "id.atlassian.com/manage-profile/security/api-tokens" "wizard walks Jira token creation"
+assert_contains "$INSTALL" "Validating Jira connection" "wizard validates Jira live"
+assert_contains "$(cat "$REPO/docs/setup-guide.md")" "Jira setup" "setup guide covers Jira steps"
 
 echo ""
 echo "── Results: $PASS passed, $FAIL failed ──"

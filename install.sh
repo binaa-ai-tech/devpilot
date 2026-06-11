@@ -57,7 +57,12 @@ RESET="\033[0m"
 
 info()    { echo -e "${GREEN}[install]${RESET} $*"; }
 warn()    { echo -e "${YELLOW}[warn]${RESET} $*"; }
-section() { echo -e "\n${CYAN}${BOLD}$*${RESET}"; }
+section() {
+  echo ""
+  echo -e "${CYAN}${BOLD}╭──────────────────────────────────────────────────────────╮${RESET}"
+  printf  "${CYAN}${BOLD}│${RESET}  ${BOLD}%-56s${RESET}${CYAN}${BOLD}│${RESET}\n" "$*"
+  echo -e "${CYAN}${BOLD}╰──────────────────────────────────────────────────────────╯${RESET}"
+}
 ask()     { printf "${BOLD}%s${RESET}" "$*"; }
 
 # Track files that could not be installed, so a partial install is loud, not silent.
@@ -107,11 +112,11 @@ run_update() {
   RULE_SNIPPETS="angular.md react-vue.md dotnet.md node.md python.md go.md java.md sqlserver.md postgres-mysql.md"
   PROMPT_TEAM="ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md backend-agent.md qa-agent.md"
   TEMPLATE_TEAM="requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md jira-brief.md"
-  SKILLS="get-shit-done.md spec-first.md security-scan.md performance-review.md architecture-guard.md self-heal.md definition-of-done.md compact-context.md core-rules.md code-review.md test-strategy.md debug-method.md estimation-and-slicing.md tech-debt.md observability.md release-discipline.md status-reporting.md definition-of-ready.md incident-postmortem.md data-migration-safety.md api-design.md accessibility.md threat-modeling.md secrets-management.md data-privacy.md clean-code.md version-control.md refactoring.md ci-cd.md feature-flags.md reliability-slo.md dependency-management.md documentation.md i18n.md cost-awareness.md database-performance.md test-case-design.md e2e-testing.md performance-testing.md auto-merge.md README.md"
+  SKILLS="get-shit-done.md spec-first.md security-scan.md performance-review.md architecture-guard.md self-heal.md definition-of-done.md compact-context.md core-rules.md code-review.md test-strategy.md debug-method.md estimation-and-slicing.md tech-debt.md observability.md release-discipline.md status-reporting.md definition-of-ready.md incident-postmortem.md data-migration-safety.md api-design.md accessibility.md threat-modeling.md secrets-management.md data-privacy.md clean-code.md version-control.md refactoring.md ci-cd.md feature-flags.md reliability-slo.md dependency-management.md documentation.md i18n.md cost-awareness.md database-performance.md test-case-design.md e2e-testing.md performance-testing.md auto-merge.md test-guard.md README.md"
   CHECKLISTS="feature.md bugfix.md hotfix.md"
   CMDS="ceo.md dp-plan.md dp-sprint.md dp-build.md dp-release.md dp-rollback.md dp-hotfix.md dp-status.md dp-config.md dp-review-fix.md dp-test.md dp-autofix.md"
   AGENTS_LIST="team-lead.md team-ba.md team-frontend.md team-dotnet.md team-backend.md team-qa.md"
-  SCRIPTS="git-flow.sh new-feature.sh run-command.sh resolve-engine.sh model-profiles.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh create-jira-ticket.sh create-jira-epic.sh update-jira-status.sh update-jira-description.sh add-jira-comment.sh generate-project-index.sh generate-backlog-index.sh jira-sprint.sh link-jira-issues.sh md-to-adf.sh jira-describe.sh ceo.sh dp-plan.sh dp-sprint.sh dp-build.sh dp-release.sh dp-status.sh dp-config.sh"
+  SCRIPTS="git-flow.sh new-feature.sh run-command.sh resolve-engine.sh model-profiles.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh create-jira-ticket.sh create-jira-epic.sh update-jira-status.sh update-jira-description.sh add-jira-comment.sh generate-project-index.sh generate-backlog-index.sh jira-sprint.sh link-jira-issues.sh md-to-adf.sh jira-describe.sh ceo.sh dp-plan.sh dp-sprint.sh dp-build.sh dp-release.sh dp-status.sh dp-config.sh"
 
   info "Refreshing .devpilot/rules..."
   fetch ".devpilot/rules.md" ".devpilot/rules.md"
@@ -159,17 +164,23 @@ else
   DEVPILOT_VERSION=$(curl -fsSL "$REPO/VERSION" 2>/dev/null | tr -d '[:space:]' || echo "2.0.0")
 fi
 
-echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
-echo -e "${BOLD}  devpilot v${DEVPILOT_VERSION} — AI Team System Installer${RESET}"
-echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${RESET}"
 echo ""
-echo "  Project: $PROJECT_ROOT"
+echo -e "${CYAN}${BOLD}╔══════════════════════════════════════════════════════════╗${RESET}"
+echo -e "${CYAN}${BOLD}║${RESET}                                                          ${CYAN}${BOLD}║${RESET}"
+printf  "${CYAN}${BOLD}║${RESET}  ${BOLD}%-56s${RESET}${CYAN}${BOLD}║${RESET}\n" "devpilot v${DEVPILOT_VERSION} — AI Team System"
+printf  "${CYAN}${BOLD}║${RESET}  %-56s${CYAN}${BOLD}║${RESET}\n" "Plan → Build → Test → Merge → Release, on autopilot"
+echo -e "${CYAN}${BOLD}║${RESET}                                                          ${CYAN}${BOLD}║${RESET}"
+echo -e "${CYAN}${BOLD}╚══════════════════════════════════════════════════════════╝${RESET}"
+echo ""
+echo "  Project:  $PROJECT_ROOT"
+echo "  Setup:    8 short steps (~5 min) · Enter accepts the recommended default"
+echo "  Safety:   nothing is written until you confirm the summary at the end"
 echo ""
 
 # ═════════════════════════════════════════════════════════════════════════════
 # STEP 1 — SYSTEM SCAN
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 1 — Scanning installed AI tools..."
+section "STEP 1/8 · System scan — AI tools"
 
 HAS_CLAUDE=false
 HAS_OPENCODE=false
@@ -202,7 +213,7 @@ fi
 # ═════════════════════════════════════════════════════════════════════════════
 # STEP 2 — PROJECT STACK SCAN
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 2 — Scanning project stack..."
+section "STEP 2/8 · Project stack scan"
 
 DETECT_FRONTEND="none"
 DETECT_BACKEND="none"
@@ -250,7 +261,7 @@ fi
 # ═════════════════════════════════════════════════════════════════════════════
 # STEP 3 — AGENT TEAM
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 3 — Recommended agent team..."
+section "STEP 3/8 · Agent team"
 
 AGENT_FRONTEND="false"; AGENT_BACKEND="false"; AGENT_DB="false"; AGENT_INTEGRATION="false"
 [ "$DETECT_FRONTEND" != "none" ]  && AGENT_FRONTEND="true"
@@ -277,7 +288,7 @@ fi
 # ═════════════════════════════════════════════════════════════════════════════
 # STEP 4 — CODING ENGINE
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 4 — Coding engine (who writes the implementation code)..."
+section "STEP 4/8 · Coding engine — who writes the code"
 
 CODING_ENGINE="claude"
 FALLBACK_ENGINE="none"
@@ -333,7 +344,7 @@ info "Coding engine: $CODING_ENGINE  (fallback: $FALLBACK_ENGINE)"
 # ═════════════════════════════════════════════════════════════════════════════
 # STEP 5 — MODEL ASSIGNMENT (recommended tiers · one model · per-team)
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 5 — Model assignment..."
+section "STEP 5/8 · Model assignment"
 
 # NOTE: profile mappings mirror scripts/model-profiles.sh — keep them in sync.
 CL_OPUS="claude-opus-4-8"; CL_SONNET="claude-sonnet-4-6"; CL_HAIKU="claude-haiku-4-5-20251001"
@@ -580,7 +591,7 @@ ACTIVE_PROFILE="$CODING_PROFILE"
 # ═════════════════════════════════════════════════════════════════════════════
 # STEP 6 — TERMINAL RUNNER (which AI CLI runs /ceo from scripts/)
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 6 — Terminal runner (runs /ceo from bash scripts)..."
+section "STEP 6/8 · Terminal runner"
 
 RUNNER_CLI="claude"
 
@@ -613,7 +624,7 @@ info "Runner: $RUNNER_CLI"
 # ═════════════════════════════════════════════════════════════════════════════
 # STEP 7 — TEAM MODELS (derived from the model assignment in STEP 5)
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 7 — Team models..."
+section "STEP 7/8 · Team models — review"
 
 # tier2/tier3 stay as Copilot/free fallbacks. Fine-tune later: /dp-config wizard.
 info "BA        → $T1_BA"
@@ -625,7 +636,7 @@ info "Backend   → ${LM_BE:-$T1_BE_DEV}"
 # ═════════════════════════════════════════════════════════════════════════════
 # STEP 8 — PROJECT IDENTITY
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 8 — Project identity..."
+section "STEP 8/8 · Project identity & policies"
 
 DEFAULT_NAME=$(basename "$PROJECT_ROOT")
 ask "  Project name [$DEFAULT_NAME]: ";    read -r PROJECT_NAME;   [ -z "$PROJECT_NAME" ]   && PROJECT_NAME="$DEFAULT_NAME"
@@ -653,6 +664,33 @@ case "${TRK_CHOICE:-1}" in
 esac
 info "Tracker: $TRACKER_TYPE"
 
+# Jira: collect credentials NOW with a guided walkthrough (skippable) so the
+# tracker works on the first task instead of failing mid-implementation.
+JIRA_URL_IN=""; JIRA_EMAIL_IN=""; JIRA_TOKEN_IN=""
+if [ "$TRACKER_TYPE" = "jira" ]; then
+  echo ""
+  echo "  Jira connection — 3 quick steps (Enter on the URL skips; set later via"
+  echo "  bash scripts/devpilot-config.sh):"
+  echo "    1. Create an API token:  https://id.atlassian.com/manage-profile/security/api-tokens"
+  echo "    2. Site URL = where you open Jira, e.g. https://your-org.atlassian.net"
+  echo "    3. Email   = your Atlassian account email"
+  echo ""
+  echo "  ℹ Your ticket prefix '$TICKET_PREFIX' must equal the Jira PROJECT KEY"
+  echo "    (Jira → Projects → your project → the short key, e.g. APP)."
+  echo ""
+  ask "  Jira site URL [skip]: "; read -r JIRA_URL_IN
+  if [ -n "$JIRA_URL_IN" ]; then
+    JIRA_URL_IN="${JIRA_URL_IN%/}"
+    case "$JIRA_URL_IN" in http*) : ;; *) JIRA_URL_IN="https://$JIRA_URL_IN" ;; esac
+    ask "  Atlassian account email: "; read -r JIRA_EMAIL_IN
+    ask "  API token (input hidden): "; read -rs JIRA_TOKEN_IN; echo ""
+    [ -n "$JIRA_TOKEN_IN" ] && info "Jira credentials captured — validated live after install" \
+                            || warn "No token entered — set it later: bash scripts/devpilot-config.sh set jira_api_token=<token>"
+  else
+    warn "Jira setup skipped — the tracker falls back to local logs until credentials are set (see docs/setup-guide.md § Jira)"
+  fi
+fi
+
 echo ""
 echo "  Merge policy:"
 echo "    [1] auto     — devpilot squash-merges the PR into $BASE_BRANCH automatically"
@@ -671,9 +709,42 @@ ask "  Docs language (en, ar, fr, …) [en]: "; read -r LANG_IN; [ -n "$LANG_IN"
 info "Docs language: $DOC_LANGUAGE  (code stays English)"
 
 # ═════════════════════════════════════════════════════════════════════════════
+# REVIEW & CONFIRM — nothing has been written yet
+# ═════════════════════════════════════════════════════════════════════════════
+section "Review — your configuration"
+
+echo ""
+printf "  %-18s %s\n" "Project"        "$PROJECT_NAME  ($DETECTED_TYPE)"
+printf "  %-18s %s\n" "Ticket prefix"  "$TICKET_PREFIX"
+printf "  %-18s %s\n" "Base branch"    "$BASE_BRANCH"
+printf "  %-18s %s\n" "Coding engine"  "$CODING_ENGINE  (fallback: $FALLBACK_ENGINE)"
+printf "  %-18s %s\n" "Model mode"     "$MODEL_MODE  (profile: $ACTIVE_PROFILE)"
+printf "  %-18s %s\n" "BA / Lead / QA" "$T1_BA · $T1_LEAD · $T1_QA"
+printf "  %-18s %s\n" "Frontend / BE"  "${LM_FE:-$T1_FE_DEV} · ${LM_BE:-$T1_BE_DEV}"
+printf "  %-18s %s\n" "Runner"         "$RUNNER_CLI"
+printf "  %-18s %s\n" "Tracker"        "$TRACKER_TYPE$([ "$TRACKER_TYPE" = jira ] && [ -n "$JIRA_TOKEN_IN" ] && echo ' (credentials captured)')"
+printf "  %-18s %s\n" "Merge policy"   "$MERGE_POLICY"
+printf "  %-18s %s\n" "Docs language"  "$DOC_LANGUAGE"
+AGENT_LIST="BA · Lead · QA"
+[ "$AGENT_FRONTEND" = "true" ]    && AGENT_LIST="$AGENT_LIST · Frontend"
+[ "$AGENT_BACKEND" = "true" ]     && AGENT_LIST="$AGENT_LIST · Backend"
+[ "$AGENT_DB" = "true" ]          && AGENT_LIST="$AGENT_LIST · DB"
+[ "$AGENT_INTEGRATION" = "true" ] && AGENT_LIST="$AGENT_LIST · Integration"
+printf "  %-18s %s\n" "Team"           "$AGENT_LIST"
+echo ""
+echo "  Everything above is changeable later — /dp-config (or edit project.config.md)."
+echo ""
+ask "  Install with these settings? [Y/n]: "; read -r CONFIRM_INSTALL
+if [[ "${CONFIRM_INSTALL:-Y}" =~ ^[Nn] ]]; then
+  echo ""
+  warn "Cancelled — nothing was written. Re-run: bash install.sh"
+  exit 0
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════
 # STEP 9 — DOWNLOAD / COPY FILES
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 9 — Installing devpilot files..."
+section "Installing devpilot files..."
 
 # Create directory structure
 mkdir -p .devpilot/{prompts/team,templates/team,checklists,skills,config}
@@ -721,9 +792,9 @@ else
 # =============================================================================
 
 # ── Jira ─────────────────────────────────────────────────────────────────────
-JIRA_BASE_URL="https://YOUR-ORG.atlassian.net"
-JIRA_EMAIL="your-email@example.com"
-JIRA_API_TOKEN='YOUR_JIRA_API_TOKEN'
+JIRA_BASE_URL="${JIRA_URL_IN:-https://YOUR-ORG.atlassian.net}"
+JIRA_EMAIL="${JIRA_EMAIL_IN:-your-email@example.com}"
+JIRA_API_TOKEN='${JIRA_TOKEN_IN:-YOUR_JIRA_API_TOKEN}'
 JIRA_PROJECT_KEY="$CFG_JIRA_KEY"        # e.g. MSK, APP, PRJ
 
 # ── Git / GitHub ──────────────────────────────────────────────────────────────
@@ -788,7 +859,7 @@ for f in get-shit-done.md spec-first.md security-scan.md performance-review.md a
          definition-of-ready.md incident-postmortem.md data-migration-safety.md api-design.md accessibility.md \
          threat-modeling.md secrets-management.md data-privacy.md clean-code.md version-control.md refactoring.md ci-cd.md feature-flags.md reliability-slo.md dependency-management.md documentation.md \
          i18n.md cost-awareness.md database-performance.md \
-         test-case-design.md e2e-testing.md performance-testing.md auto-merge.md \
+         test-case-design.md e2e-testing.md performance-testing.md auto-merge.md test-guard.md \
          README.md; do
   fetch ".devpilot/skills/$f" ".devpilot/skills/$f"
 done
@@ -837,7 +908,7 @@ fi
 # scripts/
 info "Installing scripts/..."
 for f in git-flow.sh new-feature.sh run-command.sh resolve-engine.sh model-profiles.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh \
-          run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh session-start.sh \
+          run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh session-start.sh \
           doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh \
           deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh \
           create-jira-ticket.sh create-jira-epic.sh \
@@ -877,7 +948,7 @@ fi
 # ═════════════════════════════════════════════════════════════════════════════
 # STEP 10 — WRITE project.config.md
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 10 — Writing project.config.md..."
+section "Writing project.config.md..."
 
 cat > project.config.md << CONFIGEOF
 # Project Configuration
@@ -1028,7 +1099,7 @@ fi
 # ═════════════════════════════════════════════════════════════════════════════
 # STEP 12 — SYNC AGENT FRONTMATTER
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 11 — Syncing Claude agent models..."
+section "Syncing agent models..."
 
 sync_model() {
   local file="$1" model="$2"
@@ -1045,7 +1116,7 @@ sync_model ".claude/agents/team-dotnet.md"   "$T1_BE_DEV"
 # ═════════════════════════════════════════════════════════════════════════════
 # STEP 13 — GIT BRANCH SETUP
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 12 — Git branch setup..."
+section "Git branch setup..."
 
 if git rev-parse --git-dir > /dev/null 2>&1; then
   CURRENT_BRANCH=$(git branch --show-current 2>/dev/null || echo "main")
@@ -1060,6 +1131,25 @@ if git rev-parse --git-dir > /dev/null 2>&1; then
 
   # Install the Conventional-Commits commit-msg hook.
   bash scripts/install-git-hooks.sh 2>/dev/null || warn "Could not install git hooks — run: bash scripts/install-git-hooks.sh"
+fi
+
+# ═════════════════════════════════════════════════════════════════════════════
+# STEP 14 — JIRA VALIDATION (live, only when credentials were captured)
+# ═════════════════════════════════════════════════════════════════════════════
+if [ "$TRACKER_TYPE" = "jira" ] && [ -n "$JIRA_TOKEN_IN" ]; then
+  section "Validating Jira connection..."
+  # Re-installs keep an existing config.sh — push the captured values into it
+  # so validation tests what was just entered, not stale credentials.
+  bash scripts/devpilot-config.sh set "jira_base_url=$JIRA_URL_IN"   >/dev/null 2>&1 || true
+  bash scripts/devpilot-config.sh set "jira_email=$JIRA_EMAIL_IN"    >/dev/null 2>&1 || true
+  bash scripts/devpilot-config.sh set "jira_api_token=$JIRA_TOKEN_IN" >/dev/null 2>&1 || true
+  if bash scripts/devpilot-config.sh validate; then
+    info "Jira connection OK — tickets will be created in project '$TICKET_PREFIX'"
+  else
+    warn "Jira validation FAILED — fix and re-test with:"
+    warn "  bash scripts/devpilot-config.sh set jira_api_token=<token>"
+    warn "  bash scripts/devpilot-config.sh validate"
+  fi
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════
@@ -1133,8 +1223,9 @@ fi
 
 echo "  ── Change config anytime ───────────────────────────────"
 echo ""
+echo "    /dp-config fix          — doctor finds missing/invalid config, fixes interactively"
 echo "    /dp-config wizard       — re-run engine + model wizard"
-echo "    /dp-config models       — switch coding engine / per-layer models"
+echo "    /dp-config models       — switch model mode / profile / per-layer models"
 echo "    Edit project.config.md directly"
 echo ""
 

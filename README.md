@@ -327,6 +327,8 @@ The lifecycle is gated end to end — **Ready → built → tested → reviewed 
 - **QA verdict** — test cases derived per AC (`test-case-design.md`, traceability matrix in the QA
   report); every acceptance criterion has a test; perf budgets proven when in scope
   (`performance-testing.md`); PASS or BLOCKED.
+- **Test guard** — `scripts/test-guard.sh` (skill: `test-guard.md`): every changed source file has
+  a covering test or a justified exemption; merge gates run it strict (`STRICT=1`) — a gap blocks the PR.
 - **Auto-merge ladder** — `auto-merge.md`: build/tests/audit/review/QA/CI all green **on the PR head**
   before a robot merges; `/dp-autofix` fixes red CI within a bounded loop (max 3 push-fix cycles),
   then escalates instead of looping forever.

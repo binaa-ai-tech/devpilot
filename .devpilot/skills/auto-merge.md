@@ -6,8 +6,10 @@ that merges on "probably fine" is a liability, not a teammate.
 
 ## The gate ladder — all green, in order
 1. **Build + lint + typecheck** for every touched stack.
-2. **Full test suite** — including new tests for the change (`test-strategy.md`);
-   a green suite with no test for the new behavior fails this gate.
+2. **Full test suite + test guard** — the suite is green AND
+   `STRICT=1 bash scripts/test-guard.sh` passes (`test-guard.md`): every changed
+   source file has a covering test or a justified exemption in the PR body.
+   A green suite with no test for the new behavior fails this gate.
 3. **Dependency audit** — `bash scripts/audit.sh`; no new high/critical CVEs.
 4. **Review gate** — no open 🔴 (`code-review.md`); `security-scan.md` applied
    to any auth/input diff.

@@ -33,7 +33,8 @@ For each cycle:
    Review comments on the PR are `/dp-review-fix`'s job — leave them alone
    unless one is the cause of the red check.
 4. **Re-run the local ladder before pushing** — build, full test suite,
-   `bash scripts/audit.sh`. Push only a locally-green commit: `fix(ci): <what>`.
+   `STRICT=1 bash scripts/test-guard.sh`, `bash scripts/audit.sh`. Push only a
+   locally-green commit: `fix(ci): <what>`.
 5. Wait for CI on the new head; green → Step 2, red → next cycle.
 
 After 3 cycles still red → stop. Report the self-heal escalation template
