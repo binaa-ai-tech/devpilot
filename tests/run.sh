@@ -385,6 +385,15 @@ assert_contains "$(cat "$REPO/.claude/commands/dp-autofix.md")" "notify.sh" "dp-
 assert_contains "$(cat "$REPO/README.md")" "--defaults" "README documents non-interactive install"
 assert_contains "$(cat "$REPO/README.md")" "devpilot-ci" "README documents the generated CI"
 
+echo "== update-org.sh guards =="
+set +e
+OUT=$(PATH=/usr/bin:/bin bash "$REPO/scripts/update-org.sh" some-org 2>&1); RC=$?
+assert_code "$RC" "1" "update-org without gh exits 1"
+assert_contains "$OUT" "gh CLI" "update-org explains the gh requirement"
+OUT=$(bash "$REPO/scripts/update-org.sh" 2>&1); RC=$?
+assert_code "$RC" "1" "update-org without an org exits 1 with usage"
+assert_contains "$(cat "$REPO/scripts/update-org.sh")" "--update" "update-org uses --update, never delete+reinstall"
+
 echo "== token-lean wiring (round 8) =="
 assert_contains "$(cat "$REPO/.claude/commands/dp-plan.md")" "scope.sh --save" "dp-plan saves the scope once"
 assert_contains "$(cat "$REPO/.claude/commands/dp-build.md")" "-scope.md" "dp-build reuses the saved scope"
