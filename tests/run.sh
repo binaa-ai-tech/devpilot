@@ -122,6 +122,33 @@ assert_code "$RC" "0" "STRICT=1 passes once the spec exists"
 assert_code "$RC" "0" "docs/config changes are exempt"
 rm -rf "$D"
 
+echo "== two-tier index + scope cache (token-lean) =="
+D=$(mktemp -d); git -C "$D" init -q; git -C "$D" config user.email t@t.t; git -C "$D" config user.name t; git -C "$D" config commit.gpgsign false
+mkdir -p "$D/scripts" "$D/src/app/header" "$D/src/orders"
+cp "$REPO"/scripts/generate-project-index.sh "$REPO"/scripts/scope.sh "$D/scripts/"
+printf 'stack:\n  frontend: angular\n  backend: dotnet\n  database: sqlserver\n' > "$D/project.config.md"
+echo 'export class LogoutComponent {}' > "$D/src/app/header/logout.component.ts"
+echo 'public class OrdersController {}' > "$D/src/orders/OrdersController.cs"
+( cd "$D" && git add -A && git commit -qm init )
+OUT=$( cd "$D" && bash scripts/generate-project-index.sh )
+assert_contains "$OUT" "shard(s)" "index builds map + shards"
+[ -f "$D/docs/index/frontend.md" ] && ok "frontend shard written" || no "frontend shard written"
+MAPLINES=$(wc -l < "$D/docs/project-index.md" | tr -d ' ')
+assert_eq "$([ "$MAPLINES" -lt 100 ] && echo ok)" "ok" "map stays small (<100 lines, got $MAPLINES)"
+assert_contains "$(cat "$D/docs/project-index.md")" "scope.sh" "map instructs scope.sh, not wholesale reads"
+OUT=$( cd "$D" && bash scripts/generate-project-index.sh )
+assert_contains "$OUT" "skipped" "unchanged repo → hash-gated skip"
+( cd "$D" && echo 'export class NewComponent {}' > src/app/new.component.ts && git add -A && git commit -qm "feat: new" )
+OUT=$( cd "$D" && bash scripts/generate-project-index.sh )
+assert_contains "$OUT" "written" "content change → regenerates"
+# scope finds entries from the shards, saves a reusable per-task scope
+OUT=$( cd "$D" && bash scripts/scope.sh --save logout-task "add a logout button to the header" )
+assert_contains "$OUT" "logout.component.ts" "scope ranks shard entries"
+[ -f "$D/docs/tasks/logout-task-scope.md" ] && ok "scope saved per task" || no "scope saved per task"
+OUT=$( cd "$D" && bash scripts/scope.sh --save logout-task "add a logout button to the header" )
+assert_contains "$OUT" "cached scope" "second call is a cache hit (no re-derivation)"
+rm -rf "$D"
+
 echo "== generate-ci.sh / protect-branches.sh / notify.sh =="
 D=$(sandbox)
 ( cd "$D" && printf 'base_branch: develop\nstack:\n  frontend: react\n  backend: node\n' > project.config.md && touch package.json )
@@ -357,6 +384,16 @@ assert_contains "$(cat "$REPO/.claude/commands/dp-build.md")" "notify.sh" "dp-bu
 assert_contains "$(cat "$REPO/.claude/commands/dp-autofix.md")" "notify.sh" "dp-autofix notifies on merge/escalation"
 assert_contains "$(cat "$REPO/README.md")" "--defaults" "README documents non-interactive install"
 assert_contains "$(cat "$REPO/README.md")" "devpilot-ci" "README documents the generated CI"
+
+echo "== token-lean wiring (round 8) =="
+assert_contains "$(cat "$REPO/.claude/commands/dp-plan.md")" "scope.sh --save" "dp-plan saves the scope once"
+assert_contains "$(cat "$REPO/.claude/commands/dp-build.md")" "-scope.md" "dp-build reuses the saved scope"
+assert_contains "$(cat "$REPO/.devpilot/prompts/team/ba-agent.md")" "scope.sh --save" "ba-agent saves the scope"
+assert_contains "$(cat "$REPO/CLAUDE.md")" "Two-tier index" "CLAUDE.md documents the two-tier index"
+assert_contains "$(cat "$REPO/scripts/install-git-hooks.sh")" "post-merge" "git hooks refresh the index after merges"
+assert_contains "$INSTALL" "docs/index/.state" "installer gitignores the index state file"
+n=$(grep -c -- '-mmin' "$REPO/.claude/commands/dp-plan.md" || true); n=${n:-0}
+assert_eq "$n" "0" "time-based freshness check removed from dp-plan"
 
 echo ""
 echo "── Results: $PASS passed, $FAIL failed ──"

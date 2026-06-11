@@ -339,6 +339,24 @@ how models map to the team.
 
 Tests: 151 assertions ×3 consecutive green runs.
 
+## Follow-up enhancements (round 8) — O(1) token scoping per task — ✅ done
+
+Problem: every task/plan loaded the whole `docs/project-index.md` into context
+(grows with repo size), freshness was time-based (2h) so post-merge staleness
+pushed agents back to broad scanning, and every phase re-derived the same scope.
+
+| Item | Artifacts |
+|------|-----------|
+| Two-tier index | `generate-project-index.sh` now writes a **small bounded map** (`docs/project-index.md`: top-level layout, shard counts, entry points — <100 lines at any repo size) + **detail shards** (`docs/index/*.md`) that are grep targets for `scope.sh`, never context |
+| Hash-gated freshness | regeneration keyed on HEAD + tracked-file checksum + untracked-source count (`docs/index/.state`, gitignored); unchanged repo → free no-op; `--force` to override; SessionStart hook simplified; new post-merge/post-checkout git hooks refresh in background |
+| Scope once, reuse everywhere | `scope.sh --save <slug>` greps map+shards, saves the ranked list to `docs/tasks/<slug>-scope.md`; a cached scope newer than the index is a pure cache hit; hand-maintained indexes (no `.state`) are never clobbered |
+| Consumer wiring | `dp-plan` Step 2 computes scope once (`--save $SLUG`), `dp-build` lead phase reuses the saved file, BA agent fallback = grep one shard (never wholesale); CLAUDE.md + README token discipline rewritten around the O(1) contract |
+| Tests | 167 assertions — map size bound, shard creation, skip-on-unchanged, regen-on-change, scope ranking from shards, per-task cache hit, all consumer wiring |
+
+Net effect: per-task index context cost goes from O(repo files) to O(1)
+(~40-line map + top-8 scope lines), and the scope derivation is paid once per
+task instead of once per phase.
+
 ---
 
 ## Risks / notes

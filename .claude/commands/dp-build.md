@@ -71,6 +71,9 @@ done
 
 **Adopt Team Lead persona.** Read `.devpilot/prompts/team/lead-plan.md`. For each Story,
 write/refresh `docs/plans/<slug>.md` from the requirements (don't re-analyze from scratch).
+**Reuse the saved scope** — `docs/tasks/<slug>-scope.md` was computed at plan time; read it
+instead of re-running discovery or reading the project index. Only if it's missing:
+`bash scripts/scope.sh --save <slug> "<story summary>"`.
 Determine which layers (frontend / backend / DB / integration) each Story touches.
 
 ---

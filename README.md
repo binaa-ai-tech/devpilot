@@ -362,8 +362,15 @@ Designed to stay cheap in **any** repo it's installed into:
 - **On-demand skills** — agents read `core-rules.md` once and pull heavier skills only at the step
   that needs them (per core-rules rule #10). That's a **75–89% cut** in per-spawn skill load
   vs. pre-loading; the 838-word `self-heal` loads only on a real failure, not every spawn.
-- **Index-scoped reading** — `docs/project-index.md` + `docs/backlog/index.md` cap reading to the
-  3–8 relevant files; agents never scan the whole repo. The dedup brain reads only the top 1–3 candidate specs.
+- **Two-tier index** — `docs/project-index.md` is a small bounded map; per-file detail lives in
+  `docs/index/*.md` shards that `scope.sh` greps (deterministic bash, zero AI tokens) — agents read
+  the map + the top-8 ranked results, never the whole index. Context cost per task is O(1) at any repo size.
+- **Scope once, reuse everywhere** — `scope.sh --save <slug>` persists the ranked file list to
+  `docs/tasks/<slug>-scope.md` at plan time; lead/dev/QA phases reuse it instead of re-deriving.
+- **Hash-gated index freshness** — regeneration is keyed on git content (HEAD + file-list checksum),
+  refreshed automatically by post-merge/post-checkout hooks and the SessionStart hook: a free no-op
+  when nothing changed, always trustworthy so agents never broad-scan "just in case".
+- The dedup brain reads only `docs/backlog/index.md` + the top 1–3 candidate specs.
 - **Task-balanced models** — lite tiers (Haiku / gpt-4o-mini) handle simple work so tokens go to the hard parts.
 - **Compact handoffs** — agents get a brief (ACs + files to touch), not raw document dumps.
 

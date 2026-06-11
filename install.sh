@@ -966,7 +966,7 @@ done
 
 # .gitignore additions
 if [ -f ".gitignore" ]; then
-  for entry in ".devpilot/config.sh" ".devpilot/.scope-lock" ".env" ".env.local" "docs/fallback/"; do
+  for entry in ".devpilot/config.sh" ".devpilot/.scope-lock" ".env" ".env.local" "docs/fallback/" "docs/index/.state"; do
     grep -qF "$entry" .gitignore || echo "$entry" >> .gitignore
   done
 fi

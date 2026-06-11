@@ -43,3 +43,19 @@ EOF
 
 chmod +x "$HOOK"
 echo "✅ Installed commit-msg hook → .git/hooks/commit-msg (Conventional Commits enforced)"
+
+# post-merge / post-checkout: refresh the project index in the background so it
+# is always content-fresh and agents never broad-scan due to a stale index.
+# The generator is hash-gated, so these are near-free when nothing changed.
+for H in post-merge post-checkout; do
+  cat > "$HOOKS/$H" <<'EOF'
+#!/usr/bin/env bash
+# devpilot hook — keep docs/project-index.md fresh (hash-gated, background).
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null)" || exit 0
+[ -f "$ROOT/scripts/generate-project-index.sh" ] || exit 0
+( cd "$ROOT" && bash scripts/generate-project-index.sh >/dev/null 2>&1 & ) || true
+exit 0
+EOF
+  chmod +x "$HOOKS/$H"
+done
+echo "✅ Installed post-merge + post-checkout hooks → project index auto-refresh (hash-gated)"

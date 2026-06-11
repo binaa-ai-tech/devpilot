@@ -19,9 +19,8 @@ cd "$ROOT" 2>/dev/null || exit 0
 # Ensure devpilot scripts are runnable.
 chmod +x scripts/*.sh 2>/dev/null || true
 
-# Refresh the project index if it's missing or older than ~2h.
-if [ ! -f docs/project-index.md ] || ! find docs/project-index.md -mmin -120 2>/dev/null | grep -q .; then
-  bash scripts/generate-project-index.sh >/dev/null 2>&1 || true
-fi
+# Refresh the project index — hash-gated, so this is a free no-op when the
+# repo content is unchanged and an automatic rebuild when it isn't.
+bash scripts/generate-project-index.sh >/dev/null 2>&1 || true
 
 exit 0

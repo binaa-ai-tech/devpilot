@@ -47,8 +47,15 @@ reversible Jira links + one Story with combined ACs.
 
 ## Token discipline (works in any repo)
 
-- **Scope via indexes** — read `docs/project-index.md` + `docs/backlog/index.md` first;
-  cap codebase reading to 3–8 files. Never broad-scan.
+- **Two-tier index** — `docs/project-index.md` is a small bounded **map** (always safe to
+  read); the per-file detail lives in `docs/index/*.md` **shards** that are grepped by
+  `scope.sh`, never loaded into context. Per-task context cost stays O(1) at any repo size.
+- **Scope once, reuse everywhere** — `bash scripts/scope.sh --save <slug> "<task>"` ranks
+  the relevant files and saves to `docs/tasks/<slug>-scope.md`; lead/dev/QA phases reuse
+  that file instead of re-deriving. Cap codebase reading to the top 3–8 scoped files.
+- **Hash-gated freshness** — the index regenerates only when repo content actually changed
+  (HEAD + file-list signature; also via post-merge/checkout hooks), so it's always
+  trustworthy and never rebuilt or re-read "just in case". Never broad-scan.
 - **Read-once core** — `.devpilot/skills/core-rules.md` replaces re-reading long skill files.
 - Pull a specific skill from `.devpilot/skills/` only when the task needs it.
 
