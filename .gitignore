@@ -26,4 +26,11 @@ Desktop.ini
 .idea/
 .vscode/
 *.log
+
+# Auto-generated project index — regenerated on session-start + post-merge/
+# post-checkout hooks (scripts/generate-project-index.sh). Tracking it created
+# perpetual "modified" churn (wall-clock timestamp) and modify/modify merge
+# conflicts. It is regenerated everywhere, so it is not version-controlled.
+docs/project-index.md
 docs/index/.state
+docs/index/*.md
