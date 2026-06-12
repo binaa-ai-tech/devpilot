@@ -108,6 +108,10 @@ then execute each that exists, blocking until done:
 
 ## Step 5 — QA (whole sprint)
 
+**QA here is automated and is the only test gate** — the `team-qa` agent derives and runs the
+cases. Do **not** pause to ask the user to test or sign off before the PR/merge; that breaks the
+autonomous run (see `core-rules.md` #1 and `auto-merge.md`).
+
 Spawn `subagent_type: "team-qa"`:
 > Sprint: `<SPRINT>`. Verify every acceptance criterion across all Stories. Derive the
 > case matrix per AC with `.devpilot/skills/test-case-design.md`, apply

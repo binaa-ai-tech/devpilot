@@ -18,6 +18,16 @@ gray-zone dedup decision (Step 1). For the approve-first path instead, use
 > never do. **A P0/P1 bug is refused here** — `scripts/jira-guard.sh hotfix-gate`
 > (inside Step 1) blocks it and redirects to the expedited `/dp-hotfix` lane.
 
+> ## 🤖 Second invariant — fully autonomous, no human-in-the-loop before merge
+> `/ceo` is the **walk-away** path. It **stops for exactly one thing: a gray-zone dedup
+> question (Step 1).** It must **never** pause to ask you to *test, verify, review, or approve
+> before merging* — that is the single most common way the express run stalls. **QA is the
+> `team-qa` agent plus the automated suite** (Step 5), not your manual click; the merge gate is
+> `.devpilot/skills/auto-merge.md`, run by the agent. When `merge_policy: auto`, the run drives
+> the PR through the gate ladder and **merges itself** — it does not hand the PR back and wait.
+> The only legitimate stop short of merge is a **red gate the bounded auto-fix loop couldn't
+> clear** (escalate with the self-heal template) or `merge_policy: pr-only` (leave it for a human).
+
 **Engine flag** (optional leading token, defaults to `engines.coding` in `project.config.md`):
 `--claude` (Claude models) · `--opencode` (Claude plans; opencode/GitHub Copilot codes).
 Within the chosen family, the model is picked **per task** — power vs token-saving — by
