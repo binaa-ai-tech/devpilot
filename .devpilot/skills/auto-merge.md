@@ -4,6 +4,13 @@ Load when merging a PR autonomously (`merge_policy: auto`) or running
 `/dp-autofix`. Autonomy is earned per-merge by passing every gate — a robot
 that merges on "probably fine" is a liability, not a teammate.
 
+**Autonomous, not human-gated.** Under `merge_policy: auto` the gates below are the
+*entire* approval. The **QA verdict comes from the `team-qa` agent + the automated suite**,
+never from asking the user to test, verify, or click approve. Do **not** open the PR and hand
+it back for manual testing — pass the ladder and merge. The only stops are a **red gate the
+bounded auto-fix loop can't clear** (escalate) or one of the **never-auto-merge** conditions
+below. Waiting on human action when every gate is green is a defect, not caution.
+
 ## The gate ladder — all green, in order
 1. **Build + lint + typecheck** for every touched stack.
 2. **Full test suite + test guard** — the suite is green AND

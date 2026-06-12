@@ -108,6 +108,10 @@ then execute each that exists, blocking until done:
 
 ## Step 5 — QA (whole sprint)
 
+**QA here is automated and is the only test gate** — the `team-qa` agent derives and runs the
+cases. Do **not** pause to ask the user to test or sign off before the PR/merge; that breaks the
+autonomous run (see `core-rules.md` #1 and `auto-merge.md`).
+
 Spawn `subagent_type: "team-qa"`:
 > Sprint: `<SPRINT>`. Verify every acceptance criterion across all Stories. Derive the
 > case matrix per AC with `.devpilot/skills/test-case-design.md`, apply
@@ -135,22 +139,41 @@ STRICT=1 bash scripts/test-guard.sh
 The merge itself follows the `.devpilot/skills/auto-merge.md` gate ladder; if CI goes red
 after the PR opens, `/dp-autofix <PR>` drives it back to green within bounded fix cycles.
 
+> **🔌 Transport — `gh` CLI or GitHub MCP.** `open-pr.sh` uses `gh` when present and otherwise
+> just pushes the branch and prints a *compare URL* (exit 3) — it **cannot** create or merge the
+> PR without `gh`. In a `gh`-less environment (Claude Code on the web/remote), that means the
+> PR is neither opened nor auto-merged even though `merge_policy: auto` is set. **Finish the job
+> via the GitHub MCP tools in that case** — don't stop at the compare URL.
+
 ```bash
 git add docs/ && git commit -m "docs($SPRINT_SLUG): sprint plans, qa, review"
-PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$SPRINT: <n> stories" "docs/qa/${SPRINT_SLUG}.md")
+git push -u origin "$BRANCH" >/dev/null 2>&1 || true
+MERGE_POLICY=$(grep '^merge_policy:' project.config.md | head -1 | awk '{print $2}')
+PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$SPRINT: <n> stories" "docs/qa/${SPRINT_SLUG}.md"); PR_RC=$?
 END_TIME=$(date '+%Y-%m-%d %H:%M:%S')
 COMMITS=$(git log ${BASE_BRANCH}..HEAD --oneline | awk '{print $1}' | head -20 | tr '\n' ' ')
+echo "open-pr.sh rc=$PR_RC (0=created+merged · 3=opened/needs MCP · 1=error)"
+```
 
-if [ $? -eq 0 ]; then
-  for KEY in <STORY_KEYS>; do
-    bash scripts/update-jira-status.sh "$KEY" "Done"
-    bash scripts/add-jira-comment.sh "$KEY" "✅ Built in sprint $SPRINT [$END_TIME] · PR: $PR_URL"
-  done
-  bash scripts/notify.sh done "Sprint $SPRINT built — <N> stories · PR: $PR_URL"
-else
-  echo "⚠️  Auto-merge failed — merge $PR_URL manually, then mark the sprint's Stories Done."
-  bash scripts/notify.sh blocked "Sprint $SPRINT: auto-merge failed — manual merge needed: $PR_URL"
-fi
+Resolve the PR to a terminal state by exit code — **only mark Stories Done after a confirmed merge:**
+
+- **`PR_RC = 0`** — `gh` created and squash-merged it. Done.
+- **`PR_RC = 3`** — `open-pr.sh` could not create/merge (no `gh`, or merge failed). Use the
+  **GitHub MCP tools**: `mcp__github__create_pull_request` (if `$PR_URL` is a compare URL, i.e.
+  the PR isn't open yet) into `$BASE_BRANCH`; then, when `MERGE_POLICY = auto`, run the
+  `auto-merge.md` ladder and `mcp__github__merge_pull_request` with `merge_method: "squash"`.
+  Confirm it returned `merged: true`. If `MERGE_POLICY = pr-only`, leave it open for a human.
+- **`PR_RC = 1`** — hard error; report it, do not mark Stories Done.
+
+```bash
+# After a CONFIRMED merge (gh exit 0, or MCP merged:true):
+for KEY in <STORY_KEYS>; do
+  bash scripts/update-jira-status.sh "$KEY" "Done"
+  bash scripts/add-jira-comment.sh "$KEY" "✅ Built in sprint $SPRINT [$END_TIME] · PR: $PR_URL"
+done
+bash scripts/notify.sh done "Sprint $SPRINT built — <N> stories · PR: $PR_URL"
+# If still unmerged (pr-only, or a red gate the ladder couldn't clear):
+#   bash scripts/notify.sh blocked "Sprint $SPRINT: PR open, not merged — $PR_URL"
 ```
 
 ---
