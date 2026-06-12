@@ -7,6 +7,16 @@ sprint, build it, open a PR into `develop`. It stops only to ask **one** thing �
 gray-zone dedup decision (Step 1). For the approve-first path instead, use
 `/dp-plan` → `/dp-sprint` → `/dp-build`.
 
+> ## 🚦 Non-negotiable invariant — the tracker comes first
+> **Every `/ceo` run creates the work in the tracker BEFORE a single line of code.**
+> No matter the intent — bug, issue, hotfix, feature, enhancement — the PLAN phase
+> (Step 1) MUST land a Jira issue (Epic→Story) and you MUST capture its key. **New
+> features additionally get a sprint** (Step 2). It is a hard error to branch, edit
+> files, or spawn a build agent before `<STORY_KEYS>` exists — Step 1 ends with
+> `scripts/jira-guard.sh assert-key`, which fails the run if the ceremony was skipped.
+> Being "efficient" by jumping straight to the code fix is the one thing `/ceo` must
+> never do.
+
 **Engine flag** (optional leading token, defaults to `engines.coding` in `project.config.md`):
 `--claude` (Claude models) · `--opencode` (Claude plans; opencode/GitHub Copilot codes).
 Within the chosen family, the model is picked **per task** — power vs token-saving — by
@@ -14,11 +24,16 @@ Within the chosen family, the model is picked **per task** — power vs token-sa
 
 ---
 
-## Step 0 — Run mode
+## Step 0 — Run mode + tracker preflight
 
 ```bash
 eval "$(bash scripts/run-mode.sh "$ARGUMENTS")"   # $RUN_MODE + $TASK (flag stripped)
 echo "🎛  Run mode: $RUN_MODE"
+
+# Hard gate #1: the tracker must be able to accept the issue. If Jira is the
+# selected tracker but unconfigured, STOP and surface the fix — do not silently
+# fall through to a code-only run.
+bash scripts/jira-guard.sh check || exit 1
 ```
 Use `$TASK` as the description from here on.
 
@@ -27,21 +42,34 @@ Use `$TASK` as the description from here on.
 ## Step 1 — PLAN (delegates to the /dp-plan brain)
 
 Execute **`/dp-plan` Steps 0–6** on `$TASK`:
-- classify intent + slug
+- classify intent + slug (carry `$INTENT` forward — it decides Step 2)
 - refresh project index + backlog index (token-lean scoping)
 - run the **dedup ladder** → DUPLICATE / FOLD-IN / RELATED / UNRELATED
 - write the spec to git + the Epic→Story into Jira
 
 **Only stop** if the dedup verdict lands in the gray band — ask the user, then continue.
-Capture the resulting Story key(s) as `<STORY_KEYS>`.
+Capture the resulting Story key(s) as `<STORY_KEYS>` (every verdict resolves to at least
+one key: a new Story for RELATED/UNRELATED, or the existing/target key for FOLD-IN/DUPLICATE).
+
+**Hard gate #2 — do not advance without a tracker issue:**
+```bash
+bash scripts/jira-guard.sh assert-key <STORY_KEYS> || exit 1
+```
+If this fails, the ceremony was skipped — go back and create the issue. **Never** continue
+to Step 2/3 (sprint or build) without it.
 
 ---
 
 ## Step 2 — SPRINT (auto, single-sprint)
 
-Put the new Story (or Stories, if `$TASK` fanned out) into one sprint:
+A **new feature or enhancement is delivered through a sprint** — create one and assign the
+Story so the build is tracked the same way `/dp-sprint` would. Bugs/issues/hotfixes use the
+same single-sprint container so `/dp-build` (Step 3) has a sprint to resolve; the difference
+is only intent, the Jira issue from Step 1 is mandatory either way.
+
 ```bash
-SPRINT_ID=$(bash scripts/jira-sprint.sh create "ceo-$(date +%Y%m%d-%H%M)")
+# Name the sprint by intent so the board reads clearly.
+SPRINT_ID=$(bash scripts/jira-sprint.sh create "ceo-${INTENT:-task}-$(date +%Y%m%d-%H%M)")
 bash scripts/jira-sprint.sh assign "$SPRINT_ID" <STORY_KEYS>
 ```
 No run-order question — there is exactly one sprint.

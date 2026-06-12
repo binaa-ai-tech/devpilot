@@ -17,6 +17,10 @@ Read `project.config.md`. Extract `project_name`, `ticket_prefix`, `base_branch`
 ```bash
 START_TIME=$(date '+%Y-%m-%d %H:%M:%S')
 BASE_BRANCH=$(grep '^base_branch:' project.config.md | head -1 | sed 's/base_branch:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
+
+# The output of planning is a tracker issue — confirm the tracker can accept one
+# before doing the work. If Jira is selected but unconfigured, STOP with the fix.
+bash scripts/jira-guard.sh check || exit 1
 ```
 
 If `$ARGUMENTS` is a Jira key (matches `^[A-Z]+-[0-9]+$`), fetch that issue's summary
@@ -144,6 +148,13 @@ Brief: docs/tasks/${KEY}-brief.md · Spec: docs/requirements/<SLUG>.md
 
 The Jira description is now a complete implementation brief; the git spec remains the
 authoritative source it links to. Keep the issue in **To Do** — planning does not start work.
+
+**Gate — planning is not done until the issue exists.** Every verdict resolves to a `KEY`
+(new for RELATED/UNRELATED, existing/target for FOLD-IN/DUPLICATE). Assert it before claiming
+the plan is complete; an empty `KEY` means the tracker write was skipped — go back and create it:
+```bash
+bash scripts/jira-guard.sh assert-key "$KEY" || exit 1
+```
 
 ---
 

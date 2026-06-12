@@ -13,7 +13,7 @@ INTAKE → READY → SPRINT → BUILD → VERIFY → MERGE → RELEASE → OPERA
 
 | # | Phase | Driven by | Exit gate (must hold to advance) |
 |---|-------|-----------|----------------------------------|
-| 1 | **Intake** | `/dp-plan` (or `/ceo`) | Item is classified, **deduped** against `docs/backlog/index.md`, and written as Epic→Story with a self-contained brief. |
+| 1 | **Intake** | `/dp-plan` (or `/ceo`) | Item is classified, **deduped** against `docs/backlog/index.md`, and written as Epic→Story with a self-contained brief. **Hard-gated by `scripts/jira-guard.sh assert-key`** — no branch/code until a tracker key exists. |
 | 2 | **Ready** | BA | `definition-of-ready.md` — clear, testable ACs; sized & sliced (`estimation-and-slicing.md`); no open questions. |
 | 3 | **Sprint** | `/dp-sprint` | Only READY Stories enter; sprint has a goal and a recommended run order. |
 | 4 | **Build** | `/dp-build` | One branch per sprint; layer agents stay in scope (`scope-guard`); every commit conventional, build never left red (`core-rules.md`). |
