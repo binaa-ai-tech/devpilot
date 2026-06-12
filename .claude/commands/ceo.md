@@ -60,19 +60,27 @@ to Step 2/3 (sprint or build) without it.
 
 ---
 
-## Step 2 — SPRINT (auto, single-sprint)
+## Step 2 — SPRINT (routed by intent)
 
-A **new feature or enhancement is delivered through a sprint** — create one and assign the
-Story so the build is tracked the same way `/dp-sprint` would. Bugs/issues/hotfixes use the
-same single-sprint container so `/dp-build` (Step 3) has a sprint to resolve; the difference
-is only intent, the Jira issue from Step 1 is mandatory either way.
+The Jira issue from Step 1 is mandatory for every intent; **how it reaches a sprint depends
+on the intent:**
 
-```bash
-# Name the sprint by intent so the board reads clearly.
-SPRINT_ID=$(bash scripts/jira-sprint.sh create "ceo-${INTENT:-task}-$(date +%Y%m%d-%H%M)")
-bash scripts/jira-sprint.sh assign "$SPRINT_ID" <STORY_KEYS>
-```
-No run-order question — there is exactly one sprint.
+- **`feature` / `enhancement` / `task` / `requirement`** → a new feature ships **through its
+  own sprint**. Create one and assign the Story:
+  ```bash
+  SPRINT_ID=$(bash scripts/jira-sprint.sh create "ceo-${INTENT}-$(date +%Y%m%d-%H%M)")
+  bash scripts/jira-sprint.sh assign "$SPRINT_ID" <STORY_KEYS>
+  ```
+- **`bug` / `issue`** → a defect **joins the active sprint**, it does not spawn a new one. If
+  there's no active sprint, fall back to a single bugfix sprint so Step 3 has one to resolve:
+  ```bash
+  SPRINT_ID=$(bash scripts/jira-sprint.sh active)
+  [ -z "$SPRINT_ID" ] && SPRINT_ID=$(bash scripts/jira-sprint.sh create "ceo-bugfix-$(date +%Y%m%d-%H%M)")
+  bash scripts/jira-sprint.sh assign "$SPRINT_ID" <STORY_KEYS>
+  ```
+  (P0/P1 production-critical bugs belong on `/dp-hotfix`, not `/ceo` — see `.devpilot/process.md`.)
+
+No run-order question — there is exactly one sprint in play.
 
 ---
 

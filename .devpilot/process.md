@@ -36,6 +36,10 @@ A failed gate sends work **back one phase**, never forward with a TODO.
 ## Cross-cutting standards (always on)
 
 - **Spec-first** — every change traces to a verifiable AC (`spec-first.md`).
+- **Defect standard** — a bug is a single typed `Bug` issue (no Epic→Story), routed by
+  severity: **P0/P1 → `/dp-hotfix`** (branch from `main`, postmortem); **P2 → active sprint**;
+  **P3 → next sprint, batched**. Bug DoD is *reproduce-before-fix*: a regression test must fail
+  on the unfixed code, then pass and stay (`definition-of-done.md` Bug DoD).
 - **Security & data** — `threat-modeling` at design time, `security-scan` +
   `scripts/audit.sh` at diff time, `secrets-management`/`data-privacy` always.
 - **Performance** — `performance-review` on code, `database-performance` on

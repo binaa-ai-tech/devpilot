@@ -9,6 +9,7 @@
 #   mode                         → prints "scrum" or "version" (which model is active)
 #   create  <name>               → create a sprint; prints its id (sprint id or version name)
 #   assign  <sprint-id> <KEY...> → add issues to the sprint
+#   active                       → prints the current active sprint id (empty if none)
 #   list                         → list current sprints/versions
 #
 # Usage: bash scripts/jira-sprint.sh <subcommand> [args...]
@@ -81,6 +82,20 @@ case "$cmd" in
     echo "✅ Assigned $* → $SPRINT"
     ;;
 
+  active)
+    # The sprint a bug/quick fix should join instead of spawning a new one.
+    # scrum  → the board's active sprint (most recent if several).
+    # version→ the oldest unreleased Fix Version (the one in flight).
+    if [ "$(_mode)" = "scrum" ]; then
+      BOARD="$(_board_id)"
+      _get --url "$AGILE/board/$BOARD/sprint?state=active" \
+        | jq -r '.values | sort_by(.id) | last | .id // empty' 2>/dev/null || true
+    else
+      _get --url "$API/project/$JIRA_PROJECT_KEY/versions" \
+        | jq -r '[.[] | select(.released==false)] | first | .name // empty' 2>/dev/null || true
+    fi
+    ;;
+
   list)
     if [ "$(_mode)" = "scrum" ]; then
       BOARD="$(_board_id)"
@@ -93,7 +108,7 @@ case "$cmd" in
     ;;
 
   *)
-    echo "Usage: jira-sprint.sh {mode|create <name>|assign <sprint-id> <KEY...>|list}" >&2
+    echo "Usage: jira-sprint.sh {mode|create <name>|assign <sprint-id> <KEY...>|active|list}" >&2
     exit 1
     ;;
 esac

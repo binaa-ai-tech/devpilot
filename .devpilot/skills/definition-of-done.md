@@ -20,6 +20,17 @@ A handoff with a failing DoD item is a defect.
 
 ---
 
+## Bug DoD (any agent fixing a `bug`/`issue` ticket)
+
+Applies on top of the layer DoD. A bug is not "done" because the symptom disappeared:
+- [ ] A test was written that **reproduces** the bug and **fails on the unfixed code** (red first)
+- [ ] After the fix that test **passes**, and it is committed as a **regression test** (stays in the suite)
+- [ ] The **root cause** is addressed, not just the symptom — noted in one line on the ticket
+- [ ] Severity-appropriate path was honored (P0/P1 → `/dp-hotfix`; P2/P3 → active/next sprint)
+- [ ] No new regressions — full pre-existing suite still green
+
+---
+
 ## Frontend DoD (Frontend Developer)
 
 All universal items, plus:
@@ -51,6 +62,7 @@ All universal items, plus:
 
 All universal items, plus:
 - [ ] Every acceptance criterion has at least one dedicated test
+- [ ] For a **bug** ticket: a regression test exists that fails on the pre-fix code (apply the Bug DoD)
 - [ ] Happy path, at least two edge cases, and at least one error/empty state are covered
 - [ ] Mutation-mindset applied: boundary values, null/empty inputs, inverted boolean conditions all tested
 - [ ] QA report written with explicit ✅ PASS or ❌ BLOCKED verdict
