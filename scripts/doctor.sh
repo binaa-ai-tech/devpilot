@@ -131,7 +131,13 @@ fi
 
 # Tooling
 command -v git >/dev/null 2>&1 && ok "git" || bad "git is required"
-command -v gh  >/dev/null 2>&1 && ok "gh (PR automation)" || warn "gh not found — open-pr.sh will print a compare URL"
+if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+  ok "gh (PR automation) authenticated"
+elif [ "$(cfg merge_policy)" = "auto" ]; then
+  warn "merge_policy=auto but gh CLI missing/unauthenticated — auto-merge runs via GitHub MCP (Claude Code on the web) but will NOT work in a plain terminal. Install+auth gh, or run /ceo from the web."
+else
+  warn "gh not found — open-pr.sh will print a compare URL (open/merge via GitHub MCP)"
+fi
 command -v jq  >/dev/null 2>&1 && ok "jq" || warn "jq not found — some scripts are limited"
 
 # Scripts executable
