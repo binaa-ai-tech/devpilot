@@ -35,8 +35,14 @@ Derive `SLUG` (lowercase, hyphens, ≤6 words). Carry `INTENT` forward.
 
 **Bug branch (`INTENT=bug` or `issue`):** also assign a **severity** `P0`–`P3` and carry it
 as `$SEVERITY`. A bug is tracked as a **single typed `Bug` issue** (no Epic→Story), gets the
-lighter spec in Step 4, and follows the bug DoD (reproduce-before-fix). Severity routes it:
-`P0/P1` → recommend `/dp-hotfix` (don't plan it into the backlog); `P2/P3` → continue here.
+lighter spec in Step 4, and follows the bug DoD (reproduce-before-fix).
+
+**Hard gate — P0/P1 belong on `/dp-hotfix`, not here:**
+```bash
+bash scripts/jira-guard.sh hotfix-gate "$INTENT" "$SEVERITY" || exit 1
+```
+This blocks before any Jira write. A production-critical defect must take the expedited
+hotfix lane (branch from `main`, postmortem); `P2/P3` continue through this plan.
 
 ---
 

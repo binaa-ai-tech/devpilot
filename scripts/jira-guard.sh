@@ -16,11 +16,16 @@
 #   assert-key <KEY...>   → exit 0 if at least one well-formed issue key was
 #                           produced by the PLAN phase; non-zero (loud) if not.
 #                           Echoes the count of valid keys on success.
+#   hotfix-gate <intent> <severity>
+#                         → exit non-zero (block) when a P0/P1 bug is being
+#                           planned/built through /ceo or /dp-plan — those belong
+#                           on the expedited /dp-hotfix lane. exit 0 otherwise.
 #
 # Usage:
 #   bash scripts/jira-guard.sh check
 #   STORY_KEYS="MSK-50 MSK-51"
 #   bash scripts/jira-guard.sh assert-key $STORY_KEYS
+#   bash scripts/jira-guard.sh hotfix-gate bug P1
 # =============================================================================
 set -euo pipefail
 
@@ -99,8 +104,23 @@ case "$cmd" in
     exit 1
     ;;
 
+  hotfix-gate)
+    intent="$(printf '%s' "${1:-}" | tr '[:upper:]' '[:lower:]')"
+    severity="$(printf '%s' "${2:-}" | tr '[:lower:]' '[:upper:]')"
+    if { [ "$intent" = "bug" ] || [ "$intent" = "issue" ]; } \
+       && { [ "$severity" = "P0" ] || [ "$severity" = "P1" ]; }; then
+      echo -e "${RED}${BOLD}❌ STOP — $severity bug must not go through /ceo or /dp-plan.${RESET}" >&2
+      echo -e "${YELLOW}   A production-critical defect takes the expedited /dp-hotfix lane:${RESET}" >&2
+      echo -e "     • branches from \`main\` (not develop), ships to PRD behind a manual gate" >&2
+      echo -e "     • minimal diff, then a blameless postmortem (.devpilot/skills/incident-postmortem.md)" >&2
+      echo -e "   Run:  /dp-hotfix <ticket> <slug> <version>   (see .devpilot/process.md)" >&2
+      exit 1
+    fi
+    exit 0
+    ;;
+
   *)
-    echo "Usage: jira-guard.sh {ready | check | assert-key <KEY...>}" >&2
+    echo "Usage: jira-guard.sh {ready | check | assert-key <KEY...> | hotfix-gate <intent> <severity>}" >&2
     exit 1
     ;;
 esac

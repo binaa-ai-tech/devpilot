@@ -15,7 +15,8 @@ gray-zone dedup decision (Step 1). For the approve-first path instead, use
 > files, or spawn a build agent before `<STORY_KEYS>` exists — Step 1 ends with
 > `scripts/jira-guard.sh assert-key`, which fails the run if the ceremony was skipped.
 > Being "efficient" by jumping straight to the code fix is the one thing `/ceo` must
-> never do.
+> never do. **A P0/P1 bug is refused here** — `scripts/jira-guard.sh hotfix-gate`
+> (inside Step 1) blocks it and redirects to the expedited `/dp-hotfix` lane.
 
 **Engine flag** (optional leading token, defaults to `engines.coding` in `project.config.md`):
 `--claude` (Claude models) · `--opencode` (Claude plans; opencode/GitHub Copilot codes).
@@ -78,7 +79,8 @@ on the intent:**
   [ -z "$SPRINT_ID" ] && SPRINT_ID=$(bash scripts/jira-sprint.sh create "ceo-bugfix-$(date +%Y%m%d-%H%M)")
   bash scripts/jira-sprint.sh assign "$SPRINT_ID" <STORY_KEYS>
   ```
-  (P0/P1 production-critical bugs belong on `/dp-hotfix`, not `/ceo` — see `.devpilot/process.md`.)
+  (P0/P1 production-critical bugs never reach this step — `hotfix-gate` in Step 1 already
+  blocked them and redirected to `/dp-hotfix`. See `.devpilot/process.md`.)
 
 No run-order question — there is exactly one sprint in play.
 
