@@ -6,7 +6,7 @@
 
 You write what you need in one sentence. DevPilot plans it, writes the code, tests it, reviews it, and merges it.
 
-[![Version](https://img.shields.io/badge/version-5.4.1-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-5.4.2-blue.svg)](VERSION)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#license)
 [![Runs on](https://img.shields.io/badge/runs%20on-Claude%20Code-7c3aed.svg)](#what-you-need)
 [![Stack](https://img.shields.io/badge/stack-Angular%20%7C%20.NET%20%7C%20SQL%20Server-orange.svg)](#what-you-need)

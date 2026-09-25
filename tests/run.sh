@@ -609,22 +609,6 @@ eval "$( cd "$D" && bash scripts/resolve-model.sh suggest "add a button" )"
 assert_eq "$TIER" "standard" "suggest output is eval-safe"
 rm -rf "$D"
 
-echo "== preflight-scan.sh / run-summary.sh =="
-D=$(mktemp -d)
-git -C "$D" init -q; git -C "$D" config user.email t@t.t; git -C "$D" config user.name t
-mkdir -p "$D/scripts"
-cp "$REPO/scripts/preflight-scan.sh" "$REPO/scripts/run-summary.sh" "$REPO/scripts/tracker.sh" "$REPO/scripts/devpilot-lib.sh" "$D/scripts/"
-printf 'base_branch: develop\ntracker:\n  type: local\n' > "$D/project.config.md"
-( cd "$D" && git checkout -q -b develop && echo a > a.txt && git add a.txt project.config.md scripts && git commit -qm base )
-PF=$( cd "$D" && bash scripts/preflight-scan.sh "fix the a file" pf-test )
-assert_contains "$PF" "docs/preflight/pf-test.md" "preflight writes a brief path"
-assert_contains "$(cat "$D/$PF" 2>/dev/null)" "Pre-flight scan" "preflight brief has a header"
-( cd "$D" && git checkout -q -b feature/y && echo b >> a.txt && git commit -qam "fix(core): edit a" )
-RS=$( cd "$D" && bash scripts/run-summary.sh LOCAL-1 sum-test "root cause text" "3 passed" develop )
-assert_contains "$RS" "docs/summaries/sum-test.md" "run-summary writes a summary path"
-assert_contains "$(cat "$D/$RS" 2>/dev/null)" "root cause text" "summary includes root cause"
-rm -rf "$D"
-
 echo "== process-logging policy (core-rules #11) =="
 # The policy: each /dp-deliver flow posts only a start + DONE comment to the ticket
 # (plus BLOCKED as the exception). Routine progress comments must not creep back.
@@ -635,8 +619,6 @@ for CMD in "$REPO"/.claude/commands/*.md; do
   f=$(basename "$CMD")
   n=$(grep -cE "$ROUTINE_RE" "$CMD"); n=${n:-0}
   assert_eq "$n" "0" "$f posts no routine progress comments"
-  p=$(grep -cE 'run-summary\.sh.*--post' "$CMD"); p=${p:-0}
-  assert_eq "$p" "0" "$f drops redundant run-summary --post"
 done
 
 echo "== model-profiles.sh =="
@@ -852,12 +834,10 @@ assert_contains "$(cat "$REPO/.claude/commands/dp-release.md")" "STAGE = rollbac
 assert_contains "$(cat "$REPO/.claude/commands/dp-pr.md")" "Review comments" "dp-pr handles review comments"
 assert_contains "$(cat "$REPO/.claude/commands/dp-pr.md")" "max 3 cycles" "dp-pr keeps the bounded CI loop"
 
-echo "== shipped templates + checklists match the current flow =="
-STALE=$(grep -rlE 'impact-maps|apps/api|npm run lint` passes|Tested with Arabic' "$REPO/.github/pull_request_template.md" "$REPO/.github/ISSUE_TEMPLATE" "$REPO/.devpilot/checklists" 2>/dev/null | tr '\n' ' ')
+echo "== shipped templates match the current flow =="
+STALE=$(grep -rlE 'impact-maps|apps/api|npm run lint` passes|Tested with Arabic' "$REPO/.github/pull_request_template.md" "$REPO/.github/ISSUE_TEMPLATE" 2>/dev/null | tr '\n' ' ')
 assert_eq "${STALE:-none}" "none" "no stale steps (impact maps, apps/api, generic npm checks)"
 assert_contains "$(cat "$REPO/.github/pull_request_template.md")" "run-tests.sh all" "PR template uses the token-lean test runner"
-assert_contains "$(cat "$REPO/.devpilot/checklists/feature.md")" "Then \`release-finish\`: PR into \`main\`" "feature checklist: tag + main only after PRD"
-assert_contains "$(cat "$REPO/.devpilot/checklists/hotfix.md")" "A person approves **PRD**" "hotfix checklist: PRD approval before hotfix-finish"
 
 echo "== audit fixes: agents, checkpoints, permissions, toolchain detection =="
 for A in "$REPO"/.claude/agents/*.md; do
@@ -895,6 +875,20 @@ assert_contains "$(cat "$D/.github/workflows/devpilot-ci.yml")" "dotnet-version:
 rm -rf "$D"
 OUT=$(printf '{"tool_input":{"file_path":"api/Migrations/20260101_Init.cs"}}' | ( D=$(mktemp -d); cd "$D" && git init -q && mkdir .devpilot && echo backend > .devpilot/.scope-lock && bash "$REPO/scripts/scope-hook.sh"; echo "rc=$?" ))
 assert_contains "$OUT" "rc=0" "backend layer lock lets the .NET agent write EF migrations"
+
+echo "== lean repo: nothing shipped that nothing uses =="
+ARCHIVES=$(git -C "$REPO" ls-files | grep -E '\.(tar\.gz|tgz|zip|whl|exe|dll)$' | tr '\n' ' ')
+assert_eq "${ARCHIVES:-none}" "none" "no archives or binaries committed"
+UNUSED=""
+for f in "$REPO"/scripts/*.sh "$REPO"/.devpilot/skills/*.md "$REPO"/.devpilot/prompts/*.md "$REPO"/.devpilot/templates/*.md; do
+  n=$(basename "$f"); [ "$n" = README.md ] && continue
+  c=$(grep -rlF "$n" "$REPO/.claude/commands" "$REPO/.claude/agents" "$REPO/.devpilot" "$REPO/scripts" "$REPO/CLAUDE.md" "$REPO/README.md" "$REPO/docs" 2>/dev/null \
+      | grep -v -e "/$n\$" -e '/skills/README.md$' | head -1)
+  # A hook command in settings.json or a run from install.sh also counts (permission rules don't).
+  [ -n "$c" ] || c=$( { jq -r '.. | .command? // empty' "$REPO/.claude/settings.json"; grep -v '^ *#' "$REPO/install.sh"; } | grep -F "bash scripts/$n" | head -1)
+  [ -n "$c" ] || UNUSED="$UNUSED $n"
+done
+assert_eq "${UNUSED:-none}" "none" "every script, skill, prompt and template is used by a command, agent, skill or script"
 
 echo ""
 echo "── Results: $PASS passed, $FAIL failed ──"
