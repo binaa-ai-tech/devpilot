@@ -1,6 +1,6 @@
 # Domain Model: <TASK-TITLE>
 
-**Ticket:** <JIRA-KEY>
+**Ticket:** <KEY>
 **Date:** <DATE>
 **Author:** AI Business Analyst
 

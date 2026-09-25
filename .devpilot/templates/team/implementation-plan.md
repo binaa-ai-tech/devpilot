@@ -1,6 +1,6 @@
 # Implementation Plan: <TASK-TITLE>
 
-**Ticket:** <JIRA-KEY>
+**Ticket:** <KEY>
 **Branch:** `feature/<n>-<slug>`
 **Complexity:** S / M / L
 **Date:** <DATE>

@@ -40,14 +40,30 @@ ok "model profile=${PROFILE:-auto}  (change: /dp-setup models <auto|balanced|sav
 command -v claude >/dev/null 2>&1 && ok "claude CLI present" || warn "claude CLI not found — install Claude Code"
 grep -q '^engines:' project.config.md 2>/dev/null && warn "project.config.md still has a legacy 'engines:' block (OpenCode/Antigravity support was removed) — delete it; models live under model_policy/coding_models"
 
-# Tracker
-TRACKER=$(grep -A3 '^tracker:' project.config.md 2>/dev/null | grep -E '^\s*type:' | head -1 | sed 's/.*type:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
-TRACKER="${TRACKER:-local}"
-case "$TRACKER" in
-  local)  ok "tracker=local (no external setup needed)" ;;
-  github) command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1 && ok "tracker=github, gh authenticated" || warn "tracker=github but gh missing/unauthenticated — will fall back to local" ;;
-  jira)   if [ -f .devpilot/config.sh ] && ! grep -q 'YOUR_JIRA_API_TOKEN' .devpilot/config.sh; then ok "tracker=jira, credentials set"; else warn "tracker=jira but .devpilot/config.sh looks unconfigured"; fi ;;
+# Tracker (local | jira | azure | github) — credentials only; live test: /dp-setup tracker
+TRACKER=$(bash scripts/tracker.sh configured 2>/dev/null || echo local)
+TRK_OUT=$(bash scripts/tracker.sh check 2>/dev/null); TRK_RC=$?
+case "$TRK_RC" in
+  0) case "$TRK_OUT" in
+       *STATE=skipped*) warn "tracker=$TRACKER not configured — runs continue with local tracking (connect: /dp-setup tracker)" ;;
+       *) ok "tracker=$TRACKER ready" ;;
+     esac ;;
+  2) warn "tracker=$TRACKER selected but credentials missing — /dp-setup tracker (or: bash scripts/tracker.sh skip)" ;;
+  3) ok "tracker=local (connect Jira / Azure DevOps / GitHub Issues anytime: /dp-setup tracker)" ;;
+  *) warn "tracker check failed — run: bash scripts/tracker.sh check" ;;
 esac
+
+# Git host + PR automation
+HOST=$(bash scripts/git-host.sh 2>/dev/null || echo other)
+HOST_MSG=$(bash scripts/git-host.sh check 2>/dev/null); HOST_RC=$?
+if [ "$HOST_RC" = 0 ]; then ok "${HOST_MSG#✅ }"
+elif [ "$HOST" = "github" ] && [ "$(cfg merge_policy)" = "auto" ]; then
+  warn "git host GitHub, gh missing/unauthenticated — PRs run through the GitHub MCP tools (Claude Code on the web); in a terminal: gh auth login"
+else warn "${HOST_MSG#⚠️  }"
+fi
+
+# Versioning
+command -v bash >/dev/null && ok "version $(bash scripts/version.sh current 2>/dev/null) (bumped by every /dp-deliver PR: feature→minor, bug→patch)"
 
 # ── Model configuration ───────────────────────────────────────────────────────
 cfg_deep() {  # cfg_deep <grandparent> <parent> <key>
@@ -98,24 +114,12 @@ for K in project_name ticket_prefix base_branch merge_policy; do
   V=$(cfg "$K")
   [ -n "$V" ] && [ "$V" != "KEY" ] || { warn "config '$K' is missing/default — re-configure: /dp-setup fix"; MISSING_CFG=1; }
 done
-if [ "$TRACKER" = "jira" ]; then
-  if [ ! -f .devpilot/config.sh ] || grep -q 'YOUR_JIRA_API_TOKEN\|YOUR-ORG.atlassian.net' .devpilot/config.sh 2>/dev/null; then
-    warn "tracker=jira but credentials incomplete — run: bash scripts/devpilot-config.sh set jira_base_url=… / jira_api_token=…  then: bash scripts/devpilot-config.sh validate"
-    MISSING_CFG=1
-  fi
-fi
 [ "$MISSING_CFG" = 0 ] && ok "config complete (no missing values)"
 
 # Tooling
 command -v git >/dev/null 2>&1 && ok "git" || bad "git is required"
-if command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
-  ok "gh (PR automation) authenticated"
-elif [ "$(cfg merge_policy)" = "auto" ]; then
-  warn "merge_policy=auto but gh CLI missing/unauthenticated — auto-merge runs via GitHub MCP (Claude Code on the web) but will NOT work in a plain terminal. Install+auth gh, or run /dp-deliver from the web."
-else
-  warn "gh not found — open-pr.sh will print a compare URL (open/merge via GitHub MCP)"
-fi
-command -v jq  >/dev/null 2>&1 && ok "jq" || warn "jq not found — some scripts are limited"
+command -v curl >/dev/null 2>&1 && ok "curl" || warn "curl not found — Jira / Azure DevOps / GitHub APIs unavailable"
+command -v jq  >/dev/null 2>&1 && ok "jq" || warn "jq not found — tracker and PR automation need it"
 
 # Scripts executable
 NOTEXEC=$(find scripts -name '*.sh' ! -perm -u+x 2>/dev/null | wc -l | tr -d ' ')

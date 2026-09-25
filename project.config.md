@@ -9,19 +9,37 @@ ticket_prefix: "KEY"             # e.g. MSK, APP, PRJ — matches Jira project k
 base_branch: develop             # branch PRs target & DEV deploys from. Use `develop` for the
                                   # DEV→SIT→UAT→PRD pipeline; `main` only for trunk-based projects.
 
-## Issue Tracker
-# local  — no external service; tasks logged to docs/tasks/<KEY>.md  (zero setup — default)
-# github — GitHub Issues via the gh CLI (falls back to local if gh is unavailable)
-# jira   — Jira Cloud (set credentials in .devpilot/config.sh)
+## Issue Tracker — where Epics, Stories, Bugs and sprints live
+# local  — no external service; items in docs/tasks/<KEY>.md (zero setup — default)
+# jira   — Jira Cloud            (credentials: bash scripts/tracker.sh setup jira …)
+# azure  — Azure DevOps Boards   (credentials: bash scripts/tracker.sh setup azure …)
+# github — GitHub Issues         (gh auth login, or GITHUB_TOKEN)
+#
+# when_unconfigured — what a run does when the selected tracker has no credentials:
+#   ask  — offer to connect it (add API keys) or continue locally (default)
+#   skip — always continue locally without asking (CI / unattended runs)
 
 tracker:
-  type: local                    # local | github | jira
+  type: local                    # local | jira | azure | github
+  when_unconfigured: ask         # ask | skip
+
+## Git host — where PRs are opened and merged
+# auto (from the origin remote) | github | azure (Azure Repos)
+git_host: auto
 
 ## Merge Policy
-# auto    — devpilot squash-merges the PR into base_branch automatically (default)
+# auto    — devpilot squash-merges the PR into base_branch when every gate is green (default)
 # pr-only — devpilot opens the PR and stops; a human merges it
 
 merge_policy: auto               # auto | pr-only
+
+## Versioning
+# Every /dp-deliver PR bumps the version on base_branch (feature → minor, bug → patch),
+# computed from base_branch's current version so parallel PRs never collide.
+# Files: VERSION · Directory.Build.props · package.json · *.csproj <Version> (scripts/version.sh)
+
+versioning:
+  bump: auto                     # auto | off
 
 ## Docs Language
 # Human language for BA requirements, QA, and review docs. Code, identifiers,

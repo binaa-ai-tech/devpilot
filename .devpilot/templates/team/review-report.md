@@ -1,6 +1,6 @@
 # Code Review: <TASK-TITLE>
 
-**Ticket:** <JIRA-KEY>
+**Ticket:** <KEY>
 **Branch:** `feature/<n>-<slug>`
 **Date:** <DATE>
 **Reviewer:** AI Team Lead

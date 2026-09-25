@@ -48,9 +48,9 @@ bash scripts/git-flow.sh hotfix-finish X.Y.Z
 ```
 
 - [ ] CI runs on `main` push — lint + test + build pass ✅
-- [ ] **PRD** approved in GitHub Actions ✅ (manual gate)
+- [ ] **PRD** approved in the pipeline (GitHub Actions / Azure Pipelines) ✅ (manual gate)
 - [ ] Fix verified on production
 - [ ] `develop` also has the fix (git-flow.sh handles this automatically)
-- [ ] Jira ticket Done
+- [ ] Tracker item Done
 - [ ] Post-mortem written if customer-impacting
 - [ ] Follow-up ticket created for proper fix if this was a band-aid

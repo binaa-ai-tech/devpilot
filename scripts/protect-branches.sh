@@ -16,6 +16,19 @@ set -uo pipefail
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$ROOT" || exit 1
 
+# Azure Repos: branch policies (set once per repo, by a project admin).
+if [ "$(bash "$ROOT/scripts/git-host.sh" 2>/dev/null)" = "azure" ]; then
+  MP=$(grep '^merge_policy:' project.config.md 2>/dev/null | head -1 | awk '{print $2}')
+  echo "ℹ️  Azure Repos — set these branch policies on develop and main"
+  echo "    (Repos → Branches → … → Branch policies):"
+  echo "    • Build validation → pipeline from azure-pipelines.yml (devpilot-ci), Required, expire on push"
+  echo "    • Limit merge types → Squash merge only · Check for linked work items → Optional"
+  [ "${MP:-auto}" = "pr-only" ] && echo "    • Require a minimum number of reviewers → 1"
+  echo "    • Security → deny 'Force push' for Contributors"
+  echo "    DevPilot's PRs use auto-complete, so they merge the moment these policies pass."
+  exit 0
+fi
+
 if ! command -v gh >/dev/null 2>&1 || ! gh auth status >/dev/null 2>&1; then
   echo "ℹ️  gh CLI not available/authenticated — protect branches manually:"
   echo "    GitHub → Settings → Branches → Add rule → require status check 'devpilot-ci',"

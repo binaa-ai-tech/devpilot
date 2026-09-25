@@ -4,7 +4,8 @@ Input: **$ARGUMENTS** — optional. Empty = organize all unplanned Stories. You 
 a focus hint (e.g. `/dp-sprint payments` to prioritize that area).
 
 You are the **Project Manager**. Group the backlog's Stories into sprints, write the
-sprints into Jira, and **recommend which sprint to run first** with rationale.
+sprints into the tracker (Jira sprints · Azure DevOps iterations · GitHub milestones ·
+local `docs/sprints/`), and **recommend which sprint to run first** with rationale.
 **No code.** When the user is ready, they run `/dp-build <sprint>`.
 
 ---
@@ -12,9 +13,9 @@ sprints into Jira, and **recommend which sprint to run first** with rationale.
 ## Step 0 — Load config + sprint model
 
 ```bash
-BASE_BRANCH=$(grep '^base_branch:' project.config.md | head -1 | sed 's/base_branch:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
-SPRINT_MODE=$(bash scripts/jira-sprint.sh mode)   # "scrum" (real Sprints) or "version" (Fix Versions)
-echo "Sprint model: $SPRINT_MODE"
+BASE_BRANCH=$(grep '^base_branch:' project.config.md | head -1 | awk '{print $2}' | tr -d '"')
+TRACKER=$(bash scripts/tracker.sh type)          # jira | azure | github | local
+bash scripts/tracker.sh sprint list              # sprints already open — reuse, don't duplicate
 ```
 
 ---
@@ -25,8 +26,9 @@ echo "Sprint model: $SPRINT_MODE"
 bash scripts/generate-backlog-index.sh
 ```
 
-Read `docs/backlog/index.md`. Take the Stories/Tasks in **To Do** that are **not yet in
-a sprint**. A sprint may mix types — e.g. 10 requirements + 4 issues + 6 enhancements is
+Read `docs/backlog/index.md`. Take the Stories/Tasks/Bugs in **To Do** that are **not yet in
+a sprint**. If two items describe the same work, merge them first (`/dp-plan` FOLD-IN) — never
+sprint a duplicate. A sprint may mix types — e.g. 10 requirements + 4 issues + 6 enhancements is
 one valid sprint.
 
 **Readiness gate.** Apply `.devpilot/skills/definition-of-ready.md`: only Stories that are
@@ -46,25 +48,26 @@ For each sprint produce: a name, the Story keys, rough size, and the dependencie
 
 ---
 
-## Step 3 — Write sprints into Jira
+## Step 3 — Write sprints into the tracker
 
 ```bash
-SPRINT_ID=$(bash scripts/jira-sprint.sh create "<sprint name>")
-bash scripts/jira-sprint.sh assign "$SPRINT_ID" <KEY1> <KEY2> <KEY3> ...
+SPRINT_ID=$(bash scripts/tracker.sh sprint create "<sprint name>")
+bash scripts/tracker.sh sprint assign "$SPRINT_ID" <KEY1> <KEY2> <KEY3> ...
 ```
 
-**Keep each Story self-contained.** For every Story assigned, make sure its Jira description is
-the full implementation brief (set at `/dp-plan` time). If a Story is missing one — or its brief
-predates this sprint — refresh it so any external tool can build from Jira alone:
+**Keep each Story self-contained.** Its description must be the full implementation brief (set
+at `/dp-plan` time). If one is missing or predates this sprint, refresh it so anyone can build
+from the tracker alone:
 ```bash
 for KEY in <KEY1> <KEY2> ...; do
-  # ensure docs/tasks/${KEY}-brief.md exists & has Sprint: <sprint name>, then:
-  bash scripts/jira-describe.sh "$KEY" "docs/tasks/${KEY}-brief.md"
-  bash scripts/add-jira-comment.sh "$KEY" "🗂 Added to sprint <sprint name>. Self-contained brief is in the description — implementable from Jira by any Claude session or teammate."
+  # ensure the brief (docs/tasks/<slug>-brief.md) names Sprint: <sprint name>, then:
+  bash scripts/tracker.sh describe "$KEY" "docs/tasks/<slug>-brief.md"
+  bash scripts/tracker.sh comment "$KEY" "🗂 Added to sprint <sprint name> — the description is a self-contained brief."
 done
 ```
 
-Repeat per sprint. (`create`/`assign` auto-use real Sprints or Fix Versions per `$SPRINT_MODE`.)
+Repeat per sprint. Jira uses real Sprints on Scrum boards (Fix Versions otherwise), Azure DevOps
+team iterations, GitHub milestones.
 
 ---
 
@@ -77,7 +80,7 @@ risk, highest value). List the rest in suggested order. Save the plan:
 mkdir -p docs/sprints
 cat > "docs/sprints/plan.md" << 'EOF'
 # Sprint Plan
-Generated: <timestamp> · Model: <SPRINT_MODE>
+Generated: <timestamp> · Tracker: <TRACKER>
 
 ## ▶ Run first: <sprint name> (<id>)
 - <why>
@@ -95,7 +98,7 @@ EOF
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🗂  SPRINTS ORGANIZED  (model: <scrum | version>)
+🗂  SPRINTS ORGANIZED  (tracker: <jira | azure | github | local>)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ▶  Run first:  <sprint name> (<id>)
    <one-line why>

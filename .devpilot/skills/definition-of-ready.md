@@ -14,6 +14,6 @@ the entry. A "not ready" Story stays in the backlog — never pull unclear work 
 - [ ] **Deduped** — checked against the backlog index; not a duplicate or unmerged overlap.
 
 ## On failure
-Don't block silently. Record the missing item on the Story (Jira comment / `docs/requirements`),
+Don't block silently. Record the missing item on the Story (tracker comment / `docs/requirements`),
 keep it in the backlog as **needs grooming**, and surface it in the `/dp-sprint` recommendation
 ("3 Stories not ready: …"). Readiness is the BA/PM's job to resolve, autonomously where possible.

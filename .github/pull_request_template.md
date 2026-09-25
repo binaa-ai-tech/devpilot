@@ -1,6 +1,9 @@
-## Jira Ticket
+## Work item
 
-[<KEY>-](https://your-org.atlassian.net/browse/<KEY>-)
+<!-- Jira: MSK-12 · Azure Boards: AB#345 (auto-links) · GitHub: #7 -->
+<KEY and link>
+
+**Version:** v<X.Y.Z>
 
 ## Description
 

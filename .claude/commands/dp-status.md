@@ -8,14 +8,16 @@ One window into the system. Runs the existing scripts and summarizes.
 ```bash
 bash scripts/doctor.sh
 ```
-Reports: config present, Jira/tracker reachable, git-flow branches, Claude CLI + model tiers.
+Reports: config present, tracker (Jira / Azure DevOps / GitHub / local) + git host (GitHub / Azure
+Repos) readiness, version, git-flow branches, Claude CLI + model tiers.
 
 ## board  (task dashboard)
 ```bash
 bash scripts/status.sh
+bash scripts/tracker.sh sprint list
 bash scripts/generate-backlog-index.sh >/dev/null && sed -n '1,40p' docs/backlog/index.md
 ```
-Reports: in-flight tasks, sprint state, and the current backlog index.
+Reports: in-flight tasks, open sprints, and the current backlog index (live from the tracker).
 
 ## metrics  (throughput)
 ```bash

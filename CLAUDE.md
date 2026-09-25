@@ -9,8 +9,8 @@ The end-to-end SDLC contract (phases, gates, roles) lives in `.devpilot/process.
 
 | Role | Command | Does |
 |------|---------|------|
-| Whole team | `/dp-deliver <requirement> [--to sit]` | **End to end** — plan → sprint → build → QA → review → merge into `develop` (→ SIT). Stops only on a gray-zone dedup question. `/dp-deliver resume` continues after an interruption. |
-| Product Owner / BA | `/dp-plan <requirement\|Jira key>` | Dedup against the backlog, write Epic→Story with testable ACs. No code. |
+| Whole team | `/dp-deliver <requirement\|KEY> [--to sit]` | **End to end** — plan → sprint → build → QA → review → version bump → PR → merge into `develop` → items, Epic & sprint closed (→ SIT). Asks only if no tracker is connected (connect or skip) or on a gray-zone dedup. `/dp-deliver resume` continues after an interruption. |
+| Product Owner / BA | `/dp-plan <requirement\|KEY>` | Dedup against the tracker + the top matches' child tasks, write Epic→Story with testable ACs. No code. |
 | Scrum Master | `/dp-sprint` | Group READY Stories into sprints, recommend run order. |
 | Developers | `/dp-build [sprint]` | Angular + .NET agents build a sprint on one branch → one PR → `develop`. |
 | QA | `/dp-test [ui\|perf] [story\|PR\|diff]` | Cases from ACs → unit / integration / Playwright UI tests → run. |
@@ -18,7 +18,7 @@ The end-to-end SDLC contract (phases, gates, roles) lives in `.devpilot/process.
 | DevOps | `/dp-release <sit\|uat\|prd\|rollback> [version]` | Promote DEV→SIT→UAT→PRD, or roll back. PRD is always human-approved. |
 | On-call | `/dp-hotfix <ticket> <slug> <version>` | Emergency fix from the deployed tag + postmortem. |
 | Everyone | `/dp-status [health\|board\|metrics]` | Health · board · throughput. |
-| Admin | `/dp-setup [fix\|models\|wizard\|index]` | Repair config, switch Claude model profile, refresh index. |
+| Admin | `/dp-setup [fix\|tracker\|models\|wizard\|index]` | Repair config, connect Jira / Azure DevOps / GitHub, switch Claude model profile, refresh index. |
 
 ---
 
@@ -26,17 +26,33 @@ The end-to-end SDLC contract (phases, gates, roles) lives in `.devpilot/process.
 
 ```
 /dp-deliver "add CSV export"
-  PLAN    → classify · dedup vs docs/backlog/index.md · spec to git · Epic→Story to tracker
+  TRACKER → tracker.sh check · not configured → ask once: connect (API key) or continue locally
+  PLAN    → classify · dedup vs tracker.sh search + child items (tracker.sh show) · Epic→Story first
   SPRINT  → feature: own sprint · bug: active sprint · P0/P1: refused → /dp-hotfix
   BUILD   → team-dotnet (API · EF Core · OpenAPI) ║ team-frontend (Angular · generated client)
   QA      → Vitest · xUnit + real SQL Server · Playwright journeys + axe
   REVIEW  → code-review · security · performance · test guard (strict)
-  MERGE   → one PR → develop (auto-merge ladder)  ·  --to sit → release branch → SIT
+  VERSION → version.sh bump from develop (feature → minor · bug → patch)
+  MERGE   → one PR "[vX.Y.Z] …" → develop (auto-merge ladder; GitHub or Azure Repos)
+  CLOSE   → close-delivery.sh: items Done · Epic Done · sprint closed · back on develop
+            --to sit → release/<version> → SIT
 ```
 
-**Dedup brain:** `/dp-plan` matches each new item against `docs/backlog/index.md`, reading full
-specs of only the top 1–3 candidates. Merges are reversible tracker links + one Story with
-combined ACs.
+**Dedup brain:** `/dp-plan` searches the live tracker (`tracker.sh search`, Done items included)
+and `docs/backlog/index.md`, then opens only the top 1–3 candidates *with their child items*
+(`tracker.sh show`) — an existing Story or Task under a matching Epic is reused, never duplicated.
+Merges are reversible tracker links + one Story with combined ACs.
+
+## Trackers & git hosts
+
+| | Options | Interface |
+|--|---------|-----------|
+| Work tracker | Jira · Azure DevOps Boards · GitHub Issues · local (`docs/tasks/`) | `scripts/tracker.sh` (backends `jira.sh` · `azdo.sh` · `github.sh`) |
+| Git host | GitHub (`gh` / GitHub MCP) · Azure Repos (`azdo.sh`, auto-complete) | `scripts/git-host.sh` → `open-pr.sh` |
+| Version | `VERSION` · `Directory.Build.props` · `package.json` · `*.csproj` | `scripts/version.sh` |
+
+Never call a backend directly from a command — always `tracker.sh`. Secrets live in the gitignored
+`.devpilot/config.sh`; same-named environment variables override it.
 
 ---
 

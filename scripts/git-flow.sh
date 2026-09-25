@@ -6,9 +6,11 @@
 #   bash scripts/git-flow.sh <command> [args...]
 #
 # Commands:
-#   feature-start  <ticket> <description>   Start a feature branch
+#   feature-start  <ticket|KEY> <description>   Start a feature branch
+#                  (a full tracker key — MSK-12, ADO-12, GH-7 — is used as-is)
 #   feature-finish                           Push & remind to open PR
-#   release-start  <version>                 Start a release branch
+#   release-start  [version]                 Start a release branch (default: the
+#                                            version develop already carries)
 #   release-finish <version>                 Merge, tag, clean up
 #   hotfix-start   <ticket> <description>   Start a hotfix branch
 #   hotfix-finish  <version>                 Merge, tag, clean up
@@ -20,6 +22,10 @@ if [ -f ".devpilot/config.sh" ]; then
   source ".devpilot/config.sh" 2>/dev/null || true
 fi
 TICKET_PREFIX="${TICKET_PREFIX:-key}"
+DEVELOP=$(grep -E '^base_branch:' project.config.md 2>/dev/null | head -1 | sed 's/base_branch:[[:space:]]*//; s/[[:space:]]*#.*//' | tr -d '"')
+DEVELOP="${DEVELOP:-develop}"
+[ "$DEVELOP" = "main" ] && DEVELOP="develop"   # trunk-based projects still release from develop if it exists
+SCRIPTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 
 BOLD="\033[1m"
 GREEN="\033[0;32m"
@@ -56,7 +62,12 @@ feature_start() {
     [ -z "$base" ] && base="develop"
   fi
 
-  local branch="feature/${TICKET_PREFIX}-${ticket}-${desc}"
+  local branch
+  if [[ "$ticket" =~ ^[A-Za-z][A-Za-z0-9_]*-[0-9]+$ ]]; then
+    branch="feature/$(printf '%s' "$ticket" | tr '[:upper:]' '[:lower:]')-${desc}"
+  else
+    branch="feature/${TICKET_PREFIX}-${ticket}-${desc}"
+  fi
   require_clean_tree
 
   section "Starting feature: $branch"
@@ -85,7 +96,7 @@ feature_finish() {
 
   echo ""
   warn "Next step — open a Pull Request on GitHub:"
-  echo "  https://github.com/$(git remote get-url origin | sed 's/.*github.com[:/]//' | sed 's/.git$//')/compare/develop...${branch}"
+  echo "  bash scripts/open-pr.sh $DEVELOP \"<title>\" \"<body>\"   (GitHub or Azure Repos)"
   echo ""
   info "After the PR is merged, delete the branch:"
   echo "  git branch -d $branch && git push origin --delete $branch"
@@ -96,56 +107,25 @@ feature_finish() {
 # =============================================================================
 release_start() {
   local version="${1:-}"
-  [[ -z "$version" ]] && error "Usage: release-start <version>  (e.g. 1.0.0)"
-
-  local branch="release/${version}"
   require_clean_tree
 
-  section "Starting release: $branch"
-  info "Switching to develop and pulling latest..."
-  git checkout develop
-  git pull origin develop
+  section "Starting release from $DEVELOP"
+  git checkout "$DEVELOP"
+  git pull origin "$DEVELOP"
 
+  # Every /dp-deliver merge already bumped the version on develop — release that one.
+  [[ -z "$version" ]] && version=$(bash "$SCRIPTS_DIR/version.sh" current)
+  [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || error "Invalid version '$version' (want X.Y.Z)"
+  git rev-parse -q --verify "refs/tags/v$version" >/dev/null && error "Tag v$version already exists — deliver a change first or pass a higher version."
+
+  local branch="release/${version}"
   info "Creating branch: $branch"
   git checkout -b "$branch"
 
-  info "Bumping version to $version..."
-  BUMPED=false
-
-  # npm / Node
-  if command -v npm &>/dev/null && [[ -f package.json ]]; then
-    npm version "$version" --no-git-tag-version --allow-same-version 2>/dev/null && BUMPED=true \
-      || warn "npm version bump failed — update package.json manually."
-    git add package.json package-lock.json 2>/dev/null || true
-
-  # .NET — update <Version> in all .csproj files
-  elif find . -maxdepth 4 -name "*.csproj" ! -path "*/obj/*" ! -path "*/bin/*" 2>/dev/null | grep -q .; then
-    while IFS= read -r csproj; do
-      if grep -q '<Version>' "$csproj" 2>/dev/null; then
-        sed -i.bak "s|<Version>.*</Version>|<Version>${version}</Version>|" "$csproj" && rm -f "${csproj}.bak"
-        git add "$csproj"
-        BUMPED=true
-        info "Bumped version in $csproj"
-      fi
-    done < <(find . -maxdepth 4 -name "*.csproj" ! -path "*/obj/*" ! -path "*/bin/*" 2>/dev/null)
-
-  # Python — update pyproject.toml
-  elif [[ -f pyproject.toml ]]; then
-    sed -i.bak "s/^version = .*/version = \"${version}\"/" pyproject.toml && rm -f pyproject.toml.bak
-    git add pyproject.toml
-    BUMPED=true
-
-  # VERSION file fallback
-  elif [[ -f VERSION ]]; then
-    echo "$version" > VERSION
-    git add VERSION
-    BUMPED=true
-  fi
-
-  if $BUMPED; then
-    git commit -m "chore(release): bump version to $version" || true
-  else
-    warn "No version file found (package.json / .csproj / pyproject.toml / VERSION) — skip version bump."
+  if [ "$(bash "$SCRIPTS_DIR/version.sh" current)" != "$version" ]; then
+    bash "$SCRIPTS_DIR/version.sh" bump "$version" >/dev/null
+    bash "$SCRIPTS_DIR/version.sh" files | xargs git add
+    git commit -m "chore(release): set version $version" || true
   fi
 
   git push -u origin "$branch"
@@ -177,13 +157,13 @@ release_finish() {
   info "Tagging v$version..."
   git tag -a "v${version}" -m "Release v${version}"
 
-  info "Merging $branch → develop..."
-  git checkout develop
-  git pull origin develop
-  git merge --no-ff "$branch" -m "chore(git): merge $branch back into develop"
+  info "Merging $branch → $DEVELOP..."
+  git checkout "$DEVELOP"
+  git pull origin "$DEVELOP"
+  git merge --no-ff "$branch" -m "chore(git): merge $branch back into $DEVELOP"
 
-  info "Pushing main, develop, and tag..."
-  git push origin main develop "v${version}"
+  info "Pushing main, $DEVELOP, and tag..."
+  git push origin main "$DEVELOP" "v${version}"
 
   info "Deleting release branch..."
   git branch -d "$branch"
@@ -203,7 +183,12 @@ hotfix_start() {
   [[ -z "$ticket" ]] && error "Usage: hotfix-start <ticket-number> <description>"
   [[ -z "$desc"   ]] && error "Usage: hotfix-start <ticket-number> <description>"
 
-  local branch="hotfix/${TICKET_PREFIX}-${ticket}-${desc}"
+  local branch
+  if [[ "$ticket" =~ ^[A-Za-z][A-Za-z0-9_]*-[0-9]+$ ]]; then
+    branch="hotfix/$(printf '%s' "$ticket" | tr '[:upper:]' '[:lower:]')-${desc}"
+  else
+    branch="hotfix/${TICKET_PREFIX}-${ticket}-${desc}"
+  fi
   require_clean_tree
 
   section "Starting hotfix: $branch"
@@ -239,13 +224,13 @@ hotfix_finish() {
   info "Tagging v$version..."
   git tag -a "v${version}" -m "Hotfix v${version}"
 
-  info "Merging $branch → develop..."
-  git checkout develop
-  git pull origin develop
-  git merge --no-ff "$branch" -m "chore(git): merge $branch back into develop"
+  info "Merging $branch → $DEVELOP..."
+  git checkout "$DEVELOP"
+  git pull origin "$DEVELOP"
+  git merge --no-ff "$branch" -m "chore(git): merge $branch back into $DEVELOP"
 
-  info "Pushing main, develop, and tag..."
-  git push origin main develop "v${version}"
+  info "Pushing main, $DEVELOP, and tag..."
+  git push origin main "$DEVELOP" "v${version}"
 
   info "Deleting hotfix branch..."
   git branch -d "$branch"
@@ -277,7 +262,7 @@ case "$command" in
     echo ""
     echo "  feature-start  <ticket> <description>   Create feature/${TICKET_PREFIX}-{ticket}-{description}"
     echo "  feature-finish                           Push branch + print PR link"
-    echo "  release-start  <version>                 Create release/{version}, bump package.json"
+    echo "  release-start  [version]                 Create release/{version} (default: develop's version)"
     echo "  release-finish <version>                 Merge to main+develop, tag, delete branch"
     echo "  hotfix-start   <ticket> <description>   Create hotfix/${TICKET_PREFIX}-{ticket}-{description}"
     echo "  hotfix-finish  <version>                 Merge to main+develop, tag, delete branch"

@@ -124,12 +124,12 @@ run_update() {
 
   RULE_SNIPPETS="angular.md dotnet.md sqlserver.md"
   PROMPT_TEAM="ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md qa-agent.md"
-  TEMPLATE_TEAM="requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md jira-brief.md"
+  TEMPLATE_TEAM="requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md bug-report.md item-brief.md"
   SKILLS="core-rules.md definition-of-ready.md estimation-and-slicing.md architecture-guard.md angular-dev.md angular-testing.md accessibility.md dotnet-api.md efcore-sqlserver.md dotnet-testing.md api-contract.md test-case-design.md test-strategy.md ui-e2e-playwright.md token-lean-testing.md test-guard.md performance.md code-review.md security-scan.md definition-of-done.md auto-merge.md release-ops.md self-heal.md README.md"
   CHECKLISTS="feature.md bugfix.md hotfix.md"
   CMDS="dp-deliver.md dp-plan.md dp-sprint.md dp-build.md dp-test.md dp-pr.md dp-release.md dp-hotfix.md dp-status.md dp-setup.md"
   AGENTS_LIST="team-lead.md team-ba.md team-frontend.md team-dotnet.md team-qa.md"
-  SCRIPTS="git-flow.sh new-feature.sh resolve-model.sh model-profiles.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh track.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh create-jira-ticket.sh create-jira-epic.sh update-jira-status.sh update-jira-description.sh add-jira-comment.sh generate-project-index.sh generate-backlog-index.sh jira-sprint.sh link-jira-issues.sh md-to-adf.sh jira-describe.sh"
+  SCRIPTS="git-flow.sh new-feature.sh resolve-model.sh model-profiles.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh devpilot-lib.sh tracker.sh jira.sh azdo.sh github.sh git-host.sh version.sh close-delivery.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh generate-project-index.sh generate-backlog-index.sh md-to-adf.sh"
 
   info "Refreshing .devpilot/rules..."
   fetch ".devpilot/rules.md" ".devpilot/rules.md"
@@ -168,11 +168,21 @@ run_update() {
   for f in ceo.md dp-config.md dp-autofix.md dp-review-fix.md dp-rollback.md; do rm -f ".claude/commands/$f"; done
   for f in run-command.sh run-mode.sh resolve-engine.sh ceo.sh dp-plan.sh dp-build.sh dp-sprint.sh dp-release.sh dp-status.sh dp-config.sh; do rm -f "scripts/$f"; done
   rm -rf .opencode
+  # Retired in the multi-tracker move — replaced by tracker.sh + jira.sh / azdo.sh / github.sh.
+  for f in track.sh jira-guard.sh jira-sprint.sh create-jira-ticket.sh create-jira-epic.sh update-jira-status.sh \
+           update-jira-description.sh add-jira-comment.sh link-jira-issues.sh jira-describe.sh; do rm -f "scripts/$f"; done
+  rm -f .devpilot/templates/team/jira-brief.md
 
   # Refetching the agent files above reset their model: frontmatter to repo
   # defaults — re-sync it from the user's project.config.md so their chosen
   # profile / wizard model assignments survive the update.
   [ -f project.config.md ] && bash scripts/model-profiles.sh sync-agents 2>/dev/null || true
+
+  # Secrets + per-developer state stay out of git (config.sh may now hold Azure/Jira keys).
+  touch .gitignore
+  for entry in ".devpilot/config.sh" ".devpilot/.tracker-skip" ".devpilot/logs/"; do
+    grep -qxF "$entry" .gitignore || echo "$entry" >> .gitignore
+  done
 
   fetch_summary || true
 
@@ -457,32 +467,31 @@ fi
 ask "  Base branch [$DEFAULT_BASE]: ";      read -r BASE_BRANCH;    [ -z "$BASE_BRANCH" ]    && BASE_BRANCH="$DEFAULT_BASE"
 
 echo ""
-echo "  Issue tracker:"
-echo "    [1] local   — no setup; tasks logged to docs/tasks/  (recommended for solo / quick start)"
-echo "    [2] github  — GitHub Issues via the gh CLI"
-echo "    [3] jira    — Jira Cloud (needs credentials in .devpilot/config.sh)"
+echo "  Work tracker (Epics, Stories, Bugs, sprints):"
+echo "    [1] local   — no setup; items in docs/tasks/  (connect a tracker later: /dp-setup tracker)"
+echo "    [2] jira    — Jira Cloud"
+echo "    [3] azure   — Azure DevOps Boards"
+echo "    [4] github  — GitHub Issues"
 TRACKER_TYPE="local"
 ask "  Choice [1]: "; read -r TRK_CHOICE
 case "${TRK_CHOICE:-1}" in
-  2) TRACKER_TYPE="github" ;;
-  3) TRACKER_TYPE="jira" ;;
+  2) TRACKER_TYPE="jira" ;;
+  3) TRACKER_TYPE="azure" ;;
+  4) TRACKER_TYPE="github" ;;
   *) TRACKER_TYPE="local" ;;
 esac
 info "Tracker: $TRACKER_TYPE"
 
-# Jira: collect credentials NOW with a guided walkthrough (skippable) so the
-# tracker works on the first task instead of failing mid-implementation.
+# Collect credentials NOW (skippable) so the first run works. Skipped → the first
+# /dp-deliver asks once: connect now, or continue with local tracking.
 JIRA_URL_IN=""; JIRA_EMAIL_IN=""; JIRA_TOKEN_IN=""
+AZ_ORG_IN=""; AZ_PROJECT_IN=""; AZ_PAT_IN=""; TRK_CREDS=0
 if [ "$TRACKER_TYPE" = "jira" ]; then
   echo ""
-  echo "  Jira connection — 3 quick steps (Enter on the URL skips; set later via"
-  echo "  bash scripts/devpilot-config.sh):"
+  echo "  Jira connection — Enter on the URL skips (connect later: /dp-setup tracker)"
   echo "    1. Create an API token:  https://id.atlassian.com/manage-profile/security/api-tokens"
   echo "    2. Site URL = where you open Jira, e.g. https://your-org.atlassian.net"
-  echo "    3. Email   = your Atlassian account email"
-  echo ""
-  echo "  ℹ Your ticket prefix '$TICKET_PREFIX' must equal the Jira PROJECT KEY"
-  echo "    (Jira → Projects → your project → the short key, e.g. APP)."
+  echo "    3. Ticket prefix '$TICKET_PREFIX' must equal the Jira PROJECT KEY"
   echo ""
   ask "  Jira site URL [skip]: "; read -r JIRA_URL_IN
   if [ -n "$JIRA_URL_IN" ]; then
@@ -490,12 +499,32 @@ if [ "$TRACKER_TYPE" = "jira" ]; then
     case "$JIRA_URL_IN" in http*) : ;; *) JIRA_URL_IN="https://$JIRA_URL_IN" ;; esac
     ask "  Atlassian account email: "; read -r JIRA_EMAIL_IN
     ask "  API token (input hidden): "; read -rs JIRA_TOKEN_IN; echo ""
-    [ -n "$JIRA_TOKEN_IN" ] && info "Jira credentials captured — validated live after install" \
-                            || warn "No token entered — set it later: bash scripts/devpilot-config.sh set jira_api_token=<token>"
-  else
-    warn "Jira setup skipped — the tracker falls back to local logs until credentials are set (see docs/setup-guide.md § Jira)"
+    [ -n "$JIRA_TOKEN_IN" ] && TRK_CREDS=1
   fi
+elif [ "$TRACKER_TYPE" = "azure" ]; then
+  AZ_REMOTE=$(git config --get remote.origin.url 2>/dev/null || true)
+  AZ_ORG_DEFAULT=""; AZ_PROJECT_DEFAULT=""
+  case "$AZ_REMOTE" in
+    *dev.azure.com/*) P="${AZ_REMOTE#*dev.azure.com/}"; AZ_ORG_DEFAULT="https://dev.azure.com/${P%%/*}"; P="${P#*/}"; AZ_PROJECT_DEFAULT="${P%%/_git/*}" ;;
+  esac
+  echo ""
+  echo "  Azure DevOps connection — Enter on the org URL skips (connect later: /dp-setup tracker)"
+  echo "    1. Create a PAT: User settings → Personal access tokens"
+  echo "       scopes: Work Items (Read & write) · Code (Read & write) · Build (Read)"
+  echo "    2. Org URL = https://dev.azure.com/<org>   ·   Project = the Boards project name"
+  echo ""
+  ask "  Org URL [${AZ_ORG_DEFAULT:-skip}]: "; read -r AZ_ORG_IN; AZ_ORG_IN="${AZ_ORG_IN:-$AZ_ORG_DEFAULT}"
+  if [ -n "$AZ_ORG_IN" ]; then
+    AZ_ORG_IN="${AZ_ORG_IN%/}"
+    ask "  Project [${AZ_PROJECT_DEFAULT}]: "; read -r AZ_PROJECT_IN; AZ_PROJECT_IN="${AZ_PROJECT_IN:-$AZ_PROJECT_DEFAULT}"
+    ask "  PAT (input hidden): "; read -rs AZ_PAT_IN; echo ""
+    [ -n "$AZ_PAT_IN" ] && TRK_CREDS=1
+  fi
+elif [ "$TRACKER_TYPE" = "github" ]; then
+  info "GitHub Issues uses 'gh auth login' (or GITHUB_TOKEN) — nothing to enter now"
 fi
+[ "$TRACKER_TYPE" != "local" ] && [ "$TRK_CREDS" = 0 ] && [ "$TRACKER_TYPE" != "github" ] \
+  && warn "No credentials entered — the first /dp-deliver offers to connect $TRACKER_TYPE or continue locally"
 
 echo ""
 echo "  Merge policy:"
@@ -526,7 +555,8 @@ printf "  %-18s %s\n" "Base branch"    "$BASE_BRANCH"
 printf "  %-18s %s\n" "Model mode"     "$MODEL_MODE  (profile: $ACTIVE_PROFILE)"
 printf "  %-18s %s\n" "BA / Lead / QA" "$T1_BA · $T1_LEAD · $T1_QA"
 printf "  %-18s %s\n" "Frontend / BE"  "$T1_FE_DEV · $T1_BE_DEV"
-printf "  %-18s %s\n" "Tracker"        "$TRACKER_TYPE$([ "$TRACKER_TYPE" = jira ] && [ -n "$JIRA_TOKEN_IN" ] && echo ' (credentials captured)')"
+printf "  %-18s %s\n" "Tracker"        "$TRACKER_TYPE$([ "$TRK_CREDS" = 1 ] && echo ' (credentials captured)')"
+printf "  %-18s %s\n" "Git host"       "$(case "$(git config --get remote.origin.url 2>/dev/null)" in *dev.azure.com*|*visualstudio.com*) echo 'Azure Repos';; *github.com*) echo GitHub;; *) echo 'unknown (set git_host later)';; esac)"
 printf "  %-18s %s\n" "Merge policy"   "$MERGE_POLICY"
 printf "  %-18s %s\n" "Docs language"  "$DOC_LANGUAGE"
 AGENT_LIST="BA · Lead · QA"
@@ -587,7 +617,8 @@ else
 #!/bin/bash
 # =============================================================================
 # PROJECT CONFIG — fill this in once per project, then keep it out of git
-# (.devpilot/config.sh is gitignored by the installer)
+# (.devpilot/config.sh is gitignored by the installer). Environment variables with the
+# same names override these values (CI).
 #
 # Update any key via CLI (recommended — no manual editing needed):
 #   bash scripts/devpilot-config.sh set jira_api_token=<new-token>
@@ -599,6 +630,15 @@ JIRA_BASE_URL="${JIRA_URL_IN:-https://YOUR-ORG.atlassian.net}"
 JIRA_EMAIL="${JIRA_EMAIL_IN:-your-email@example.com}"
 JIRA_API_TOKEN='${JIRA_TOKEN_IN:-YOUR_JIRA_API_TOKEN}'
 JIRA_PROJECT_KEY="$CFG_JIRA_KEY"        # e.g. MSK, APP, PRJ
+
+# ── Azure DevOps (Boards + Repos + Pipelines) ────────────────────────────────
+AZDO_ORG_URL="${AZ_ORG_IN:-https://dev.azure.com/YOUR-ORG}"
+AZDO_PROJECT="${AZ_PROJECT_IN:-}"
+AZDO_PAT='${AZ_PAT_IN:-}'                    # Work Items R/W · Code R/W · Build Read
+AZDO_TEAM=""                           # default: "<project> Team"
+
+# ── GitHub (Issues tracker / PRs without gh) ─────────────────────────────────
+GITHUB_TOKEN=""                        # only when gh is not installed/authenticated
 
 # ── Git / GitHub ──────────────────────────────────────────────────────────────
 GITHUB_ORG="$CFG_GH_ORG"
@@ -629,7 +669,7 @@ NOTIFY_WEBHOOK=""                      # Slack/Teams/Discord-compatible webhook 
 NOTIFY_EMAIL="your-email@example.com"  # used when a local 'mail' command exists
 DEVPILOT_CONFIG_UPDATED_AT='$CFG_NOW'
 CFGEOF
-  info ".devpilot/config.sh created — set your Jira/GitHub credentials with: bash scripts/devpilot-config.sh set jira_api_token=<token>"
+  info ".devpilot/config.sh created (gitignored) — connect a tracker anytime: /dp-setup tracker"
 fi
 
 # Per-stack rule snippets (router in rules.md tells agents which to read)
@@ -646,7 +686,7 @@ for f in ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.
   fetch ".devpilot/prompts/team/$f" ".devpilot/prompts/team/$f"
 done
 
-for f in requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md jira-brief.md; do
+for f in requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md bug-report.md item-brief.md; do
   fetch ".devpilot/templates/team/$f" ".devpilot/templates/team/$f"
 done
 
@@ -696,15 +736,12 @@ fi
 
 # scripts/
 info "Installing scripts/..."
-for f in git-flow.sh new-feature.sh resolve-model.sh model-profiles.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh \
-          track.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh \
+for f in git-flow.sh new-feature.sh resolve-model.sh model-profiles.sh preflight-scan.sh run-summary.sh checkpoint.sh \
+          devpilot-config.sh devpilot-lib.sh tracker.sh jira.sh azdo.sh github.sh git-host.sh version.sh close-delivery.sh \
+          open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh \
           doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh \
           deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh \
-          create-jira-ticket.sh create-jira-epic.sh \
-          update-jira-status.sh update-jira-description.sh \
-          add-jira-comment.sh generate-project-index.sh \
-          generate-backlog-index.sh jira-sprint.sh link-jira-issues.sh \
-          md-to-adf.sh jira-describe.sh; do
+          generate-project-index.sh generate-backlog-index.sh md-to-adf.sh; do
   fetch "scripts/$f" "scripts/$f"
   chmod +x "scripts/$f" 2>/dev/null || true
 done
@@ -725,9 +762,11 @@ for d in requirements plans qa reviews adrs domain-models tasks; do
   touch "docs/$d/.gitkeep"
 done
 
-# .gitignore additions
+# .gitignore additions — always, even in a repo with no .gitignore yet:
+# .devpilot/config.sh holds tracker API keys and must never be committed.
+touch .gitignore
 if [ -f ".gitignore" ]; then
-  for entry in ".devpilot/config.sh" ".devpilot/.scope-lock" ".env" ".env.local" ".devpilot/logs/" "docs/index/.state" "docs/project-index.md" "docs/index/*.md"; do
+  for entry in ".devpilot/config.sh" ".devpilot/.tracker-skip" ".devpilot/.scope-lock" ".env" ".env.local" ".devpilot/logs/" "docs/index/.state" "docs/project-index.md" "docs/index/*.md"; do
     grep -qF "$entry" .gitignore || echo "$entry" >> .gitignore
   done
 fi
@@ -748,17 +787,26 @@ project_type: $DETECTED_TYPE
 ticket_prefix: "$TICKET_PREFIX"
 base_branch: $BASE_BRANCH
 
-## Issue Tracker
-# local | github | jira  — switch anytime by editing this value.
+## Issue Tracker — local | jira | azure | github   (connect: /dp-setup tracker)
+# when_unconfigured: ask (offer to add API keys, else continue locally) | skip (never ask)
 
 tracker:
   type: $TRACKER_TYPE
+  when_unconfigured: ask
+
+## Git host — auto (from origin) | github | azure
+git_host: auto
 
 ## Merge Policy
 # auto    — devpilot squash-merges the PR into base_branch automatically
 # pr-only — devpilot opens the PR and stops; a human merges it
 
 merge_policy: $MERGE_POLICY
+
+## Versioning — every /dp-deliver PR bumps the version (feature → minor, bug → patch)
+
+versioning:
+  bump: auto                     # auto | off
 
 ## Docs Language
 # Human language for BA/QA/review docs. Code & commits stay English.
@@ -866,14 +914,16 @@ fi
 section "CI workflow & branch protection..."
 
 CI_GENERATED=0
-if [ -f ".github/workflows/devpilot-ci.yml" ]; then
+CI_FILE=".github/workflows/devpilot-ci.yml"
+[ "$(bash scripts/git-host.sh 2>/dev/null)" = "azure" ] && CI_FILE="azure-pipelines.yml"
+if [ -f "$CI_FILE" ]; then
   info "CI workflow exists — refresh anytime: bash scripts/generate-ci.sh --force"
   CI_GENERATED=1
 else
   echo ""
   echo "  A GitHub Actions workflow enforces the gate ladder on every PR:"
   echo "  build → tests → test-guard (strict) → dependency audit."
-  ask "  Generate .github/workflows/devpilot-ci.yml? [Y/n]: "; read -r CI_CHOICE
+  ask "  Generate $CI_FILE? [Y/n]: "; read -r CI_CHOICE
   if [[ ! "${CI_CHOICE:-Y}" =~ ^[Nn] ]]; then
     bash scripts/generate-ci.sh && CI_GENERATED=1
   else
@@ -881,7 +931,9 @@ else
   fi
 fi
 
-if [ "$CI_GENERATED" = 1 ] && command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
+if [ "$CI_GENERATED" = 1 ] && [ "$CI_FILE" = "azure-pipelines.yml" ]; then
+  bash scripts/protect-branches.sh || true
+elif [ "$CI_GENERATED" = 1 ] && command -v gh >/dev/null 2>&1 && gh auth status >/dev/null 2>&1; then
   echo ""
   echo "  Branch protection makes the check non-bypassable (no force-push, devpilot-ci"
   echo "  required$([ "$MERGE_POLICY" = "pr-only" ] && echo ', 1 review required'))."
@@ -896,21 +948,20 @@ else
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════
-# STEP 14 — JIRA VALIDATION (live, only when credentials were captured)
+# STEP 14 — TRACKER VALIDATION (live, only when credentials were captured)
 # ═════════════════════════════════════════════════════════════════════════════
-if [ "$TRACKER_TYPE" = "jira" ] && [ -n "$JIRA_TOKEN_IN" ]; then
-  section "Validating Jira connection..."
-  # Re-installs keep an existing config.sh — push the captured values into it
-  # so validation tests what was just entered, not stale credentials.
-  bash scripts/devpilot-config.sh set "jira_base_url=$JIRA_URL_IN"   >/dev/null 2>&1 || true
-  bash scripts/devpilot-config.sh set "jira_email=$JIRA_EMAIL_IN"    >/dev/null 2>&1 || true
-  bash scripts/devpilot-config.sh set "jira_api_token=$JIRA_TOKEN_IN" >/dev/null 2>&1 || true
-  if bash scripts/devpilot-config.sh validate; then
-    info "Jira connection OK — tickets will be created in project '$TICKET_PREFIX'"
+if [ "$TRK_CREDS" = 1 ]; then
+  section "Validating the $TRACKER_TYPE connection..."
+  # Re-installs keep an existing config.sh — tracker.sh setup writes the captured values into it.
+  if [ "$TRACKER_TYPE" = "jira" ]; then
+    SETUP_ARGS=("jira_base_url=$JIRA_URL_IN" "jira_email=$JIRA_EMAIL_IN" "jira_api_token=$JIRA_TOKEN_IN")
   else
-    warn "Jira validation FAILED — fix and re-test with:"
-    warn "  bash scripts/devpilot-config.sh set jira_api_token=<token>"
-    warn "  bash scripts/devpilot-config.sh validate"
+    SETUP_ARGS=("azdo_org_url=$AZ_ORG_IN" "azdo_project=$AZ_PROJECT_IN" "azdo_pat=$AZ_PAT_IN")
+  fi
+  if bash scripts/tracker.sh setup "$TRACKER_TYPE" "${SETUP_ARGS[@]}"; then
+    info "$TRACKER_TYPE connection OK"
+  else
+    warn "$TRACKER_TYPE validation FAILED — fix it anytime with /dp-setup tracker"
   fi
 fi
 
@@ -931,21 +982,18 @@ echo "    .claude/commands/    — slash commands for Claude Code"
 echo "    .claude/agents/      — agent definitions"
 echo "    CLAUDE.md            — project context (Claude Code)"
 echo "    .devpilot/           — rules, templates, skills"
-echo "    scripts/             — git-flow, Jira, deploy helpers"
+echo "    scripts/             — tracker (Jira · Azure DevOps · GitHub · local), PRs, versioning, deploy"
 echo "    project.config.md    — team + Claude model config"
 echo ""
 echo "  ── Next steps ──────────────────────────────────────────"
 echo ""
 STEP_N=1
-if [ "$TRACKER_TYPE" = "jira" ]; then
-echo "  $STEP_N. Set Jira credentials (required for tracker: jira):"
-echo "     bash scripts/devpilot-config.sh set jira_base_url=https://your-org.atlassian.net"
-echo "     bash scripts/devpilot-config.sh set jira_api_token=<token>   # validates live"
+if [ "$TRACKER_TYPE" != "local" ] && [ "$TRK_CREDS" = 0 ] && [ "$TRACKER_TYPE" != "github" ]; then
+echo "  $STEP_N. Connect $TRACKER_TYPE (or let the first /dp-deliver ask):  /dp-setup tracker"
 echo ""
 STEP_N=$((STEP_N + 1))
 elif [ "$TRACKER_TYPE" = "github" ]; then
-echo "  $STEP_N. Authenticate the GitHub CLI (required for tracker: github):"
-echo "     gh auth login"
+echo "  $STEP_N. Authenticate GitHub for Issues + PRs:  gh auth login   (or set GITHUB_TOKEN)"
 echo ""
 STEP_N=$((STEP_N + 1))
 fi
@@ -953,7 +1001,7 @@ echo "  $STEP_N. Verify the install:    /dp-status health    (or: bash scripts/d
 STEP_N=$((STEP_N + 1))
 echo "  $STEP_N. Commit the setup:      git add -A && git commit -m \"chore: install devpilot\""
 STEP_N=$((STEP_N + 1))
-echo "  $STEP_N. Optional (deploys):    edit .devpilot/config.sh → DEV/SIT/UAT/PRD URLs + GitHub secrets"
+echo "  $STEP_N. Optional (deploys):    edit .devpilot/config.sh → DEV/SIT/UAT/PRD URLs + pipeline secrets"
 STEP_N=$((STEP_N + 1))
 echo "  $STEP_N. Optional (alerts):     set NOTIFY_WEBHOOK in .devpilot/config.sh → pinged on sprint DONE / QA BLOCKED"
 echo ""
@@ -972,6 +1020,7 @@ echo "  ── Change config anytime ──────────────�
 echo ""
 echo "    /dp-setup fix          — doctor finds missing/invalid config, fixes interactively"
 echo "    /dp-setup wizard       — re-run the configuration wizard"
+echo "    /dp-setup tracker      — connect Jira / Azure DevOps / GitHub Issues (or stay local)"
 echo "    /dp-setup models       — switch Claude model profile (auto | balanced | save)"
 echo "    Edit project.config.md directly"
 echo ""

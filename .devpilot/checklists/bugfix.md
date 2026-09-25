@@ -44,9 +44,9 @@
 - [ ] Merged → **DEV** auto-deployed ✅ — verify fix on DEV
 - [ ] `bash scripts/git-flow.sh release-start X.Y.Z`
 - [ ] **SIT** auto-deployed ✅ — verify fix on SIT
-- [ ] **UAT** approved in GitHub Actions ✅ — verify fix on UAT
+- [ ] **UAT** approved in the pipeline (GitHub Actions / Azure Pipelines) ✅ — verify fix on UAT
 - [ ] `bash scripts/git-flow.sh release-finish X.Y.Z`
-- [ ] **PRD** approved in GitHub Actions ✅
+- [ ] **PRD** approved in the pipeline (GitHub Actions / Azure Pipelines) ✅
 - [ ] Verify fix on production
-- [ ] Jira ticket Done with PR link + verification note
+- [ ] Tracker item Done with PR link + verification note
 - [ ] Changelog entry under "Fixed"

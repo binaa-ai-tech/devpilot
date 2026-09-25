@@ -10,7 +10,7 @@
 #   • Collects commits + changed files since <base-branch> (default: base_branch
 #     from project.config.md, else develop).
 #   • Writes docs/summaries/<slug>.md and echoes the path on stdout.
-#   • With --post, appends a condensed version to the ticket via track.sh
+#   • With --post, appends a condensed version to the ticket via tracker.sh
 #     (works for local | github | jira — no Jira coupling here).
 # =============================================================================
 set -uo pipefail
@@ -98,7 +98,7 @@ Commits: ${COMMIT_HASHES:-none}
 Models: ${DEVPILOT_ENGINES:-$(bash "$ROOT/scripts/resolve-model.sh" show 2>/dev/null | tr '\n' ' ')}
 Tests: ${TESTS:-n/a}
 Detail: ${OUT}"
-  bash "$ROOT/scripts/track.sh" comment "$KEY" "$COMMENT" >/dev/null 2>&1 \
+  bash "$ROOT/scripts/tracker.sh" comment "$KEY" "$COMMENT" >/dev/null 2>&1 \
     && echo "📌 summary posted to $KEY" >&2 \
     || echo "⚠️  could not post summary to $KEY (tracker unavailable)" >&2
 fi

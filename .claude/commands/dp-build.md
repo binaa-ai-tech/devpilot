@@ -1,10 +1,10 @@
-# /dp-build — Build a sprint → develop
+# /dp-build — Build a sprint → versioned PR → merged into develop → items closed
 
-Input: **$ARGUMENTS** — a sprint id or name (from `/dp-sprint`). Empty = the
-"run first" sprint in `docs/sprints/plan.md`.
+Input: **$ARGUMENTS** — a sprint id or name (from `/dp-sprint`). Empty = the "run first" sprint in
+`docs/sprints/plan.md`. (`/dp-deliver` calls this with its own sprint and Story keys.)
 
-Build **every Story in the sprint** on **one branch**, run QA, and open **one PR into
-`develop`** — one push per sprint. The team works in parallel per layer.
+Build **every Story in the sprint** on **one branch**, run QA, bump the version, open **one PR
+into `develop`**, merge it when every gate is green, then close the items and the sprint.
 
 ---
 
@@ -12,14 +12,12 @@ Build **every Story in the sprint** on **one branch**, run QA, and open **one PR
 
 ```bash
 START_TIME=$(date '+%Y-%m-%d %H:%M:%S')
-BASE_BRANCH=$(grep '^base_branch:' project.config.md | head -1 | sed 's/base_branch:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
-
-# Task-balanced Claude tier: power (Opus) for architectural/cross-cutting sprints,
-# else standard (Sonnet). Derived from the sprint's combined story summaries.
-eval "$(bash scripts/resolve-model.sh suggest "<sprint name + story summaries>")"   # sets COMPLEXITY, TIER, MODEL
+BASE_BRANCH=$(grep '^base_branch:' project.config.md | head -1 | awk '{print $2}' | tr -d '"')
+BUMP=$(awk '/^versioning:/{f=1;next} f&&/^[^[:space:]#]/{f=0} f&&/bump:/{print $2;exit}' project.config.md); BUMP="${BUMP:-auto}"
+eval "$(bash scripts/resolve-model.sh suggest "<sprint name + story summaries>")"   # COMPLEXITY, TIER, MODEL
 ```
-Each agent runs on its role model (`.claude/agents/*.md`); when `TIER=power`, spawn the
-implementation agents with `model: "opus"` so hard sprints get the strongest model.
+Agents run on their role model (`.claude/agents/*.md`); when `TIER=power`, spawn the
+implementation agents with `model: "opus"`.
 
 ---
 
@@ -28,16 +26,13 @@ implementation agents with `model: "opus"` so hard sprints get the strongest mod
 ```bash
 SPRINT="$ARGUMENTS"
 [ -z "$SPRINT" ] && SPRINT=$(grep -m1 'Run first:' docs/sprints/plan.md | sed 's/.*(\(.*\)).*/\1/')
-bash scripts/jira-sprint.sh list
+bash scripts/tracker.sh sprint list
 ```
+Story keys come from `docs/sprints/plan.md` (or from `/dp-deliver`). For each, read
+`docs/requirements/<slug>.md`. **Fresh checkout / other session:** `bash scripts/tracker.sh show
+<KEY>` — the description is a self-contained brief (full ACs, scope, DoD); the tracker is enough.
 
-Read `docs/sprints/plan.md` to get the Story keys in `$SPRINT`. For each Story, read its
-spec `docs/requirements/<slug>.md` (scope per Story already recorded at plan time).
-
-**Portable / fresh checkout:** if the local specs aren't present (a different session or
-teammate building from Jira alone), read each Story's **Jira description** —
-it's a self-contained implementation brief (`/dp-plan` set it via `jira-describe.sh`) with the
-full ACs, scope, technical notes, repo + branch convention, and DoD. Jira is sufficient to build.
+Note each Story's intent (feature / enhancement / bug …) → `INTENTS`.
 
 ---
 
@@ -45,15 +40,13 @@ full ACs, scope, technical notes, repo + branch convention, and DoD. Jira is suf
 
 ```bash
 SPRINT_SLUG=$(echo "$SPRINT" | tr '[:upper:] ' '[:lower:]-' | tr -cd 'a-z0-9-')
-bash scripts/git-flow.sh feature-start "sprint" "$SPRINT_SLUG"
+# One Story → feature/<key>-<slug> (e.g. feature/ado-345-csv-export); several → feature/<prefix>-sprint-<slug>
+bash scripts/git-flow.sh feature-start "<KEY or 'sprint'>" "<slug or $SPRINT_SLUG>"
 BRANCH=$(git branch --show-current)
-```
-
-Move every Story in the sprint to **In Progress** and log start:
-```bash
+bash scripts/tracker.sh sprint start "$SPRINT" 2>/dev/null || true
 for KEY in <STORY_KEYS>; do
-  bash scripts/update-jira-status.sh "$KEY" "In Progress"
-  bash scripts/add-jira-comment.sh "$KEY" "▶ Sprint build started [$START_TIME] · Branch: $BRANCH · Sprint: $SPRINT"
+  bash scripts/tracker.sh status "$KEY" "In Progress"
+  bash scripts/tracker.sh comment "$KEY" "▶ Build started [$START_TIME] · Branch: $BRANCH · Sprint: $SPRINT"
 done
 ```
 
@@ -61,103 +54,109 @@ done
 
 ## Step 3 — Team Lead: per-Story implementation plan
 
-**Adopt Team Lead persona.** Read `.devpilot/prompts/team/lead-plan.md`. For each Story,
-write/refresh `docs/plans/<slug>.md` from the requirements (don't re-analyze from scratch).
-**Reuse the saved scope** — `docs/tasks/<slug>-scope.md` was computed at plan time; read it
-instead of re-running discovery or reading the project index. Only if it's missing:
-`bash scripts/scope.sh --save <slug> "<story summary>"`.
-Determine which layers (frontend / backend / DB / integration) each Story touches.
+**Adopt the Team Lead persona** (`.devpilot/prompts/team/lead-plan.md`). For each Story write or
+refresh `docs/plans/<slug>.md` from the requirements. **Reuse the saved scope**
+(`docs/tasks/<slug>-scope.md`); only if missing: `bash scripts/scope.sh --save <slug> "<summary>"`.
+Decide the layers each Story touches (frontend / backend / DB).
 
 ---
 
 ## Step 4 — Implementation (parallel per layer, all Stories)
 
-Spawn agents in parallel for the union of scoped work across the sprint's Stories:
 - **Frontend (Angular)** → `subagent_type: "team-frontend"`
-- **Backend / DB / Integration (.NET + SQL Server)** → `subagent_type: "team-dotnet"`
+- **Backend / DB (.NET + SQL Server)** → `subagent_type: "team-dotnet"`
 
 When both layers change an API, the backend agent commits the regenerated OpenAPI spec first;
 the frontend agent regenerates the Angular client from it (`api-contract.md`).
 
 Each agent prompt:
-> Sprint: `<SPRINT>`. Stories + specs: `<list of docs/requirements/*.md + docs/plans/*.md>`.
-> Branch: `<BRANCH>`. Implement all <layer> work across these Stories per the plans.
-> Read `.devpilot/skills/self-heal.md`. Run build + tests via `bash scripts/run-tests.sh <angular|dotnet>`
-> (summary only — `token-lean-testing`). Commit per Story with a
-> conventional message referencing its key. Report what you built in 3 bullets.
+> Sprint `<SPRINT>` · Stories + specs: `<docs/requirements/*.md + docs/plans/*.md>` · Branch
+> `<BRANCH>`. Implement all <layer> work per the plans. Read `.devpilot/skills/self-heal.md`.
+> Build + test with `bash scripts/run-tests.sh <angular|dotnet>` (summary only). Commit per
+> Story, conventional message ending with the tracker ref (`bash scripts/tracker.sh ref <KEY>` →
+> `MSK-12` · `AB#345` · `#7`). Report what you built in 3 bullets.
 
 ---
 
 ## Step 5 — QA (whole sprint)
 
-**QA here is automated and is the only test gate** — the `team-qa` agent derives and runs the
-cases. Do **not** pause to ask the user to test or sign off before the PR/merge; that breaks the
-autonomous run (see `core-rules.md` #1 and `auto-merge.md`).
+QA is automated and is the only test gate — never pause for the user to test or sign off.
 
 Spawn `subagent_type: "team-qa"`:
-> Sprint: `<SPRINT>`. Verify every acceptance criterion across all Stories. Derive the
-> case matrix per AC with `.devpilot/skills/test-case-design.md`, apply
-> `.devpilot/skills/test-strategy.md` (what to test per AC), add a Playwright journey for
-> every user-facing AC per `.devpilot/skills/ui-e2e-playwright.md` (`performance.md` only
-> when a perf AC is in scope), run everything via `bash scripts/run-tests.sh all`, and gate on
-> `.devpilot/skills/definition-of-done.md`. Write `docs/qa/<SPRINT_SLUG>.md`.
-> Verdict per Story: PASS / BLOCKED.
+> Sprint `<SPRINT>`. Verify every AC of every Story: case matrix per AC
+> (`test-case-design.md`), layers per `test-strategy.md`, a Playwright journey for every
+> user-facing AC (`ui-e2e-playwright.md`; `performance.md` only for a perf AC). Run everything
+> via `bash scripts/run-tests.sh all`, gate on `definition-of-done.md`, write
+> `docs/qa/<SPRINT_SLUG>.md`. Verdict per Story: PASS / BLOCKED.
 
-If any Story is BLOCKED: notify (best-effort, never blocks) and fix, then re-run QA before proceeding:
-```bash
-bash scripts/notify.sh blocked "QA BLOCKED in $SPRINT: <story keys + one-line reason>"
-```
+BLOCKED → `bash scripts/notify.sh blocked "QA BLOCKED in $SPRINT: <keys + reason>"`, fix, re-run QA.
 
 ---
 
-## Step 6 — One PR → develop
+## Step 6 — Review gate + version bump + one PR → develop
 
-Before opening the PR, the Team Lead runs the review gate: apply
-`.devpilot/skills/code-review.md`, plus `.devpilot/skills/security-scan.md` over auth/input
-changes and `.devpilot/skills/definition-of-done.md` — never merge around a 🔴 BLOCKER.
-Run the test guard strict — a gap blocks the PR (`.devpilot/skills/test-guard.md`):
+**Review (Team Lead):** `.devpilot/skills/code-review.md`, `security-scan.md` over auth/input
+changes, `definition-of-done.md` — never open around a 🔴 BLOCKER. Then:
 ```bash
 STRICT=1 bash scripts/test-guard.sh
 ```
-The merge itself follows the `.devpilot/skills/auto-merge.md` gate ladder; if CI goes red
-after the PR opens, `/dp-pr <PR>` drives it back to green within bounded fix cycles.
 
-> **🔌 Transport — `gh` CLI or GitHub MCP.** `open-pr.sh` uses `gh` when present and otherwise
-> just pushes the branch and prints a *compare URL* (exit 3) — it **cannot** create or merge the
-> PR without `gh`. In a `gh`-less environment (Claude Code on the web/remote), that means the
-> PR is neither opened nor auto-merged even though `merge_policy: auto` is set. **Finish the job
-> via the GitHub MCP tools in that case** — don't stop at the compare URL.
-
+**Version** (skip when `BUMP=off`) — bumped **from develop's current version**, so two PRs in
+flight never skip or reuse a number:
 ```bash
-git add docs/ && git commit -m "docs($SPRINT_SLUG): sprint plans, qa, review"
-git push -u origin "$BRANCH" >/dev/null 2>&1 || true
-MERGE_POLICY=$(grep '^merge_policy:' project.config.md | head -1 | awk '{print $2}')
-PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$SPRINT: <n> stories" "docs/qa/${SPRINT_SLUG}.md"); PR_RC=$?
-END_TIME=$(date '+%Y-%m-%d %H:%M:%S')
-COMMITS=$(git log ${BASE_BRANCH}..HEAD --oneline | awk '{print $1}' | head -20 | tr '\n' ' ')
-echo "open-pr.sh rc=$PR_RC (0=created+merged · 3=opened/needs MCP · 1=error)"
+git fetch origin "$BASE_BRANCH" -q
+LEVEL=$(bash scripts/version.sh level $INTENTS)           # any feature → minor, bugs only → patch
+VERSION=$(bash scripts/version.sh bump "$LEVEL" --ref "origin/$BASE_BRANCH")
+bash scripts/version.sh files | xargs git add
+git commit -m "chore(release): bump version to $VERSION"
 ```
 
-Resolve the PR to a terminal state by exit code — **only mark Stories Done after a confirmed merge:**
-
-- **`PR_RC = 0`** — `gh` created and squash-merged it. Done.
-- **`PR_RC = 3`** — `open-pr.sh` could not create/merge (no `gh`, or merge failed). Use the
-  **GitHub MCP tools**: `mcp__github__create_pull_request` (if `$PR_URL` is a compare URL, i.e.
-  the PR isn't open yet) into `$BASE_BRANCH`; then, when `MERGE_POLICY = auto`, run the
-  `auto-merge.md` ladder and `mcp__github__merge_pull_request` with `merge_method: "squash"`.
-  Confirm it returned `merged: true`. If `MERGE_POLICY = pr-only`, leave it open for a human.
-- **`PR_RC = 1`** — hard error; report it, do not mark Stories Done.
+**PR body** — `docs/tasks/<SPRINT_SLUG>-pr.md`:
+```markdown
+## <sprint or story summary>
+**Version:** v<VERSION> (<LEVEL>) · **Sprint:** <SPRINT>
+### Items
+- [<KEY>](<tracker.sh url KEY>) — <title>   (one line per Story; add `<tracker.sh ref KEY>`)
+### QA
+<verdict table from docs/qa/<SPRINT_SLUG>.md> · Review: docs/reviews/<slug>.md
+<!-- devpilot: keys="<STORY_KEYS>" sprint="<SPRINT>" version="<VERSION>" -->
+```
+The last line lets `/dp-pr` finish the job (close items + sprint) on a later run.
 
 ```bash
-# After a CONFIRMED merge (gh exit 0, or MCP merged:true):
-for KEY in <STORY_KEYS>; do
-  bash scripts/update-jira-status.sh "$KEY" "Done"
-  bash scripts/add-jira-comment.sh "$KEY" "✅ Built in sprint $SPRINT [$END_TIME] · PR: $PR_URL"
-done
-bash scripts/notify.sh done "Sprint $SPRINT built — <N> stories · PR: $PR_URL"
-# If still unmerged (pr-only, or a red gate the ladder couldn't clear):
-#   bash scripts/notify.sh blocked "Sprint $SPRINT: PR open, not merged — $PR_URL"
+git add docs/ && git commit -m "docs($SPRINT_SLUG): plans, qa, review" || true
+TITLE="[v$VERSION] <summary> ($(for K in <STORY_KEYS>; do bash scripts/tracker.sh ref "$K"; done | paste -sd' ' -))"
+PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$TITLE" "docs/tasks/${SPRINT_SLUG}-pr.md" --items "<STORY_KEYS>"); PR_RC=$?
+echo "open-pr rc=$PR_RC (0 merged · 3 open/waiting · 1 error)"
 ```
+
+> **🔌 Transport.** `open-pr.sh` detects the host (`scripts/git-host.sh`):
+> **Azure Repos** → `azdo.sh pr-create` + auto-complete (squash, delete branch; completes the
+> moment branch policies pass). **GitHub** → `gh` (merge, or `--auto` while checks run). **GitHub
+> without `gh`** (Claude Code on the web) → rc 3 with a compare URL: create the PR with
+> `mcp__github__create_pull_request`, then merge with `mcp__github__merge_pull_request`
+> (`merge_method: "squash"`) once the ladder is green. Never stop at the compare URL.
+
+Resolve by exit code:
+- **`PR_RC = 0`** — merged. → Step 7.
+- **`PR_RC = 3`** — open, not merged: `merge_policy: pr-only` → report and stop (a human merges).
+  Otherwise drive it with the **`/dp-pr` loop** (review threads, CI fix cycles ≤ 3, merge per
+  `auto-merge.md`), then → Step 7 once the merge is **confirmed**.
+- **`PR_RC = 1`** — hard error; report it. Items stay In Progress.
+
+---
+
+## Step 7 — Close (only after a CONFIRMED merge)
+
+```bash
+bash scripts/close-delivery.sh --pr "$PR_URL" --version "$VERSION" --sprint "$SPRINT" <STORY_KEYS>
+bash scripts/generate-backlog-index.sh
+bash scripts/notify.sh done "v$VERSION merged into $BASE_BRANCH — <N> item(s) · $PR_URL"
+```
+`close-delivery.sh`: comment + **Done** on every Story → parent **Epic Done** when all its
+children are → **sprint closed** when nothing in it is open (otherwise reported, left open) →
+checkout `develop`, pull, delete the merged branch locally. Unmerged (pr-only / red gate)? Keep
+the items In Progress: `bash scripts/notify.sh blocked "PR open, not merged — $PR_URL"`.
 
 ---
 
@@ -165,16 +164,14 @@ bash scripts/notify.sh done "Sprint $SPRINT built — <N> stories · PR: $PR_URL
 
 ```
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-✅  SPRINT BUILT — merged into <BASE_BRANCH>
+✅  v<VERSION> MERGED into <BASE_BRANCH>
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-🗂  Sprint:  <SPRINT>   ·   Stories: <N> (all Done)
-🔀  PR:      <PR_URL> → <BASE_BRANCH>
-⏱  Time:    <START_TIME> → <END_TIME>
-🔖  Commits: <hash1> · <hash2> · ...
-
-🔗  DEV deploys automatically from <BASE_BRANCH> after CI passes
-📁  QA:      docs/qa/<SPRINT_SLUG>.md
+🗂  Sprint:   <SPRINT> <closed | open (n left)>   ·   Stories: <N> Done
+🔀  PR:       <PR_URL>  (squash-merged, branch deleted)
+⏱  Time:     <START_TIME> → <END_TIME>
+📁  QA:       docs/qa/<SPRINT_SLUG>.md
+📍  Now on:   <BASE_BRANCH> (pulled)
 ──────────────────────────────────────────────────────
-🚀  Promote when ready:  /dp-release sit → /dp-release uat → /dp-release prd
+🚀  Promote when ready:  /dp-release sit → uat → prd
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```

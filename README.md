@@ -6,10 +6,11 @@
 
 You write what you need in one sentence. DevPilot plans it, writes the code, tests it, reviews it, and merges it.
 
-[![Version](https://img.shields.io/badge/version-5.0.0-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-5.1.0-blue.svg)](VERSION)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#license)
 [![Runs on](https://img.shields.io/badge/runs%20on-Claude%20Code-7c3aed.svg)](#what-you-need)
 [![Stack](https://img.shields.io/badge/stack-Angular%20%7C%20.NET%20%7C%20SQL%20Server-orange.svg)](#what-you-need)
+[![Trackers](https://img.shields.io/badge/trackers-Jira%20%7C%20Azure%20DevOps%20%7C%20GitHub-0052cc.svg)](#connect-jira-azure-devops-or-github)
 
 </div>
 
@@ -23,12 +24,14 @@ You write what you need in one sentence. DevPilot plans it, writes the code, tes
 
 That one command does what a full team does:
 
-1. **Plans**: writes the user story and acceptance criteria, and checks the backlog for duplicates.
+1. **Plans**: writes the user story and acceptance criteria, and checks your tracker (Jira, Azure DevOps or GitHub Issues), including existing child tasks, so nothing is created twice.
 2. **Builds**: a .NET developer agent writes the API and database changes; an Angular developer agent writes the UI.
 3. **Tests**: writes and runs unit tests, API tests on a real SQL Server, and browser (UI) tests.
 4. **Reviews**: checks code quality, security, performance, and missing tests.
-5. **Merges**: opens a pull request into `develop` and merges it once every check is green.
+5. **Versions and merges**: bumps the version (`1.4.0` → `1.5.0`), opens a pull request into `develop`, and merges it once every check is green.
+6. **Closes**: marks the tickets Done and closes the Epic and the sprint once they're finished, then switches you back to `develop`.
 
+Works with **GitHub or Azure Repos**, and with **Jira, Azure DevOps Boards, GitHub Issues, or no tracker at all**.
 Production is never touched without your approval.
 
 ---
@@ -42,10 +45,10 @@ Production is never touched without your approval.
 5. [Testing](#5-testing)
 6. [Releasing to SIT, UAT, and production](#6-releasing-to-sit-uat-and-production)
 7. [Safety checks (quality gates)](#7-safety-checks-quality-gates)
-8. [Configuration](#8-configuration)
+8. [Configuration](#8-configuration) · [Connect Jira, Azure DevOps or GitHub](#connect-jira-azure-devops-or-github)
 9. [What you need](#what-you-need)
 10. [Troubleshooting](#troubleshooting)
-11. [Upgrading from 4.x](#upgrading-from-4x)
+11. [Upgrading](#upgrading)
 
 ---
 
@@ -95,7 +98,7 @@ Each command matches a role in a normal development team.
 | `/dp-release <stage>` | DevOps | Deploys to `sit`, `uat`, or `prd`, or runs `rollback`. |
 | `/dp-hotfix …` | On-call | Emergency fix for a production bug. |
 | `/dp-status` | Everyone | Shows the task board. `health` checks the setup; `metrics` shows speed. |
-| `/dp-setup` | Admin | Fixes settings and changes which Claude models the team uses. |
+| `/dp-setup` | Admin | Fixes settings, connects Jira / Azure DevOps / GitHub (`tracker`), changes Claude models. |
 
 You never call the AI agents directly. The commands start them for you.
 
@@ -108,12 +111,14 @@ You never call the AI agents directly. The commands start them for you.
 | Build a new feature | `/dp-deliver "users can reset their password by email"` |
 | Fix a bug | `/dp-deliver "the orders page shows a 500 error when the list is empty"` |
 | Build it **and** deploy to SIT | `/dp-deliver "…" --to sit` |
+| Build a ticket that already exists | `/dp-deliver PROJ-12` (Jira) · `/dp-deliver ADO-345` (Azure DevOps) · `/dp-deliver GH-7` |
+| Connect Jira / Azure DevOps / GitHub | `/dp-setup tracker` |
 | Review the plan before any code is written | `/dp-plan "…"` → check the stories → `/dp-sprint` → `/dp-build` |
 | Plan many ideas, then build them together | run `/dp-plan` several times → `/dp-sprint` → `/dp-build sprint-1` |
 | Add missing tests to a story | `/dp-test PROJ-12` |
 | Test the whole UI in a browser | `/dp-test ui PROJ-12` |
 | Fix a pull request (red CI or review comments) | `/dp-pr 42` |
-| Deploy a release | `/dp-release sit 1.4.0` → `/dp-release uat` → `/dp-release prd 1.4.0` |
+| Deploy a release | `/dp-release sit` → `/dp-release uat` → `/dp-release prd` |
 | Undo a bad production release | `/dp-release rollback` |
 | Fix production **right now** | `/dp-hotfix PROJ-99 login-crash 1.4.1` |
 | Continue after an interruption | `/dp-deliver resume` |
@@ -128,19 +133,24 @@ You never call the AI agents directly. The commands start them for you.
 ```
 /dp-deliver "add CSV export"
    │
-   ├─ 1. PLAN     Writes the story + acceptance criteria. Checks the backlog for duplicates.
-   │              Creates the ticket (Jira, GitHub Issues, or a local file) BEFORE any code.
+   ├─ 0. TRACKER  Checks Jira / Azure DevOps / GitHub is connected. If not, asks once:
+   │              connect it now (paste the API key) or continue without a tracker.
+   ├─ 1. PLAN     Writes the story + acceptance criteria. Searches the tracker for duplicates and
+   │              opens the closest matches' child tasks. Creates Epic → Story BEFORE any code.
    ├─ 2. SPRINT   New feature → its own sprint.  Bug → the current sprint.
    │              Critical production bug (P0/P1) → stops and tells you to use /dp-hotfix.
    ├─ 3. DESIGN   Tech Lead lists the files to change, the API shape, and which tests are needed.
    ├─ 4. CODE     .NET agent: API, database, migrations  ║  Angular agent: pages, services
    ├─ 5. TEST     Unit tests · API tests on real SQL Server · browser tests (Playwright)
    ├─ 6. REVIEW   Code quality · security · performance · every changed file has a test
-   ├─ 7. MERGE    Pull request into develop, merged when all checks are green
-   └─ 8. DEPLOY   (only with --to sit) creates the release and deploys to SIT
+   ├─ 7. VERSION  Bumps develop's version: feature 1.4.0 → 1.5.0 · bug 1.4.0 → 1.4.1
+   ├─ 8. MERGE    PR "[v1.5.0] Add CSV export (PROJ-12)" into develop, merged when all checks pass
+   ├─ 9. CLOSE    Stories → Done · Epic → Done (when all its stories are) · sprint → closed
+   │              · you're back on develop with the latest code
+   └─ 10. DEPLOY  (only with --to sit) creates release/1.5.0 and deploys to SIT
 ```
 
-**When does it stop and ask you?** Only when it can't tell whether your request duplicates an existing story. Everything else is automatic.
+**When does it stop and ask you?** Only twice, and only when needed: (1) the first time, if no tracker is connected, and (2) when it can't tell whether your request duplicates an existing ticket. Everything else is automatic.
 
 **Where can I see what it did?**
 
@@ -184,18 +194,22 @@ develop ──(automatic)──► DEV ──/dp-release sit──► SIT ──
 
 | Command | What it does |
 |---------|--------------|
-| `/dp-release sit 1.4.0` | Creates the release branch and deploys to SIT |
+| `/dp-release sit` | Creates `release/<version>` from develop and deploys to SIT |
 | `/dp-release uat` | Deploys the tested SIT build to UAT |
-| `/dp-release prd 1.4.0` | Merges to `main`, tags `v1.4.0`, and deploys to production **after you approve** |
+| `/dp-release prd` | Merges to `main`, tags `v<version>`, and deploys to production **after you approve** |
 | `/dp-release rollback` | Goes back to the previous production version (shows the plan first) |
 
-Version numbers: new feature → `1.4.0` → `1.5.0`. Bug fix → `1.4.0` → `1.4.1`.
+**Version numbers are automatic.** Every `/dp-deliver` bumps develop's version (new feature → `1.4.0` → `1.5.0`,
+bug fix → `1.4.0` → `1.4.1`) in `package.json`, `.csproj` / `Directory.Build.props` and `VERSION`. `/dp-release sit`
+releases whatever version develop has. You can still give one: `/dp-release sit 2.0.0`.
 
 <details>
 <summary>One-time setup for deployments</summary>
 
-In GitHub, add these secrets: `DEPLOY_HOOK_DEV`, `DEPLOY_HOOK_SIT`, `DEPLOY_HOOK_UAT`, `DEPLOY_HOOK_PRD`.
-Add these environments: `dev`, `sit`, `uat`, `prd`. Set required reviewers on `uat` and `prd`.
+**GitHub:** add the secrets `DEPLOY_HOOK_DEV`, `DEPLOY_HOOK_SIT`, `DEPLOY_HOOK_UAT`, `DEPLOY_HOOK_PRD`, and the
+environments `dev`, `sit`, `uat`, `prd`. Set required reviewers on `uat` and `prd`.
+
+**Azure DevOps:** create the Pipelines environments `dev`, `sit`, `uat`, `prd`, and add an *Approvals* check on `uat` and `prd`.
 </details>
 
 ---
@@ -215,7 +229,9 @@ Code is merged only when all of these pass. The AI never skips them.
 If a check fails, DevPilot tries to fix it up to 3 times, then stops and explains the problem.
 It never deletes or weakens a test to make it pass.
 
-For extra safety, the installer can generate a CI workflow (`.github/workflows/devpilot-ci.yml`) and protect `develop` and `main` on GitHub, so that CI must pass before anything is merged.
+For extra safety, the installer generates the CI pipeline for your git host and protects `develop` and `main`,
+so CI must pass before anything is merged. On **GitHub** that's `.github/workflows/devpilot-ci.yml` plus branch protection.
+On **Azure Repos** it's `azure-pipelines.yml`, plus the branch policies to set (Build validation, squash merge only).
 
 ---
 
@@ -227,8 +243,12 @@ All settings live in **`project.config.md`** in your project root. The most impo
 ticket_prefix: APP            # your Jira project key
 base_branch: develop          # pull requests go here
 tracker:
-  type: jira                  # local (no setup) | github | jira
+  type: azure                 # local (no setup) | jira | azure | github
+  when_unconfigured: ask      # ask = offer to connect, else continue without | skip = never ask
+git_host: auto                # auto (from your git remote) | github | azure
 merge_policy: auto            # auto = DevPilot merges green PRs | pr-only = a person merges
+versioning:
+  bump: auto                  # auto = every /dp-deliver bumps the version | off
 language: en                  # language for requirement and test documents (code stays English)
 
 model_policy:
@@ -245,7 +265,23 @@ model_policy:
 
 Change it with `/dp-setup models balanced`.
 
-**Jira setup:** run `bash scripts/devpilot-config.sh set jira_api_token=<token>` (also `jira_base_url` and `jira_email`). The token is checked right away and stored in `.devpilot/config.sh`, which is never committed.
+### Connect Jira, Azure DevOps, or GitHub
+
+Run `/dp-setup tracker` and pick one. DevPilot asks for the values below, tests the connection, and saves them in
+`.devpilot/config.sh`, which is **never committed**.
+
+| Tracker | What you need | Sprints become |
+|---------|---------------|----------------|
+| **Jira** | site URL, email, [API token](https://id.atlassian.com/manage-profile/security/api-tokens), project key | Jira sprints |
+| **Azure DevOps** | `https://dev.azure.com/<org>`, project name, Personal Access Token (Work Items R/W · Code R/W · Build Read) | iterations |
+| **GitHub Issues** | `gh auth login`, or a token | milestones |
+| **None** | nothing: tickets are kept as files in `docs/tasks/` | files in `docs/sprints/` |
+
+Prefer not to paste keys into chat? Set them as environment variables (`JIRA_API_TOKEN`, `AZDO_PAT`, `GITHUB_TOKEN`, …).
+DevPilot reads those first, which also suits CI.
+
+Your **code** can be on GitHub or Azure Repos, whichever tracker you use. DevPilot detects it from your git remote.
+Azure Repos uses the same `AZDO_PAT`.
 
 ---
 
@@ -257,7 +293,9 @@ Change it with `/dp-setup models balanced`.
 | `git` | **Yes** | Branches and releases |
 | .NET SDK and Node.js | **Yes** | To build and test your project |
 | Docker | Recommended | API tests use a real SQL Server in a container |
-| [GitHub CLI](https://cli.github.com) (`gh`) | Recommended | Opens and merges pull requests from the terminal |
+| [GitHub CLI](https://cli.github.com) (`gh`) | If your code is on GitHub | Opens and merges pull requests from the terminal |
+| Azure DevOps Personal Access Token | If you use Azure DevOps | Tickets, pull requests, and pipeline status |
+| `curl` and `jq` | **Yes** | Talk to Jira / Azure DevOps / GitHub |
 
 **Your project:** an Angular frontend and/or an ASP.NET Core backend with SQL Server.
 
@@ -269,7 +307,10 @@ Change it with `/dp-setup models balanced`.
 
 | Problem | Solution |
 |---------|----------|
-| Jira tickets are not created | `bash scripts/devpilot-config.sh validate`, then set a new token. Until it works, tasks are logged locally, so nothing is lost. |
+| Tickets are not created in Jira / Azure DevOps | `/dp-setup tracker` tests and fixes the connection. Until then, tickets are kept locally in `docs/tasks/`, so nothing is lost. |
+| I don't want to use a tracker | Answer **Continue without a tracker** once, or set `tracker.when_unconfigured: skip`. |
+| Azure DevOps PR is open but not merged | Auto-complete is on: it merges as soon as the branch policies pass. Check with `/dp-pr <id>`. |
+| The version didn't change | `versioning.bump` is `off` in `project.config.md`, or the PR hasn't merged yet. |
 | API tests fail with a Docker error | Start Docker Desktop. The tests need a real SQL Server. |
 | Claude hit a usage limit in the middle of a task | Nothing is lost. Wait for the limit to reset, then run `/dp-deliver resume`. |
 | A pull request has red CI | `/dp-pr <PR number>` |
@@ -279,9 +320,13 @@ Change it with `/dp-setup models balanced`.
 
 ---
 
-## Upgrading from 4.x
+## Upgrading
 
-Run `bash install.sh --update`. Old commands are removed and new ones installed. Then delete the `engines:`,
+**From 5.0:** run `bash install.sh --update`. The per-action Jira scripts are replaced by one interface,
+`scripts/tracker.sh`. Your `project.config.md` keeps working; to use the new options, add `when_unconfigured`, `git_host`,
+and `versioning` from the [Configuration](#8-configuration) example.
+
+**From 4.x:** run `bash install.sh --update`. Old commands are removed and new ones installed. Then delete the `engines:`,
 `layer_overrides:`, `layer_models:`, and `fallback:` blocks from `project.config.md`, and run `/dp-setup models auto`.
 
 | Old (4.x) | New (5.x) |
@@ -306,7 +351,8 @@ Run `bash install.sh --update`. Old commands are removed and new ones installed.
 .devpilot/skills/   23 short playbooks the agents load only when needed (index: skills/README.md)
 .devpilot/rules/    coding rules for angular, dotnet, sqlserver
 .devpilot/process.md  the full delivery process: phases, gates, roles
-scripts/            Jira/GitHub/local tracking, git flow, tests, CI, deploy, health check
+scripts/            tracker.sh (+ jira.sh · azdo.sh · github.sh) · open-pr.sh · version.sh · close-delivery.sh
+                    · git flow · tests · CI · deploy · health check
 tests/run.sh        test suite for the scripts
 install.sh          installer and --update
 ```

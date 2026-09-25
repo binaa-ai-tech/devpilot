@@ -2,7 +2,7 @@
 
 **Date:** <DATE>
 **Status:** Proposed | Accepted | Deprecated | Superseded by ADR-<N>
-**Ticket:** <JIRA-KEY>
+**Ticket:** <KEY>
 **Author:** AI Team Lead
 
 ---

@@ -1,10 +1,10 @@
 # Feature — Definition of Done
 
-Tick every box before marking the Jira ticket Done.
+Tick every box before the tracker item is marked Done.
 
 ## Step 1 — Triage
 
-- [ ] Ticket exists in Jira with type=feature
+- [ ] Item exists in the tracker (Story under an Epic)
 - [ ] Acceptance criteria written and specific
 - [ ] Priority assigned
 
@@ -48,10 +48,10 @@ Tick every box before marking the Jira ticket Done.
 - [ ] `bash scripts/git-flow.sh release-start X.Y.Z`
 - [ ] Release branch pushed → CI passes → **SIT** auto-deployed ✅
 - [ ] Smoke test on SIT passed
-- [ ] **UAT** approved in GitHub Actions ✅ (manual gate)
+- [ ] **UAT** approved in the pipeline (GitHub Actions / Azure Pipelines) ✅ (manual gate)
 - [ ] Smoke test on UAT passed
 - [ ] `bash scripts/git-flow.sh release-finish X.Y.Z` (tags vX.Y.Z, merges → main + develop)
-- [ ] **PRD** approved in GitHub Actions ✅ (manual gate)
+- [ ] **PRD** approved in the pipeline (GitHub Actions / Azure Pipelines) ✅ (manual gate)
 - [ ] Smoke test on production passed
-- [ ] Jira ticket moved to Done with PR link
+- [ ] Tracker item moved to Done with PR link (automatic after merge)
 - [ ] Changelog entry added

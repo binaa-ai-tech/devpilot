@@ -1,7 +1,7 @@
-# Implementation Brief — build this Story from Jira alone
+# Implementation Brief — build this Story from the tracker alone
 
 > This description is self-contained: any Claude session or teammate can
-> implement it from Jira without the originating chat. Everything needed is below
+> implement it from the tracker (Jira, Azure DevOps or GitHub) without the originating chat. Everything needed is below
 > or linked in the repo.
 
 ## How to implement

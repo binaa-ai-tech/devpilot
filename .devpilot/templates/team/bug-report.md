@@ -1,6 +1,6 @@
 # Bug: <BUG-TITLE>
 
-**Ticket:** <JIRA-KEY>  ·  **Type:** Bug  ·  **Severity:** <P0 | P1 | P2 | P3>
+**Ticket:** <KEY>  ·  **Type:** Bug  ·  **Severity:** <P0 | P1 | P2 | P3>
 **Date:** <DATE>  ·  **Reported via:** <user report / monitoring / QA / hotfix>
 **Affected version / area:** <version or component>
 

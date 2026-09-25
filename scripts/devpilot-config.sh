@@ -9,7 +9,8 @@
 #   bash scripts/devpilot-config.sh validate
 #   bash scripts/devpilot-config.sh show
 #
-# All values live in .devpilot/config.sh (gitignored).
+# All values live in .devpilot/config.sh (gitignored); environment variables of the
+# same name override them (CI). Switch trackers with scripts/tracker.sh setup.
 # This script updates that file safely via sed — no manual editing required.
 # =============================================================================
 set -euo pipefail
@@ -158,7 +159,7 @@ config_set() {
   require_config
 
   # Validate key is a known config key
-  local known_keys="JIRA_BASE_URL JIRA_EMAIL JIRA_API_TOKEN JIRA_PROJECT_KEY GITHUB_ORG GITHUB_REPO TICKET_PREFIX MAIN_BRANCH DEVELOP_BRANCH DEV_FRONTEND_URL DEV_API_URL SIT_FRONTEND_URL SIT_API_URL UAT_FRONTEND_URL UAT_API_URL PRD_FRONTEND_URL PRD_API_URL NOTIFY_EMAIL"
+  local known_keys="JIRA_BASE_URL JIRA_EMAIL JIRA_API_TOKEN JIRA_PROJECT_KEY AZDO_ORG_URL AZDO_PROJECT AZDO_PAT AZDO_TEAM AZDO_REPO AZDO_STORY_TYPE GITHUB_TOKEN GITHUB_ORG GITHUB_REPO TICKET_PREFIX MAIN_BRANCH DEVELOP_BRANCH DEV_FRONTEND_URL DEV_API_URL SIT_FRONTEND_URL SIT_API_URL UAT_FRONTEND_URL UAT_API_URL PRD_FRONTEND_URL PRD_API_URL NOTIFY_WEBHOOK NOTIFY_EMAIL"
   if ! echo "$known_keys" | grep -qw "$key"; then
     warn "Unknown key: $key"
     warn "Known keys: $known_keys"
@@ -184,7 +185,7 @@ config_show() {
     [[ -z "$line" ]] && echo "" && continue
 
     # Mask tokens
-    if [[ "$line" =~ _TOKEN= ]] || [[ "$line" =~ _SECRET= ]] || [[ "$line" =~ _PASSWORD= ]]; then
+    if [[ "$line" =~ _TOKEN= ]] || [[ "$line" =~ _PAT= ]] || [[ "$line" =~ _SECRET= ]] || [[ "$line" =~ _PASSWORD= ]]; then
       key="${line%%=*}"
       echo "  ${key}=****** (masked)"
     else
@@ -194,91 +195,21 @@ config_show() {
   echo ""
 }
 
-# Validate Jira credentials by making a real API call
+# Validate the ACTIVE tracker's credentials with a real API call (scripts/tracker.sh ping)
 config_validate() {
-  require_config
-  source "$CONFIG_FILE"
-
+  local root tracker
+  root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+  tracker=$(bash "$root/scripts/tracker.sh" configured 2>/dev/null || echo local)
   echo ""
-  echo -e "${BOLD}Validating devpilot configuration...${RESET}"
+  echo -e "${BOLD}Validating devpilot configuration (tracker: $tracker)...${RESET}"
   echo ""
-
-  local ok=true
-
-  # Check required fields
-  for var in JIRA_BASE_URL JIRA_EMAIL JIRA_API_TOKEN JIRA_PROJECT_KEY GITHUB_ORG GITHUB_REPO; do
-    val="${!var:-}"
-    if [ -z "$val" ] || [[ "$val" =~ ^YOUR_ ]] || [[ "$val" =~ example\.com ]]; then
-      echo -e "  ${RED}✗${RESET} ${var}: not set (still has placeholder value)"
-      ok=false
-    else
-      if [[ "$var" =~ _TOKEN ]] || [[ "$var" =~ _SECRET ]]; then
-        echo -e "  ${GREEN}✓${RESET} ${var}: set (masked)"
-      else
-        echo -e "  ${GREEN}✓${RESET} ${var}: ${val}"
-      fi
-    fi
-  done
-
-  echo ""
-
-  # Test Jira API connection
-  if [ "${JIRA_BASE_URL:-}" != "" ] && [[ ! "${JIRA_BASE_URL:-}" =~ YOUR_ ]]; then
-    echo -n "  Testing Jira API connection... "
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-      --url "${JIRA_BASE_URL}/rest/api/3/myself" \
-      --user "${JIRA_EMAIL}:${JIRA_API_TOKEN}" \
-      --header "Accept: application/json" \
-      --max-time 10 2>/dev/null || echo "000")
-
-    case "$HTTP_CODE" in
-      200)
-        echo -e "${GREEN}✓ Connected (HTTP 200)${RESET}"
-        ;;
-      401)
-        echo -e "${RED}✗ Unauthorized (HTTP 401) — check JIRA_EMAIL and JIRA_API_TOKEN${RESET}"
-        ok=false
-        ;;
-      403)
-        echo -e "${RED}✗ Forbidden (HTTP 403) — token lacks permission${RESET}"
-        ok=false
-        ;;
-      000)
-        echo -e "${YELLOW}⚠ Could not reach ${JIRA_BASE_URL} — check network or URL${RESET}"
-        ok=false
-        ;;
-      *)
-        echo -e "${YELLOW}⚠ Unexpected HTTP ${HTTP_CODE}${RESET}"
-        ok=false
-        ;;
-    esac
-  fi
-
-  # Test Jira project key
-  if [ "${JIRA_PROJECT_KEY:-}" != "" ] && [[ ! "${JIRA_PROJECT_KEY:-}" =~ ^KEY$ ]]; then
-    echo -n "  Testing Jira project ${JIRA_PROJECT_KEY}... "
-    HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" \
-      --url "${JIRA_BASE_URL}/rest/api/3/project/${JIRA_PROJECT_KEY}" \
-      --user "${JIRA_EMAIL}:${JIRA_API_TOKEN}" \
-      --header "Accept: application/json" \
-      --max-time 10 2>/dev/null || echo "000")
-
-    case "$HTTP_CODE" in
-      200) echo -e "${GREEN}✓ Project found${RESET}" ;;
-      404) echo -e "${RED}✗ Project ${JIRA_PROJECT_KEY} not found${RESET}"; ok=false ;;
-      *)   echo -e "${YELLOW}⚠ HTTP ${HTTP_CODE}${RESET}" ;;
-    esac
-  fi
-
-  echo ""
-  if [ "$ok" = true ]; then
+  if bash "$root/scripts/tracker.sh" ping; then
     echo -e "  ${GREEN}${BOLD}✅ Configuration valid${RESET}"
   else
-    echo -e "  ${RED}${BOLD}❌ Configuration has errors — fix above and re-run${RESET}"
-    echo ""
-    echo "  Fix with:  bash scripts/devpilot-config.sh set jira_api_token=<new-token>"
+    echo -e "  ${RED}${BOLD}❌ $tracker is not reachable — fix the values above and re-run${RESET}"
     exit 1
   fi
+  if [ -f "$root/scripts/git-host.sh" ]; then bash "$root/scripts/git-host.sh" check || true; fi
   echo ""
 }
 
@@ -312,11 +243,12 @@ case "$CMD" in
     echo "    bash scripts/devpilot-config.sh get jira_api_token         — read one key"
     echo "    bash scripts/devpilot-config.sh set jira_api_token=<val>   — update one key"
     echo "    bash scripts/devpilot-config.sh set jira_base_url=https://myorg.atlassian.net"
-    echo "    bash scripts/devpilot-config.sh validate                   — test Jira connection"
+    echo "    bash scripts/devpilot-config.sh validate                   — test the tracker + git host"
     echo ""
     echo "  Common updates:"
     echo "    Rotate Jira token:  bash scripts/devpilot-config.sh set jira_api_token=<new-token>"
     echo "    Set project key:    bash scripts/devpilot-config.sh set jira_project_key=MSK"
+    echo "    Azure DevOps PAT:   bash scripts/devpilot-config.sh set azdo_pat=<token>"
     echo "    Set GitHub org:     bash scripts/devpilot-config.sh set github_org=my-org"
     echo ""
     exit 1

@@ -1,12 +1,14 @@
 # /dp-release — DevOps: promote SIT → UAT → PRD, or roll back
 
 Usage: **/dp-release <stage> [version]**
-- `/dp-release sit 1.1.0` — cut `release/1.1.0` from develop → auto-deploy SIT
+- `/dp-release sit` — cut `release/<version>` from develop → auto-deploy SIT. The version
+  defaults to the one develop already carries (every `/dp-deliver` merge bumped it).
 - `/dp-release uat` — promote the verified SIT build to UAT
-- `/dp-release prd 1.1.0` — finish release → `main` + tag → production (human approval)
+- `/dp-release prd [version]` — finish release → `main` + tag → production (human approval)
 - `/dp-release rollback [version]` — roll production back to a previous tag
 
-Parse the first token as `STAGE`, the rest as `VERSION`. Governing skill:
+Parse the first token as `STAGE`, the rest as `VERSION` (default: `bash scripts/version.sh current`
+on develop for `sit`; the active `release/*` branch's version for `uat` / `prd`). Governing skill:
 `.devpilot/skills/release-ops.md` (build once, promote the same artifact, never skip an
 environment, PRD always gated by a human).
 
@@ -15,10 +17,10 @@ environment, PRD always gated by a human).
 ## STAGE = sit  (develop → SIT)
 
 ```bash
-bash scripts/git-flow.sh release-start <VERSION>
+bash scripts/git-flow.sh release-start ${VERSION:-}
 ```
-Cuts `release/<VERSION>` from latest `develop`, bumps the version, pushes. CI then runs
-lint → test → build → **deploy SIT** automatically.
+Cuts `release/<version>` from latest `develop` (refuses if tag `v<version>` already exists),
+pushes. CI then runs lint → test → build → **deploy SIT** automatically.
 
 **Report:** release branch, SIT URL, Actions link. Next: `/dp-release uat`.
 
@@ -27,11 +29,12 @@ lint → test → build → **deploy SIT** automatically.
 ## STAGE = uat  (SIT → UAT)
 
 1. Find the active release branch: `git branch -r | grep release/ | tail -1`.
-2. Confirm the SIT deploy and its smoke tests passed on that branch (`gh run list --branch
-   <release-branch> --limit 1`, or `mcp__github__actions_list` without `gh`). Red → stop and
-   report; never promote a failed build.
-3. Approve the `uat` environment in GitHub Actions (**Review deployments → uat → Approve**).
-   Environment protection rules decide who may approve; DevPilot never bypasses them.
+2. Confirm the SIT deploy and its smoke tests passed on that branch — GitHub: `gh run list
+   --branch <release-branch> --limit 1` (or `mcp__github__actions_list`); Azure:
+   `bash scripts/azdo.sh ci <release-branch>`. Red → stop and report; never promote a failed build.
+3. Approve the `uat` environment — GitHub Actions: **Review deployments → uat → Approve**;
+   Azure Pipelines: **Environments → uat → Approvals and checks**. Protection rules decide who
+   may approve; DevPilot never bypasses them.
 
 **Report:** UAT URL, Actions link. Next, after stakeholder sign-off: `/dp-release prd <version>`.
 
@@ -51,11 +54,13 @@ lint → test → build → **deploy SIT** automatically.
    ```
    Merges `release/<VERSION>` → `main`, tags `v<VERSION>`, merges back → `develop`, pushes,
    deletes the release branch. CI marks the commit **prd-ready** (does NOT auto-deploy).
-4. Production deploy: Actions → `deploy-prd.yml` → **Run workflow** on `main` (protected
-   `production` environment approval).
-5. Close the release's Stories: `bash scripts/update-jira-status.sh <KEY> "Done"`.
+4. Production deploy on `main` behind the protected **production** environment approval —
+   GitHub Actions `deploy-prd.yml` → **Run workflow**, or the Azure Pipelines `prd` stage.
+5. Release notes on the shipped items (they were closed at merge):
+   `bash scripts/tracker.sh comment <KEY> "🚀 Released to production in v<VERSION>"` for each item
+   in `CHANGELOG.md`'s v<VERSION> section.
 
-**Report:** production URL, tag `v<VERSION>`, Stories closed, Actions link.
+**Report:** production URL, tag `v<VERSION>`, items noted, pipeline link.
 
 ---
 
@@ -68,6 +73,7 @@ Never force-pushes or rewrites production history.
 bash scripts/rollback.sh <VERSION>              # dry run — see the plan
 CONFIRM=1 bash scripts/rollback.sh <VERSION>    # create + push rollback/<version>
 ```
-Then open a PR from `rollback/<version>` → `main`, get it approved, and redeploy that tag via
+Then open a PR from `rollback/<version>` → `main` (`bash scripts/open-pr.sh main "Rollback to
+v<version>" "<why>" --no-merge`), get it approved, and redeploy that tag via
 `/dp-release prd <version>`. Every production rollback gets a postmortem
 (`release-ops.md` → Incidents & postmortems).

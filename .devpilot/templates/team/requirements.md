@@ -1,6 +1,6 @@
 # Requirements: <TASK-TITLE>
 
-**Ticket:** <JIRA-KEY>
+**Ticket:** <KEY>
 **Date:** <DATE>
 **BA:** AI Business Analyst
 **Status:** Draft

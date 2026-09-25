@@ -30,22 +30,181 @@ tracker:
   type: local
 merge_policy: auto
 stack:
-  backend: node
+  frontend: angular
+  backend: dotnet
 EOF
   echo "$d"
 }
 
-echo "== track.sh (local) =="
+echo "== tracker.sh — local backend + not-configured flow =="
 D=$(sandbox)
-KEY=$(cd "$D" && bash scripts/create-jira-ticket.sh "Add logout" "story" "Task")
-assert_contains "$KEY" "LOCAL-" "local ticket key prefix"
-TNUM=$(printf '%s' "$KEY" | grep -oE '[0-9]+' | head -1)
-assert_eq "${TNUM:+ok}" "ok" "key has a numeric part (branch-safe)"
-( cd "$D" && bash scripts/add-jira-comment.sh "$KEY" "started" >/dev/null 2>&1 )
-( cd "$D" && bash scripts/update-jira-status.sh "$KEY" "In Progress" >/dev/null 2>&1 )
-LOG=$(cat "$D/docs/tasks/$KEY.md" 2>/dev/null || echo "")
-assert_contains "$LOG" "started" "comment logged to task file"
-assert_contains "$LOG" "In Progress" "status logged to task file"
+OUT=$(cd "$D" && bash scripts/tracker.sh check); RC=$?
+assert_code "$RC" "3" "local tracker, never chosen → check asks (rc 3)"
+assert_contains "$OUT" "tracker.sh setup azure" "check explains how to connect Azure DevOps"
+( cd "$D" && bash scripts/tracker.sh skip 2>/dev/null )
+assert_code "$(cd "$D" && bash scripts/tracker.sh check >/dev/null; echo $?)" "0" "after skip → check passes (no more asking)"
+( cd "$D" && bash scripts/tracker.sh use jira 2>/dev/null; rm -f .devpilot/.tracker-skip )
+OUT=$(cd "$D" && bash scripts/tracker.sh check); RC=$?
+assert_code "$RC" "2" "jira selected without credentials → rc 2"
+assert_contains "$OUT" "jira_api_token" "rc 2 names the missing Jira values"
+assert_eq "$(cd "$D" && bash scripts/tracker.sh type)" "local" "unconfigured jira degrades to local, never crashes"
+( cd "$D" && bash scripts/tracker.sh skip 2>/dev/null )
+OUT=$(cd "$D" && bash scripts/tracker.sh check); RC=$?
+assert_code "$RC" "0" "skip on an unconfigured jira → continue locally"
+assert_contains "$OUT" "STATE=skipped" "check reports the skipped state"
+( cd "$D" && printf 'base_branch: develop\ntracker:\n  type: azure\n  when_unconfigured: skip\n' > project.config.md; rm -f .devpilot/.tracker-skip )
+assert_code "$(cd "$D" && bash scripts/tracker.sh check >/dev/null; echo $?)" "0" "when_unconfigured: skip never asks"
+( cd "$D" && bash scripts/tracker.sh use local 2>/dev/null )
+E=$(cd "$D" && bash scripts/tracker.sh new Epic "CSV export for reports" "goal" 2>/dev/null)
+K1=$(cd "$D" && bash scripts/tracker.sh new Story "Export orders report as CSV" "AC1" "$E" 2>/dev/null)
+K2=$(cd "$D" && bash scripts/tracker.sh new Story "Download invoice as PDF" "AC" "$E" 2>/dev/null)
+assert_eq "$E $K1 $K2" "LOCAL-1 LOCAL-2 LOCAL-3" "local keys are sequential and branch-friendly"
+OUT=$(cd "$D" && bash scripts/tracker.sh search "export the orders report to a csv file")
+assert_eq "$(printf '%s\n' "$OUT" | head -1 | cut -f2)" "$K1" "search ranks the closest existing item first"
+assert_eq "$(printf '%s\n' "$OUT" | grep -c "$K2")" "0" "search leaves unrelated items out"
+OUT=$(cd "$D" && bash scripts/tracker.sh show "$E")
+assert_contains "$OUT" "Children:" "show lists child items"
+assert_contains "$OUT" "$K2" "show includes every existing child task"
+SP=$(cd "$D" && bash scripts/tracker.sh sprint create "Deliver CSV" 2>/dev/null)
+( cd "$D" && bash scripts/tracker.sh sprint assign "$SP" "$K1" "$K2" 2>/dev/null )
+assert_eq "$(cd "$D" && bash scripts/tracker.sh sprint active)" "$SP" "the new sprint is active"
+OUT=$(cd "$D" && bash scripts/tracker.sh sprint close "$SP"); RC=$?
+assert_code "$RC" "4" "sprint with open items stays open (rc 4)"
+( cd "$D" && bash scripts/tracker.sh close "$K1" "$K2" 2>/dev/null && bash scripts/tracker.sh close-parent "$E" 2>/dev/null )
+assert_contains "$(cat "$D/docs/tasks/$E.md")" "Status: Done" "Epic closes once all its children are Done"
+assert_eq "$(cd "$D" && bash scripts/tracker.sh sprint close "$SP")" "closed" "empty sprint closes"
+( cd "$D" && bash scripts/tracker.sh comment "$K1" "started" 2>/dev/null )
+assert_contains "$(cat "$D/docs/tasks/$K1.md")" "started" "comment logged to the item file"
+( cd "$D" && bash scripts/generate-backlog-index.sh >/dev/null )
+assert_contains "$(cat "$D/docs/backlog/index.md")" "| $K1 | Story | Done | $E |" "backlog index built from any tracker"
+assert_code "$(cd "$D" && bash scripts/tracker.sh assert-key "" 2>/dev/null; echo $?)" "1" "assert-key fails with no key"
+for K in MSK-12 ADO-345 GH-7 LOCAL-3; do
+  assert_code "$(cd "$D" && bash scripts/tracker.sh assert-key "$K" 2>/dev/null; echo $?)" "0" "assert-key accepts $K"
+done
+assert_code "$(cd "$D" && bash scripts/tracker.sh hotfix-gate bug P1 2>/dev/null; echo $?)" "1" "hotfix-gate blocks a P1 bug"
+assert_code "$(cd "$D" && bash scripts/tracker.sh hotfix-gate bug P3 2>/dev/null; echo $?)" "0" "hotfix-gate lets a P3 bug through"
+rm -rf "$D"
+
+echo "== version.sh =="
+D=$(sandbox)
+( cd "$D" && printf '{\n  "name": "web",\n  "version": "1.2.3",\n  "dependencies": { "x": "1.0.0" }\n}\n' > package.json \
+  && mkdir -p api && printf '<Project><PropertyGroup>\n    <Version>1.2.3</Version>\n</PropertyGroup></Project>\n' > api/Api.csproj \
+  && git add -A && git commit -qm base && git branch -M develop )
+assert_eq "$(cd "$D" && bash scripts/version.sh current)" "1.2.3" "reads the current version"
+assert_eq "$(cd "$D" && bash scripts/version.sh level bug)" "patch" "bug → patch"
+assert_eq "$(cd "$D" && bash scripts/version.sh level bug feature)" "minor" "any feature → minor"
+assert_eq "$(cd "$D" && bash scripts/version.sh bump minor --ref develop 2>/dev/null)" "1.3.0" "bump computes from the base ref"
+assert_eq "$(cd "$D" && bash scripts/version.sh bump minor --ref develop 2>/dev/null)" "1.3.0" "re-bumping against the same base is idempotent"
+assert_contains "$(cat "$D/api/Api.csproj")" "<Version>1.3.0</Version>" ".NET project version updated"
+assert_contains "$(cat "$D/package.json")" '"version": "1.3.0"' "Angular package.json version updated"
+assert_contains "$(cat "$D/package.json")" '"x": "1.0.0"' "dependency versions untouched"
+E2=$(mktemp -d); git -C "$E2" init -q
+assert_eq "$(cd "$E2" && bash "$REPO/scripts/version.sh" bump patch 2>/dev/null)" "0.0.1" "no version anywhere → 0.0.1 in a new VERSION file"
+rm -rf "$D" "$E2"
+
+echo "== backends over REST (mocked curl) =="
+MOCKBIN=$(mktemp -d); cp "$REPO/tests/mock-curl.sh" "$MOCKBIN/curl"; chmod +x "$MOCKBIN/curl"
+D=$(sandbox); export MOCK_LOG="$D/mock.log"
+mkdir -p "$D/.devpilot"
+cat > "$D/.devpilot/config.sh" <<'EOF'
+JIRA_BASE_URL="https://acme.atlassian.net"
+JIRA_EMAIL="dev@acme.io"
+JIRA_API_TOKEN='tok'
+JIRA_PROJECT_KEY="MSK"
+AZDO_ORG_URL="https://dev.azure.com/acme"
+AZDO_PROJECT="Shop"
+AZDO_PAT='pat'
+GITHUB_TOKEN="ghtok"
+GITHUB_ORG="acme"
+GITHUB_REPO="shop"
+EOF
+T() { ( cd "$D" && PATH="$MOCKBIN:$PATH" bash scripts/tracker.sh "$@" ); }
+# Jira
+( cd "$D" && bash scripts/tracker.sh use jira 2>/dev/null )
+assert_code "$(T check >/dev/null; echo $?)" "0" "jira with credentials → ready"
+assert_eq "$(T new Story "Export CSV" "AC" MSK-1 2>/dev/null)" "MSK-101" "jira: new Story returns its key"
+assert_contains "$(grep 'rest/api/3/issue' "$MOCK_LOG" | head -1)" '"parent":{"key":"MSK-1"}' "jira: Story created under its Epic"
+assert_contains "$(T search "export orders csv")" "MSK-7" "jira: search goes through /search/jql"
+: > "$MOCK_LOG"; T status MSK-7 "Done" 2>/dev/null
+assert_contains "$(cat "$MOCK_LOG")" '"id":"31"' "jira: Done picks the transition into the done category"
+assert_code "$(T sprint close 42 >/dev/null 2>&1; echo $?)" "4" "jira: sprint with open issues is not closed"
+# Azure DevOps
+( cd "$D" && bash scripts/tracker.sh use azure 2>/dev/null ); : > "$MOCK_LOG"
+assert_eq "$(T new Story "Export CSV" "## AC\n- one" ADO-9 2>/dev/null)" "ADO-345" "azure: new Story returns ADO-<id>"
+L=$(cat "$MOCK_LOG")
+assert_contains "$L" 'workitems/$User%20Story' "azure: story type auto-detected (User Story)"
+assert_contains "$L" 'System.LinkTypes.Hierarchy-Reverse' "azure: Story linked to its parent Epic"
+: > "$MOCK_LOG"; T status ADO-345 "Done" 2>/dev/null
+assert_contains "$(cat "$MOCK_LOG")" '"value":"Closed"' "azure: Done maps to the process's Completed state"
+: > "$MOCK_LOG"; SP=$(T sprint create "S1" 2>/dev/null)
+assert_eq "$SP" "S1" "azure: sprint = iteration"
+assert_contains "$(cat "$MOCK_LOG")" "teamsettings/iterations" "azure: iteration added to the team"
+assert_eq "$(T sprint close S1 2>/dev/null)" "closed" "azure: empty iteration closes"
+assert_eq "$(MOCK_WIQL='{"workItems":[{"id":1}]}' T sprint close S1 2>/dev/null)" "open:1" "azure: iteration with open items stays open"
+assert_eq "$(T ref ADO-345)" "AB#345" "azure: commit ref links Boards (AB#)"
+# GitHub via token (no gh)
+( cd "$D" && bash scripts/tracker.sh use github 2>/dev/null ); : > "$MOCK_LOG"
+GHK=$( cd "$D" && PATH="$MOCKBIN:/usr/bin:/bin" bash scripts/tracker.sh new Story "Export CSV" "AC" GH-3 2>/dev/null )
+assert_eq "$GHK" "GH-12" "github: new issue via REST token when gh is absent"
+assert_contains "$(cat "$MOCK_LOG")" "sub_issues" "github: Story attached to its parent as a sub-issue"
+assert_eq "$( cd "$D" && PATH="$MOCKBIN:/usr/bin:/bin" bash scripts/tracker.sh sprint create "S1" 2>/dev/null )" "3" "github: sprint = milestone"
+# Setup writes secrets + switches tracker + tests live
+( cd "$D" && PATH="$MOCKBIN:$PATH" bash scripts/tracker.sh setup azure azdo_pat=newpat >/dev/null 2>&1 ); RC=$?
+assert_code "$RC" "0" "setup stores credentials and pings"
+assert_contains "$(cat "$D/.devpilot/config.sh")" "AZDO_PAT='newpat'" "setup writes the PAT to the gitignored config"
+assert_eq "$(cd "$D" && bash scripts/tracker.sh configured)" "azure" "setup switches tracker.type"
+# Env vars win over the file (CI)
+: > "$MOCK_LOG"; ( cd "$D" && AZDO_PAT=envpat PATH="$MOCKBIN:$PATH" bash scripts/tracker.sh ping >/dev/null 2>&1 )
+assert_contains "$(cat "$MOCK_LOG")" "_apis/projects/Shop" "azure ping hits the project"
+rm -rf "$D"
+
+INSTALL=$(cat "$REPO/install.sh")
+echo "== secrets: env overrides file, never committed =="
+D=$(sandbox); mkdir -p "$D/.devpilot"; printf "AZDO_PAT='filepat'\nJIRA_API_TOKEN='YOUR_JIRA_API_TOKEN'\n" > "$D/.devpilot/config.sh"
+assert_eq "$(cd "$D" && bash -c '. scripts/devpilot-lib.sh; dp_load_secrets; echo "$AZDO_PAT"')" "filepat" "secret read from .devpilot/config.sh"
+assert_eq "$(cd "$D" && AZDO_PAT=envpat bash -c '. scripts/devpilot-lib.sh; dp_load_secrets; echo "$AZDO_PAT"')" "envpat" "environment variable wins over the file (CI)"
+assert_eq "$(cd "$D" && bash -c '. scripts/devpilot-lib.sh; dp_load_secrets; echo "[$JIRA_API_TOKEN]"')" "[]" "installer placeholders count as not configured"
+assert_contains "$INSTALL" '# .devpilot/config.sh holds tracker API keys and must never be committed.
+touch .gitignore' "installer creates .gitignore so config.sh is never committed"
+assert_contains "$(sed -n '/^run_update() {/,/^}/p' "$REPO/install.sh")" '".devpilot/.tracker-skip"' "--update keeps secrets + skip marker ignored"
+rm -rf "$D"
+
+echo "== git host + PRs =="
+D=$(sandbox); export MOCK_LOG="$D/mock.log"; mkdir -p "$D/.devpilot"
+printf 'AZDO_PAT=%s\n' "'pat'" > "$D/.devpilot/config.sh"
+for R in "https://dev.azure.com/acme/Shop/_git/web:azure" "git@ssh.dev.azure.com:v3/acme/Shop/web:azure" \
+         "https://acme.visualstudio.com/Shop/_git/web:azure" "git@github.com:acme/shop.git:github"; do
+  ( cd "$D" && git remote remove origin 2>/dev/null; git remote add origin "${R%:*}" )
+  assert_eq "$(cd "$D" && bash scripts/git-host.sh)" "${R##*:}" "git host from ${R%:*}"
+done
+( cd "$D" && git remote set-url origin "https://dev.azure.com/acme/My%20Shop/_git/web" && git checkout -q -b feature/ado-345-csv )
+: > "$MOCK_LOG"
+OUT=$( cd "$D" && PATH="$MOCKBIN:$PATH" bash scripts/open-pr.sh develop "[v1.3.0] CSV export (AB#345)" "body" --items "ADO-345" 2>/dev/null ); RC=$?
+assert_code "$RC" "0" "azure: PR created and auto-completed → rc 0"
+assert_contains "$OUT" "/My%20Shop/_git/web/pullrequest/77" "azure: prints the PR URL"
+L=$(cat "$MOCK_LOG")
+assert_contains "$L" '"workItemRefs":[{"id":"345"}]' "azure: PR links the work items"
+assert_contains "$L" '"mergeStrategy":"squash"' "azure: auto-complete squashes"
+assert_contains "$L" '"deleteSourceBranch":true' "azure: source branch deleted on merge"
+( cd "$D" && sed -i.bak 's/^merge_policy:.*/merge_policy: pr-only/' project.config.md; rm -f "$MOCK_LOG.merged" )
+( cd "$D" && PATH="$MOCKBIN:$PATH" bash scripts/open-pr.sh develop "t" "b" >/dev/null 2>&1 ); RC=$?
+assert_code "$RC" "3" "pr-only: PR opened, never merged"
+rm -rf "$D" "$MOCKBIN"; unset MOCK_LOG
+
+echo "== close-delivery.sh (after merge) =="
+D=$(sandbox)
+( cd "$D" && git commit -q --allow-empty -m base && git branch -M develop && git checkout -q -b feature/local-2-csv \
+  && bash scripts/tracker.sh skip 2>/dev/null )
+E=$(cd "$D" && bash scripts/tracker.sh new Epic "Reports" "g" 2>/dev/null)
+K=$(cd "$D" && bash scripts/tracker.sh new Story "CSV" "a" "$E" 2>/dev/null)
+SP=$(cd "$D" && bash scripts/tracker.sh sprint create "S1" 2>/dev/null); ( cd "$D" && bash scripts/tracker.sh sprint assign "$SP" "$K" 2>/dev/null )
+OUT=$(cd "$D" && bash scripts/close-delivery.sh --pr https://x/pr/1 --version 1.3.0 --sprint "$SP" "$K" 2>/dev/null); RC=$?
+assert_code "$RC" "0" "close-delivery succeeds"
+assert_contains "$(cat "$D/docs/tasks/$K.md")" "Status: Done" "Story closed"
+assert_contains "$(cat "$D/docs/tasks/$K.md")" "v1.3.0" "merged comment carries the version"
+assert_contains "$(cat "$D/docs/tasks/$E.md")" "Status: Done" "Epic closed with its last Story"
+assert_contains "$OUT" "sprint: closed" "sprint closed when empty"
+assert_eq "$(cd "$D" && git branch --show-current)" "develop" "back on develop after the merge"
 rm -rf "$D"
 
 echo "== scope.sh =="
@@ -143,19 +302,24 @@ rm -rf "$D"
 
 echo "== generate-ci.sh / protect-branches.sh / notify.sh =="
 D=$(sandbox)
-( cd "$D" && printf 'base_branch: develop\nstack:\n  frontend: react\n  backend: node\n' > project.config.md && touch package.json )
-( cd "$D" && bash scripts/generate-ci.sh >/dev/null 2>&1 )
+( cd "$D" && mkdir -p web && printf '{}' > web/angular.json && touch web/package.json && bash scripts/generate-ci.sh >/dev/null 2>&1 )
 CI_FILE="$D/.github/workflows/devpilot-ci.yml"
 [ -f "$CI_FILE" ] && ok "generate-ci writes the workflow" || no "generate-ci writes the workflow"
-assert_contains "$(cat "$CI_FILE" 2>/dev/null)" "npm ci" "node stack → npm steps"
+assert_contains "$(cat "$CI_FILE" 2>/dev/null)" "working-directory: web" "Angular steps run in the Angular workspace"
+assert_contains "$(cat "$CI_FILE" 2>/dev/null)" "dotnet test" ".NET tests in CI"
 assert_contains "$(cat "$CI_FILE" 2>/dev/null)" "test-guard.sh" "workflow runs the test guard"
 assert_contains "$(cat "$CI_FILE" 2>/dev/null)" "audit.sh" "workflow runs the dependency audit"
 assert_contains "$(cat "$CI_FILE" 2>/dev/null)" "name: devpilot-ci" "check is named devpilot-ci (for protection)"
 OUT=$( cd "$D" && bash scripts/generate-ci.sh 2>/dev/null ); RC=$?
 assert_code "$RC" "0" "second run without --force exits 0"
 assert_contains "$OUT" "already exists" "second run refuses to clobber"
-( cd "$D" && printf 'base_branch: main\nstack:\n  frontend: none\n  backend: dotnet\n' > project.config.md && bash scripts/generate-ci.sh --force >/dev/null 2>&1 )
-assert_contains "$(cat "$CI_FILE" 2>/dev/null)" "dotnet test" "--force regenerates for the new stack"
+( cd "$D" && git remote add origin https://dev.azure.com/acme/Shop/_git/web && bash scripts/generate-ci.sh >/dev/null 2>&1 )
+AZ="$D/azure-pipelines.yml"
+assert_contains "$(cat "$AZ" 2>/dev/null)" "UseDotNet@2" "Azure Repos → azure-pipelines.yml with .NET"
+assert_contains "$(cat "$AZ" 2>/dev/null)" "SYSTEM_PULLREQUEST_TARGETBRANCH" "Azure pipeline runs test-guard on PRs"
+OUT=$( cd "$D" && bash scripts/protect-branches.sh 2>/dev/null ); RC=$?
+assert_code "$RC" "0" "protect-branches on Azure exits 0"
+assert_contains "$OUT" "Build validation" "protect-branches explains Azure branch policies"
 # notify: unconfigured → silent success + durable log
 ( cd "$D" && bash scripts/notify.sh done "sprint built" >/dev/null 2>&1 ); RC=$?
 assert_code "$RC" "0" "notify exits 0 when unconfigured"
@@ -199,7 +363,7 @@ echo "== preflight-scan.sh / run-summary.sh =="
 D=$(mktemp -d)
 git -C "$D" init -q; git -C "$D" config user.email t@t.t; git -C "$D" config user.name t
 mkdir -p "$D/scripts"
-cp "$REPO/scripts/preflight-scan.sh" "$REPO/scripts/run-summary.sh" "$REPO/scripts/track.sh" "$D/scripts/"
+cp "$REPO/scripts/preflight-scan.sh" "$REPO/scripts/run-summary.sh" "$REPO/scripts/tracker.sh" "$REPO/scripts/devpilot-lib.sh" "$D/scripts/"
 printf 'base_branch: develop\ntracker:\n  type: local\n' > "$D/project.config.md"
 ( cd "$D" && git checkout -q -b develop && echo a > a.txt && git add a.txt project.config.md scripts && git commit -qm base )
 PF=$( cd "$D" && bash scripts/preflight-scan.sh "fix the a file" pf-test )
@@ -215,7 +379,7 @@ echo "== process-logging policy (core-rules #11) =="
 # The policy: each /dp-deliver flow posts only a start + DONE comment to the ticket
 # (plus BLOCKED as the exception). Routine progress comments must not creep back.
 assert_contains "$(cat "$REPO/.devpilot/skills/core-rules.md")" "Process logging" "core-rules documents the policy"
-ROUTINE_RE='add-jira-comment.sh "\$KEY" "(✅ QA passed|✅ Layer-Locked QA Passed|✅ Merged into|✅ Layer-Locked PR merged|📋 Plan complete|⚙️ Implementation complete|⚙️ Fix implemented)'
+ROUTINE_RE='tracker.sh comment "\$KEY" "(✅ QA passed|✅ Layer-Locked QA Passed|✅ Merged into|✅ Layer-Locked PR merged|📋 Plan complete|⚙️ Implementation complete|⚙️ Fix implemented)'
 # Glob the actual command set so this never goes stale when commands are renamed.
 for CMD in "$REPO"/.claude/commands/*.md; do
   f=$(basename "$CMD")
@@ -320,8 +484,10 @@ assert_contains "$(cat "$REPO/.claude/commands/dp-setup.md")" "## fix" "dp-setup
 INSTALL=$(cat "$REPO/install.sh")
 assert_contains "$INSTALL" "Review — your configuration" "wizard shows a confirm summary before writing"
 assert_contains "$INSTALL" "id.atlassian.com/manage-profile/security/api-tokens" "wizard walks Jira token creation"
-assert_contains "$INSTALL" "Validating Jira connection" "wizard validates Jira live"
-assert_contains "$(cat "$REPO/docs/setup-guide.md")" "Jira setup" "setup guide covers Jira steps"
+assert_contains "$INSTALL" 'tracker.sh setup "$TRACKER_TYPE"' "wizard validates the tracker live"
+assert_contains "$INSTALL" "Azure DevOps" "wizard offers Azure DevOps"
+assert_contains "$(cat "$REPO/docs/setup-guide.md")" "Jira" "setup guide covers Jira"
+assert_contains "$(cat "$REPO/docs/setup-guide.md")" "Azure DevOps" "setup guide covers Azure DevOps"
 
 echo "== ops round: CI gen, protection, notify, --defaults (round 7) =="
 for SC in generate-ci protect-branches notify; do
@@ -404,7 +570,22 @@ LEAK=$(grep -rliE 'opencode|antigravity|github-copilot' "$REPO/.claude" "$REPO/.
 assert_eq "${LEAK:-none}" "none" "no non-Claude engine references in commands, skills, or config"
 OLD=$(grep -rlE '/ceo\b|/dp-config\b|/dp-autofix|/dp-review-fix|/dp-rollback' "$REPO/.claude" "$REPO/.devpilot" "$REPO/scripts" "$REPO/CLAUDE.md" "$REPO/docs/setup-guide.md" 2>/dev/null | tr '\n' ' ')
 assert_eq "${OLD:-none}" "none" "no retired command names outside the README upgrade table"
-assert_contains "$(cat "$REPO/.claude/commands/dp-deliver.md")" "jira-guard.sh assert-key" "dp-deliver keeps the tracker-first gate"
+assert_contains "$(cat "$REPO/.claude/commands/dp-deliver.md")" "tracker.sh assert-key" "dp-deliver keeps the tracker-first gate"
+assert_contains "$(cat "$REPO/.claude/commands/dp-deliver.md")" "tracker.sh check" "dp-deliver checks the tracker first"
+assert_contains "$(cat "$REPO/.claude/commands/dp-deliver.md")" "Continue without a tracker" "dp-deliver offers to skip an unconfigured tracker"
+assert_contains "$(cat "$REPO/.claude/commands/dp-plan.md")" "tracker.sh show" "dp-plan opens candidates' child items"
+assert_contains "$(cat "$REPO/.claude/commands/dp-build.md")" 'version.sh bump "$LEVEL" --ref' "dp-build bumps from develop's version"
+assert_contains "$(cat "$REPO/.claude/commands/dp-build.md")" "close-delivery.sh" "dp-build closes items + sprint after merge"
+assert_contains "$(cat "$REPO/.claude/commands/dp-pr.md")" "azdo.sh pr-complete" "dp-pr merges on Azure Repos"
+assert_contains "$(cat "$REPO/.claude/commands/dp-setup.md")" "## tracker" "dp-setup can connect a tracker"
+RETIRED_REF=$(grep -rlE 'track\.sh|jira-guard|jira-sprint|create-jira|update-jira|add-jira-comment|link-jira|jira-describe|jira-brief' "$REPO/.claude" "$REPO/.devpilot" "$REPO/scripts" "$REPO/CLAUDE.md" "$REPO/README.md" "$REPO/docs/setup-guide.md" 2>/dev/null | tr '\n' ' ')
+assert_eq "${RETIRED_REF:-none}" "none" "no references to retired tracker scripts"
+MISSING=""
+for f in "$REPO"/scripts/*.sh; do
+  n=$(basename "$f"); [ "$n" = "update-org.sh" ] && continue
+  c=$(grep -c "$n" "$REPO/install.sh"); [ "${c:-0}" -ge 2 ] || MISSING="$MISSING $n"
+done
+assert_eq "${MISSING:-none}" "none" "installer ships every script in both lists"
 assert_contains "$(cat "$REPO/.claude/commands/dp-deliver.md")" "--to sit" "dp-deliver can promote to SIT"
 assert_contains "$(cat "$REPO/.claude/commands/dp-release.md")" "STAGE = rollback" "dp-release absorbs rollback"
 assert_contains "$(cat "$REPO/.claude/commands/dp-pr.md")" "Review comments" "dp-pr handles review comments"

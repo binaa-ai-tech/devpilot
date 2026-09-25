@@ -41,7 +41,14 @@ forever; never burn a fourth cycle "just in case".
 - The branch has conflicts needing semantic resolution beyond a clean rebase.
 
 ## Merge mechanics
-- Squash-merge with a conventional title; body links the ticket + QA report.
+- **Version first** — the PR carries exactly one bump above the base branch's version
+  (`version.sh bump <level> --ref origin/<base>`; feature → minor, bug → patch). If the base
+  moved to a new version, redo the bump from it before merging. Title: `[vX.Y.Z] <summary> (<refs>)`.
+- Squash-merge; body links the items + QA report and ends with the
+  `<!-- devpilot: keys=… sprint=… version=… -->` line `/dp-pr` reads.
+- Transport by host: GitHub → `gh pr merge --squash --delete-branch` (or `--auto` while checks run;
+  GitHub MCP `merge_pull_request` where `gh` is missing). Azure Repos → `azdo.sh pr-complete`
+  (auto-complete: squash + delete source branch the moment branch policies pass).
 - Re-run the ladder after any rebase — green-before-rebase proves nothing.
-- After merge: delete the branch, move the Stories to Done, post the single
-  DONE comment (`core-rules.md` #11).
+- After a **confirmed** merge only: `close-delivery.sh` — items Done with the merged comment,
+  Epic Done when all children are, sprint closed when nothing is open, back on the base branch.

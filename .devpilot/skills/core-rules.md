@@ -28,10 +28,10 @@
     repo, not the ticket:
     - **`docs/tasks/<KEY>.md`** is the live per-step log — append who/what/when,
       decisions, and deviations as you go. This is the durable, diffable audit.
-    - **Jira gets exactly two routine comments:** a **start** comment (branch,
-      scope, engine, intent) and a **DONE** summary (what shipped as bullets, PR
-      link, QA verdict, duration). Status transitions track real phases
-      (`In Progress → In Review/Done`).
+    - **The tracker item gets exactly three routine comments:** **planned** (verdict,
+      ACs, scope), **start** (branch, sprint) and **merged** (version, PR link — posted
+      by `close-delivery.sh`). Status transitions track real phases
+      (`To Do → In Progress → Done`); the Epic and sprint close when their work is Done.
     - **Do not post routine progress comments** (plan-complete, impl-complete,
       QA-passed, merged) — they restate the PR and the DONE block and bury the
       summary. **Exception:** a **QA BLOCKED** (or hard-failure) state _is_ worth

@@ -12,14 +12,15 @@ defaults are safe, so when in doubt press Enter.
 |------|-----|-----------|
 | `git` | branch management | **Yes** |
 | [Claude Code](https://claude.ai/code) — CLI, desktop, IDE, or claude.ai/code | runs the whole team | **Yes** |
-| GitHub CLI (`gh`) | PR automation, auto-merge | Recommended |
-| `jq` | JSON ops in checkpoint/config scripts | Recommended |
+| GitHub CLI (`gh`) — code on GitHub | PR automation, auto-merge | Recommended (Claude Code on the web uses the GitHub MCP instead) |
+| Azure DevOps PAT — code on Azure Repos | PRs, auto-complete, pipeline status | Required for Azure Repos |
+| `curl` + `jq` | Jira / Azure DevOps / GitHub REST calls, config scripts | **Yes** |
 | A `develop` branch | the DEV→SIT→UAT→PRD pipeline | Recommended (the wizard can create it) |
 
 Decide (or just take the recommendation):
 
 1. **How Claude models map to the team** — recommended tiers, one model, or per-team?
-2. **Issue tracker** — local files, GitHub Issues, or Jira?
+2. **Work tracker** — Jira, Azure DevOps Boards, GitHub Issues, or none (local files)?
 3. **Merge policy** — auto-merge to `develop`, or human-merged PRs?
 
 ## 2 · Install
@@ -76,56 +77,78 @@ Everything here is changeable later in one command — see §6.
 Shows the model each role will use. Nothing to answer.
 
 ### STEP 6 — Project identity, tracker, merge policy
-- **Ticket prefix** — e.g. `APP`; matches your Jira key if you use Jira.
+- **Ticket prefix** — e.g. `APP`; matches your Jira project key if you use Jira.
 - **Base branch** — accept `develop` (created if missing). Use `main` only for trunk-based repos.
-- **Tracker** — **`local` (recommended to start)**: zero setup, full audit in `docs/tasks/`.
-  Switch to `github`/`jira` later by editing one config line. Choosing `jira` starts the
-  guided Jira walkthrough below (skippable).
+- **Tracker** — `local` (zero setup, items in `docs/tasks/`), `jira`, `azure` (Azure DevOps
+  Boards) or `github` (GitHub Issues). Choosing Jira or Azure DevOps asks for credentials right
+  away — **press Enter to skip**; the first `/dp-deliver` then offers to connect it or continue
+  without a tracker. See §3a.
 - **Merge policy** — **`auto` (recommended)**: the team merges its own green PRs into
   `develop`; production (`/dp-release prd`) always requires you. Pick `pr-only` if every
   PR needs human eyes — e.g. a regulated codebase or a team new to DevPilot.
 - **Docs language** — BA/QA docs in your language (`en`, `ar`, …); code stays English.
 
 ### Final steps — CI workflow & branch protection (after the confirm screen)
-> **Recommendation: accept both.** The installer generates
-> `.github/workflows/devpilot-ci.yml` — a stack-aware pipeline running the gate ladder
-> (build → tests → test-guard strict → dependency audit) on every PR — and, when `gh` is
-> authenticated, applies **branch protection** so that check is required and force-pushes
-> are blocked on `develop`/`main`. This is what makes `merge_policy: auto` safe.
+> **Recommendation: accept both.** The installer generates the gate-ladder pipeline for your
+> git host — **GitHub** → `.github/workflows/devpilot-ci.yml`, **Azure Repos** →
+> `azure-pipelines.yml` (Angular lint/build/Vitest → .NET build/xUnit + SQL Server → Playwright
+> → test-guard strict → dependency audit) — then protects `develop`/`main`: on GitHub it applies
+> branch protection (with `gh`), on Azure Repos it prints the branch policies to set (Build
+> validation, squash-only, no force push). This is what makes `merge_policy: auto` safe.
 > Later: `bash scripts/generate-ci.sh --force` · `bash scripts/protect-branches.sh`.
 
-### Jira setup (tracker: `jira`) — exactly these steps
+## 3a · Trackers and git hosts
 
-1. **Create an API token** — https://id.atlassian.com/manage-profile/security/api-tokens
-   → *Create API token* → copy it (shown once).
-2. **Know your three values** — site URL (`https://<your-org>.atlassian.net`), your
-   Atlassian account **email**, and the token.
-3. **Enter them when the wizard asks** (after you choose tracker `jira`). The installer
-   stores them in `.devpilot/config.sh` (gitignored) and **validates the connection live**
-   at the end — HTTP 200 = working, 401 = wrong email/token, 403 = token lacks permission.
-4. **Ticket prefix = Jira project key.** The wizard's "ticket prefix" (e.g. `APP`) must
-   equal the key of the Jira project where Stories will be created
-   (Jira → Projects → your project → the short key).
-5. Skipped it, or rotating a token later? Same three values, anytime:
-   ```bash
-   bash scripts/devpilot-config.sh set jira_base_url=https://your-org.atlassian.net
-   bash scripts/devpilot-config.sh set jira_email=<email>
-   bash scripts/devpilot-config.sh set jira_api_token=<token>
-   bash scripts/devpilot-config.sh validate
-   ```
+DevPilot talks to one **work tracker** and one **git host**. Mix freely — e.g. Jira + Azure
+Repos, or Azure DevOps Boards + Repos, or GitHub Issues + GitHub.
 
-**What Jira looks like during implementation** (so you know what to expect): `/dp-plan`
-writes Epic → Story with a self-contained brief; a build moves Stories
-`To Do → In Progress → Done` and posts exactly **two** comments per Story — a start
-comment and a DONE summary (detail lives in the PR and `docs/tasks/`). A QA **BLOCKED**
-comment is the only exception. Until credentials are valid, tracking falls back to
-local logs — nothing is lost; `/dp-status` shows the live board either way.
+| Tracker | Sprints are | Values | Connect |
+|---------|-------------|--------|---------|
+| **Jira Cloud** | Scrum sprints (Fix Versions on non-Scrum boards) | site URL, email, API token, project key | `/dp-setup tracker jira` |
+| **Azure DevOps Boards** | team iterations | org URL, project, PAT | `/dp-setup tracker azure` |
+| **GitHub Issues** | milestones (sub-issues for Epic → Story) | `gh auth login` or a token | `/dp-setup tracker github` |
+| **local** | `docs/sprints/*.md` | none | default |
+
+**Jira** — token at https://id.atlassian.com/manage-profile/security/api-tokens; the project key
+must equal your ticket prefix.
+```bash
+bash scripts/tracker.sh setup jira jira_base_url=https://<org>.atlassian.net jira_email=<email> \
+     jira_api_token=<token> jira_project_key=<KEY>
+```
+**Azure DevOps** — PAT from *User settings → Personal access tokens* with **Work Items (Read &
+write), Code (Read & write), Build (Read)**. The Story type is detected from your process
+(User Story · Product Backlog Item · Requirement · Issue).
+```bash
+bash scripts/tracker.sh setup azure azdo_org_url=https://dev.azure.com/<org> azdo_project=<project> azdo_pat=<token>
+```
+`setup` stores the values in `.devpilot/config.sh` (gitignored), switches `tracker.type`, and tests
+the connection live. **CI or shared machines:** export the same names as environment variables
+(`JIRA_API_TOKEN`, `AZDO_PAT`, `GITHUB_TOKEN`, …) — they override the file.
+
+**Not configured?** The first `/dp-deliver` or `/dp-plan` asks once: *connect now* (paste the
+values or set the env vars) or *continue without a tracker* — items are then kept in
+`docs/tasks/` and later runs stop asking until you connect (`/dp-setup tracker`). For
+unattended runs set `tracker.when_unconfigured: skip`.
+
+**Git host** is read from the `origin` remote (`git_host: auto`): GitHub PRs go through `gh`
+(or the GitHub MCP on Claude Code on the web); Azure Repos PRs go through the REST API with the
+same `AZDO_PAT` and use **auto-complete** (squash, delete branch, merge when policies pass).
+
+**What the tracker sees during a delivery:** Epic → Story (or one Bug) with a self-contained
+brief → added to a sprint → `In Progress` with a start comment → after the PR merges, `Done` with
+the version + PR link, the Epic closed once all its Stories are Done, and the sprint closed once
+nothing in it is open. A QA **BLOCKED** comment is the only other one.
+
+**Versions:** every `/dp-deliver` PR bumps the version from `develop`'s current one — a feature
+bumps MINOR, a bug PATCH — in `VERSION`, `Directory.Build.props`, `package.json` and `*.csproj`
+`<Version>`. The PR title carries it (`[v1.4.0] …`); `/dp-release sit` releases exactly that
+version. Turn off with `versioning.bump: off`.
 
 ## 4 · After install — verify before first use
 
 ```bash
-/dp-status health        # or: bash scripts/doctor.sh — checks config, branches, Claude CLI,
-                         # model ids, agent sync, and missing values
+/dp-status health        # or: bash scripts/doctor.sh — checks config, tracker, git host,
+                         # branches, Claude CLI, model ids, agent sync, and missing values
 /dp-setup fix           # interactively repairs anything the doctor flagged
 git add -A && git commit -m "chore: install devpilot"
 ```
@@ -156,8 +179,8 @@ The standard process the team follows lives in `.devpilot/process.md`.
 | Scenario | Model mode | Tracker | Merge policy |
 |----------|-----------|---------|--------------|
 | **Solo developer** | recommended (`auto`) | local | auto |
-| **Product team** | recommended (`auto`) | github or jira | auto (`pr-only` while onboarding) |
-| **Enterprise / regulated** | recommended (`balanced`) or per-team | jira | pr-only + branch protection + CODEOWNERS |
+| **Product team** | recommended (`auto`) | jira, azure or github | auto (`pr-only` while onboarding) |
+| **Enterprise / regulated** | recommended (`balanced`) or per-team | jira or azure | pr-only + branch protection / policies + CODEOWNERS |
 | **Budget-capped** | recommended (`save`) or single (Sonnet) | local | auto |
 
 ## 6 · Changing your mind later
@@ -167,7 +190,8 @@ The standard process the team follows lives in `.devpilot/process.md`.
 | Model profile (recommended mode) | `/dp-setup models save` — or `bash scripts/model-profiles.sh apply save` |
 | One model for everything | `bash scripts/model-profiles.sh single claude-sonnet-5` |
 | Per-team models | edit `models.*` in `project.config.md` → `bash scripts/model-profiles.sh sync-agents` |
-| Agents, tracker, merge policy | edit `project.config.md` (one line each) or `/dp-setup wizard` |
+| Tracker (Jira / Azure DevOps / GitHub / local) | `/dp-setup tracker` |
+| Agents, merge policy, versioning | edit `project.config.md` (one line each) or `/dp-setup wizard` |
 | Update DevPilot itself | `bash install.sh --update` — never touches `project.config.md` or credentials |
 | Update every repo in your org | `bash scripts/update-org.sh <org> --merge` (from the devpilot clone) — clones each repo, runs `--update` on the base branch, opens/merges one PR per repo; `--install-missing` fresh-installs with defaults where devpilot isn't present. **Never delete + re-install** — that loses per-project config; `--update` exists precisely so you don't have to. |
 

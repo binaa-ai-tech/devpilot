@@ -1,6 +1,6 @@
 # /dp-setup — Admin: configure DevPilot
 
-Usage: **/dp-setup [section]** — `fix` · `models [profile]` · `wizard` · `index` · empty = show current config.
+Usage: **/dp-setup [section]** — `fix` · `tracker [jira|azure|github|local]` · `models [profile]` · `wizard` · `index` · empty = show current config.
 
 One place to tune the team. Reads `project.config.md` as the source of truth.
 
@@ -18,25 +18,43 @@ one value at a time. Never touch values that are already valid.
    - **Invalid/empty model tiers or `model_mode`** → offer the three modes; apply with
      `bash scripts/model-profiles.sh apply|single …` (never hand-edit tiers if a command exists).
    - **Agent frontmatter drift** → `bash scripts/model-profiles.sh sync-agents`.
-   - **Jira credentials incomplete** (`tracker: jira`) → walk the 3 steps: API token from
-     https://id.atlassian.com/manage-profile/security/api-tokens, then
-     ```bash
-     bash scripts/devpilot-config.sh set jira_base_url=https://<org>.atlassian.net
-     bash scripts/devpilot-config.sh set jira_email=<email>
-     bash scripts/devpilot-config.sh set jira_api_token=<token>
-     bash scripts/devpilot-config.sh validate     # live connection check
-     ```
-   - **gh missing/unauthenticated** with `tracker: github` or `merge_policy: auto` →
-     tell the user to run `gh auth login` (can't be done for them).
+   - **Tracker selected but not configured** → run the `tracker` section below.
+   - **Git host can't automate PRs** → GitHub: `gh auth login` (the user runs it; on Claude Code
+     on the web the GitHub MCP tools are used instead). Azure Repos: store a PAT with
+     `bash scripts/devpilot-config.sh set azdo_pat=<token>` (scopes: Code R/W, Build Read).
 3. Re-run `bash scripts/doctor.sh` and report before/after. Stop when clean or when the
    only remaining items need something outside the repo (an install, a login).
 
 ## (no arg) — show config
-Summarize `project.config.md`: project name, base branch, tracker, merge policy, active
-agents, the active model profile, and per-tier models:
+Summarize `project.config.md`: project name, base branch, tracker (`bash scripts/tracker.sh type`),
+git host (`bash scripts/git-host.sh`), current version (`bash scripts/version.sh current`), merge
+policy, active agents, the active model profile, and per-tier models:
 ```bash
 bash scripts/model-profiles.sh show
 ```
+
+## tracker [type] — connect Jira, Azure DevOps, GitHub Issues, or go local
+Where Epics, Stories, Bugs and sprints live. No type given → ask with AskUserQuestion:
+**Jira** · **Azure DevOps** · **GitHub Issues** · **Local only (no external tracker)**.
+
+| Tracker | Values to collect | Where to get them |
+|---------|-------------------|-------------------|
+| `jira` | site URL, account email, API token, project key | https://id.atlassian.com/manage-profile/security/api-tokens |
+| `azure` | org URL (`https://dev.azure.com/<org>`), project, PAT | User settings → Personal access tokens (Work Items R/W, Code R/W, Build Read) |
+| `github` | nothing when `gh auth login` is done; otherwise a token with Issues R/W | GitHub → Settings → Developer settings → tokens |
+
+Ask for the values (the user may paste them, or export them as environment variables of the same
+name — `JIRA_API_TOKEN`, `AZDO_PAT`, `GITHUB_TOKEN` — and say "done"). Then one call stores them
+in the gitignored `.devpilot/config.sh`, switches `tracker.type`, and tests the connection live:
+```bash
+bash scripts/tracker.sh setup jira   jira_base_url=https://<org>.atlassian.net jira_email=<email> jira_api_token=<token> jira_project_key=<KEY>
+bash scripts/tracker.sh setup azure  azdo_org_url=https://dev.azure.com/<org> azdo_project=<project> azdo_pat=<token>
+bash scripts/tracker.sh setup github github_token=<token>     # or just: gh auth login
+bash scripts/tracker.sh use local && bash scripts/tracker.sh skip   # no external tracker
+```
+Optional Azure values: `azdo_team` (default "<project> Team") and `azdo_story_type` (auto-detected:
+User Story · Product Backlog Item · Requirement · Issue). Then refresh the backlog map:
+`bash scripts/generate-backlog-index.sh`. Existing local items stay in `docs/tasks/` for reference.
 
 ## models [profile] — switch the model assignment
 DevPilot runs on Claude only. Three **model modes** (recorded as `model_policy.model_mode`):
@@ -62,10 +80,11 @@ bash scripts/resolve-model.sh show                         # verify the tiers
 ```
 
 ## wizard — re-run configuration interactively
-Walk the user through tracker, merge policy, stack, active agents, and model profile, writing
-their answers into `project.config.md`. Helper for non-interactive defaults:
+Walk the user through tracker (the `tracker` section), merge policy, versioning
+(`versioning.bump: auto|off`), stack, active agents, and model profile, writing their answers into
+`project.config.md`. Validate at the end:
 ```bash
-bash scripts/devpilot-config.sh   # if present — seeds/validates project.config.md
+bash scripts/devpilot-config.sh validate     # tracker ping + git host check
 ```
 
 ## index — refresh the project index (token-lean scoping source)

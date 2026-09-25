@@ -21,7 +21,8 @@ can immediately understand the purpose of a branch.
 
 - All lowercase, hyphen-separated words.
 - `{PREFIX}` is set in `.devpilot/config.sh` → `TICKET_PREFIX` (e.g. `msk`, `key`, `app`).
-- `{ticket}` is the Jira ticket number (e.g. `12`, `99`, `101`).
+- `{ticket}` is the tracker number (e.g. `12`). DevPilot passes the full key, so branches read
+  `feature/msk-12-slug` (Jira), `feature/ado-345-slug` (Azure DevOps), `feature/gh-7-slug` (GitHub).
 - `{slug}` is a brief imperative description, max 5 words, no spaces.
 - No trailing slashes or dots.
 

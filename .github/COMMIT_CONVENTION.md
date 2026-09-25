@@ -56,7 +56,7 @@ Common infrastructure scopes included by default:
 | `auth`   | Authentication, sessions, permissions      |
 | `db`     | Migrations, schema changes                 |
 | `infra`  | Infrastructure, cloud config               |
-| `ci`     | GitHub Actions workflows                   |
+| `ci`     | CI pipelines (GitHub Actions / Azure)      |
 | `git`    | Branch strategy, hooks, commit tooling     |
 
 Add your domain-specific scopes (e.g. `payments`, `listings`, `search`) in `.commitlintrc.json`.
