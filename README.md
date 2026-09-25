@@ -7,10 +7,13 @@
 You write what you need in one sentence. DevPilot plans it, writes the code, tests it, reviews it, and merges it.
 
 [![Version](https://img.shields.io/badge/version-5.5.0-blue.svg)](VERSION)
-[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#license)
+[![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Runs on](https://img.shields.io/badge/runs%20on-Claude%20Code-7c3aed.svg)](#what-you-need)
 [![Stack](https://img.shields.io/badge/stack-Angular%20%7C%20.NET%20%7C%20SQL%20Server-orange.svg)](#what-you-need)
 [![Trackers](https://img.shields.io/badge/trackers-Jira%20%7C%20Azure%20DevOps%20%7C%20GitHub-0052cc.svg)](#connect-jira-azure-devops-or-github)
+
+**New in 5.5:** the team's know-how is now native Claude Code skills that load by themselves when needed,
+refreshed with the latest official Angular and .NET guidance. [What changed →](CHANGELOG.md)
 
 </div>
 
@@ -46,9 +49,10 @@ Production is never touched without your approval.
 6. [Releasing to SIT, UAT, and production](#6-releasing-to-sit-uat-and-production)
 7. [Safety checks (quality gates)](#7-safety-checks-quality-gates)
 8. [Configuration](#8-configuration) · [Connect Jira, Azure DevOps or GitHub](#connect-jira-azure-devops-or-github)
-9. [What you need](#what-you-need)
-10. [Troubleshooting](#troubleshooting)
-11. [Upgrading](#upgrading)
+9. [What the team knows (skills)](#9-what-the-team-knows-skills)
+10. [What you need](#what-you-need)
+11. [Troubleshooting](#troubleshooting)
+12. [Upgrading](#upgrading) · [Changelog](CHANGELOG.md)
 
 ---
 
@@ -332,6 +336,28 @@ Azure Repos uses the same `AZDO_PAT`.
 
 ---
 
+## 9. What the team knows (skills)
+
+The agents follow **24 skills**: short playbooks written for Angular + ASP.NET Core + SQL Server. They are
+native Claude Code skills in `.claude/skills/`, so Claude loads each one **only when it's needed**:
+
+| When Claude… | It loads |
+|--------------|----------|
+| edits an Angular component, service or route | `angular-dev` (Angular 21 and 22+ rules), `accessibility` |
+| writes an Angular test (`*.spec.ts`) | `angular-testing` (Vitest) |
+| edits an API endpoint or `Program.cs` | `dotnet-api` (built-in OpenAPI, validation, ProblemDetails) |
+| edits a migration, `DbContext` or repository | `efcore-sqlserver` (safe migrations, fast queries) |
+| writes a .NET test | `dotnet-testing` (xUnit, real SQL Server) |
+| writes a browser test (`e2e/**`) | `ui-e2e-playwright` |
+| plans, reviews, merges or releases | `definition-of-ready`, `review-checklist`, `security-scan`, `auto-merge`, `release-ops` |
+| upgrades Angular or .NET | `stack-upgrade` |
+
+The full list is in [.claude/skills/README.md](.claude/skills/README.md). The skills don't appear in the `/` menu:
+you only use the 10 `/dp-*` commands. Your team can edit a skill to match its own conventions; `--update`
+replaces DevPilot's skills with the new version, so keep your own rules in a skill with a different name.
+
+---
+
 ## What you need
 
 | Tool | Needed? | Why |
@@ -402,14 +428,15 @@ and `versioning` from the [Configuration](#8-configuration) example.
 ```
 .claude/commands/   the 10 /dp-* commands
 .claude/agents/     team-ba · team-lead · team-frontend (Angular) · team-dotnet (.NET) · team-qa
-.claude/skills/    24 native Claude Code skills — stack skills load automatically on matching files,
+.claude/skills/    24 native Claude Code skills: stack skills load on matching files,
                     the rest when a command or agent needs them (index: .claude/skills/README.md)
 .devpilot/rules/    coding rules for angular, dotnet, sqlserver
 .devpilot/process.md  the full delivery process: phases, gates, roles
 scripts/            tracker.sh (+ jira.sh · azdo.sh · github.sh) · open-pr.sh · version.sh · close-delivery.sh
                     · git flow · tests · CI · deploy · health check
-tests/run.sh        test suite for the scripts
+tests/run.sh        test suite for the scripts · tests/e2e.sh end-to-end delivery simulation
 install.sh          installer and --update
+CHANGELOG.md        release notes; pushing a tag vX.Y.Z publishes that section as a GitHub Release
 ```
 
 **Saving tokens.** Only each skill's one-line description stays in context; its body loads when needed.
@@ -425,9 +452,12 @@ the whole repository. Test output is summarized. Simple tasks run on Haiku, hard
 It runs weekly in CI (`.github/workflows/real-app.yml`).
 
 **Contributing:** use [Conventional Commits](https://www.conventionalcommits.org), keep one change per commit, and run
-`bash tests/run.sh` before pushing.
+`bash tests/run.sh` and `bash tests/e2e.sh` before pushing. Every change goes to `main` through a pull request.
+
+**Releasing DevPilot:** bump `VERSION` and the README badge, add the version's section to `CHANGELOG.md`, merge,
+then push the tag (`git tag v5.5.0 && git push origin v5.5.0`). The `release` workflow publishes the GitHub Release.
 </details>
 
 ## License
 
-[MIT](#license). Free to use in any project, commercial or not.
+[MIT](LICENSE). Free to use in any project, commercial or not.
