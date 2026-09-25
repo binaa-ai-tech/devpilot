@@ -159,10 +159,9 @@ run_update() {
   PROMPT_TEAM="ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md qa-agent.md"
   TEMPLATE_TEAM="requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md bug-report.md item-brief.md"
   SKILLS="core-rules.md definition-of-ready.md estimation-and-slicing.md architecture-guard.md angular-dev.md angular-testing.md accessibility.md dotnet-api.md efcore-sqlserver.md dotnet-testing.md api-contract.md test-case-design.md test-strategy.md ui-e2e-playwright.md token-lean-testing.md test-guard.md performance.md code-review.md security-scan.md definition-of-done.md auto-merge.md release-ops.md self-heal.md README.md"
-  CHECKLISTS="feature.md bugfix.md hotfix.md"
   CMDS="dp-deliver.md dp-plan.md dp-sprint.md dp-build.md dp-test.md dp-pr.md dp-release.md dp-hotfix.md dp-status.md dp-setup.md"
   AGENTS_LIST="team-lead.md team-ba.md team-frontend.md team-dotnet.md team-qa.md"
-  SCRIPTS="git-flow.sh new-feature.sh resolve-model.sh model-profiles.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh devpilot-lib.sh tracker.sh jira.sh azdo.sh github.sh git-host.sh version.sh close-delivery.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy.sh smoke.sh setup-environments.sh db-package.sh usage-hook.sh deploy-init.sh generate-project-index.sh generate-backlog-index.sh md-to-adf.sh"
+  SCRIPTS="git-flow.sh resolve-model.sh model-profiles.sh checkpoint.sh devpilot-config.sh devpilot-lib.sh tracker.sh jira.sh azdo.sh github.sh git-host.sh version.sh close-delivery.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy.sh smoke.sh setup-environments.sh db-package.sh usage-hook.sh deploy-init.sh generate-project-index.sh generate-backlog-index.sh md-to-adf.sh"
 
   info "Refreshing .devpilot/rules..."
   fetch ".devpilot/rules.md" ".devpilot/rules.md"
@@ -170,12 +169,11 @@ run_update() {
   fetch "docs/setup-guide.md" "docs/setup-guide.md"
   for f in $RULE_SNIPPETS;   do fetch ".devpilot/rules/$f"        ".devpilot/rules/$f";        done
   for f in $PROMPT_TEAM;     do fetch ".devpilot/prompts/team/$f" ".devpilot/prompts/team/$f"; done
-  for f in 6-env-diff.md 6-generate-tests.md; do fetch ".devpilot/prompts/$f" ".devpilot/prompts/$f"; done
+  fetch ".devpilot/prompts/6-env-diff.md" ".devpilot/prompts/6-env-diff.md"
   for f in $TEMPLATE_TEAM;   do fetch ".devpilot/templates/team/$f" ".devpilot/templates/team/$f"; done
-  for f in changelog-entry.md ticket.md; do fetch ".devpilot/templates/$f" ".devpilot/templates/$f"; done
+  fetch ".devpilot/templates/changelog-entry.md" ".devpilot/templates/changelog-entry.md"
   mkdir -p .devpilot/templates/deploy
   for f in appservice.sh iis.sh kubernetes.sh db.sh; do fetch ".devpilot/templates/deploy/$f" ".devpilot/templates/deploy/$f"; done
-  for f in $CHECKLISTS;      do fetch ".devpilot/checklists/$f"   ".devpilot/checklists/$f";   done
   for f in $SKILLS;          do fetch ".devpilot/skills/$f"       ".devpilot/skills/$f";       done
   fetch ".devpilot/config/models.md" ".devpilot/config/models.md"
 
@@ -209,6 +207,11 @@ run_update() {
   rm -f .devpilot/templates/team/jira-brief.md
   # Replaced by deploy.sh + smoke.sh and the generated devpilot-cd pipeline.
   for f in deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh; do rm -f "scripts/$f"; done
+  # Unused by any command (v5.4.2 cleanup): feature branches come from git-flow.sh; the
+  # PR template carries the checklist; test generation lives in team-qa.
+  for f in new-feature.sh preflight-scan.sh run-summary.sh; do rm -f "scripts/$f"; done
+  rm -rf .devpilot/checklists
+  rm -f .devpilot/prompts/6-generate-tests.md .devpilot/templates/ticket.md .github/BRANCH_NAMING.md
 
   # Refetching the agent files above reset their model: frontmatter to repo
   # defaults — re-sync it from the user's project.config.md so their chosen
@@ -621,7 +624,7 @@ fi
 section "Installing devpilot files..."
 
 # Create directory structure
-mkdir -p .devpilot/{prompts/team,templates/team,checklists,skills,config}
+mkdir -p .devpilot/{prompts/team,templates/team,skills,config}
 mkdir -p .claude/commands .claude/agents
 mkdir -p scripts
 mkdir -p .github/ISSUE_TEMPLATE
@@ -718,9 +721,7 @@ for f in angular.md dotnet.md sqlserver.md; do
   fetch ".devpilot/rules/$f" ".devpilot/rules/$f"
 done
 
-for f in 6-env-diff.md 6-generate-tests.md; do
-  fetch ".devpilot/prompts/$f" ".devpilot/prompts/$f"
-done
+fetch ".devpilot/prompts/6-env-diff.md" ".devpilot/prompts/6-env-diff.md"
 
 for f in ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md qa-agent.md; do
   fetch ".devpilot/prompts/team/$f" ".devpilot/prompts/team/$f"
@@ -730,17 +731,11 @@ for f in requirements.md implementation-plan.md qa-report.md review-report.md ad
   fetch ".devpilot/templates/team/$f" ".devpilot/templates/team/$f"
 done
 
-for f in changelog-entry.md ticket.md; do
-  fetch ".devpilot/templates/$f" ".devpilot/templates/$f"
-done
+fetch ".devpilot/templates/changelog-entry.md" ".devpilot/templates/changelog-entry.md"
 
 mkdir -p .devpilot/templates/deploy
 for f in appservice.sh iis.sh kubernetes.sh db.sh; do
   fetch ".devpilot/templates/deploy/$f" ".devpilot/templates/deploy/$f"
-done
-
-for f in feature.md bugfix.md hotfix.md; do
-  fetch ".devpilot/checklists/$f" ".devpilot/checklists/$f"
 done
 
 for f in core-rules.md definition-of-ready.md estimation-and-slicing.md architecture-guard.md \
@@ -783,7 +778,7 @@ fi
 
 # scripts/
 info "Installing scripts/..."
-for f in git-flow.sh new-feature.sh resolve-model.sh model-profiles.sh preflight-scan.sh run-summary.sh checkpoint.sh \
+for f in git-flow.sh resolve-model.sh model-profiles.sh checkpoint.sh \
           devpilot-config.sh devpilot-lib.sh tracker.sh jira.sh azdo.sh github.sh git-host.sh version.sh close-delivery.sh \
           open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh \
           doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh \
@@ -794,7 +789,7 @@ for f in git-flow.sh new-feature.sh resolve-model.sh model-profiles.sh preflight
 done
 
 # .github/
-for f in BRANCH_NAMING.md COMMIT_CONVENTION.md pull_request_template.md; do
+for f in COMMIT_CONVENTION.md pull_request_template.md; do
   fetch ".github/$f" ".github/$f"
 done
 for f in bug_report.md feature_request.md; do
