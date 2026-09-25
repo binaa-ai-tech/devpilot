@@ -436,26 +436,48 @@ case "$cmd" in
     exit $RC
     ;;
 
+  identity)   # identity <email | "[Project]\\Group"> → identity id (for approvers)
+    Q="${1:?email or group}"
+    VSSPS=$(printf '%s' "$R_ORG" | sed -E 's#^https://dev\.azure\.com/#https://vssps.dev.azure.com/#')
+    _az GET "$VSSPS/_apis/identities?searchFilter=General&filterValue=$(dp_urlenc "$Q")&queryMembership=None&api-version=7.1" \
+      | jq -r '.value[0].id // empty'
+    ;;
+
   env-setup)   # env-setup <name> [--approval] → create the Pipelines environment (+ approval check)
+               # approvers: DEVPILOT_APPROVERS="a@corp.com,[Shop]\Release Managers" (default: the PAT owner)
     NAME="${1:?environment}"; APPROVAL="${2:-}"
     ENV=$(_az GET "$RP/_apis/distributedtask/environments?name=$(dp_urlenc "$NAME")&api-version=7.1-preview.1" | jq '.value[0] // empty')
     [ -z "$ENV" ] && ENV=$(_az POST "$RP/_apis/distributedtask/environments?api-version=7.1-preview.1" \
       "$(jq -n --arg n "$NAME" '{name:$n, description:"DevPilot delivery stage"}')")
     EID=$(echo "$ENV" | jq -r '.id // empty'); [ -n "$EID" ] || die "could not create environment $NAME"
     if [ "$APPROVAL" = "--approval" ]; then
-      HAS=$(_az GET "$RP/_apis/pipelines/checks/configurations?resourceType=environment&resourceId=$EID&api-version=7.1-preview.1" \
-        | jq '[.value[] | select(.type.name == "Approval")] | length')
-      if [ "${HAS:-0}" -eq 0 ]; then
-        ME=$(_az GET "$R_ORG/_apis/connectionData" | jq -r '.authenticatedUser.id')
-        _az POST "$RP/_apis/pipelines/checks/configurations?api-version=7.1-preview.1" "$(jq -n --arg me "$ME" --arg id "$EID" --arg n "$NAME" '
-          {type:{id:"8C6F20A7-A545-4486-9777-F762FAFE0D4D", name:"Approval"},
-           settings:{approvers:[{id:$me}], executionOrder:"anyOrder", minRequiredApprovers:0,
-                     instructions:"DevPilot: approve only after the previous stage is verified.", blockedApprovers:[]},
-           resource:{type:"environment", id:$id, name:$n}, timeout:43200}')" >/dev/null || exit 1
-        echo "  ✅ environment $NAME — approval required (add more approvers in Pipelines → Environments)"
-      else
-        echo "  ✅ environment $NAME — approval already configured"
+      IDS=""; WHO=""
+      if [ -n "${DEVPILOT_APPROVERS:-}" ]; then
+        OLDIFS="$IFS"; IFS=','
+        for A in $DEVPILOT_APPROVERS; do
+          A=$(printf '%s' "$A" | sed 's/^ *//; s/ *$//'); [ -z "$A" ] && continue
+          AID=$(bash "$0" identity "$A" 2>/dev/null)
+          if [ -n "$AID" ]; then IDS="$IDS $AID"; WHO="$WHO, $A"; else echo "  ⚠️  approver '$A' not found in Azure DevOps — skipped" >&2; fi
+        done
+        IFS="$OLDIFS"
       fi
+      if [ -z "$IDS" ]; then IDS=$(_az GET "$R_ORG/_apis/connectionData" | jq -r '.authenticatedUser.id'); WHO=", you (the PAT owner)"; fi
+      APPROVERS=$(printf '%s\n' $IDS | jq -R '{id:.}' | jq -s .)
+      BODY=$(jq -n --argjson ap "$APPROVERS" --arg id "$EID" --arg n "$NAME" '
+          {type:{id:"8C6F20A7-A545-4486-9777-F762FAFE0D4D", name:"Approval"},
+           settings:{approvers:$ap, executionOrder:"anyOrder", minRequiredApprovers:0,
+                     instructions:"DevPilot: approve only after the previous stage is verified.", blockedApprovers:[]},
+           resource:{type:"environment", id:$id, name:$n}, timeout:43200}')
+      CID=$(_az GET "$RP/_apis/pipelines/checks/configurations?resourceType=environment&resourceId=$EID&api-version=7.1-preview.1" \
+        | jq -r '[.value[] | select(.type.name == "Approval")] | first | .id // empty')
+      if [ -z "$CID" ]; then
+        _az POST "$RP/_apis/pipelines/checks/configurations?api-version=7.1-preview.1" "$BODY" >/dev/null || exit 1
+      elif [ -n "${DEVPILOT_APPROVERS:-}" ]; then
+        _az PATCH "$RP/_apis/pipelines/checks/configurations/$CID?api-version=7.1-preview.1" "$(echo "$BODY" | jq --argjson c "$CID" '. + {id:$c}')" >/dev/null || exit 1
+      else
+        echo "  ✅ environment $NAME — approval already configured"; exit 0
+      fi
+      echo "  ✅ environment $NAME — approval by${WHO#,}"
     else
       echo "  ✅ environment $NAME"
     fi

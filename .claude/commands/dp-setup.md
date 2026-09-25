@@ -74,10 +74,18 @@ git add .github azure-pipelines*.yml && git commit -m "ci: devpilot CI/CD pipeli
 bash scripts/protect-branches.sh      # CI required on develop + main (GitHub protection / Azure policies)
 bash scripts/setup-environments.sh    # dev · sit · uat · prd — approvals on uat + prd
 ```
-Then ask how each environment is deployed: a **deploy script** (`deploy/deploy.sh <env> <artifact-dir>
-<version>` — App Service, IIS, Kubernetes …; offer to write it with the user) or a **deploy webhook**
-(`DEPLOY_HOOK` secret per environment). Also collect `API_URL` / `FRONTEND_URL` per environment for
-the smoke test. Azure needs a PAT with Code (Read, write & manage) + Build (Read & execute) and project
+Then ask **how the app is deployed** (AskUserQuestion): Azure App Service · IIS · Kubernetes · a
+deploy webhook · something else. Install the matching ready-made script and show the settings it needs:
+```bash
+bash scripts/deploy-init.sh appservice   # or: iis | kubernetes | hook
+```
+It writes `deploy/deploy.sh` (+ `deploy/db.sh`, which applies the release's `db/migrations.sql`)
+— commit both; "something else" → start from the closest template and edit it with the user.
+Settings go per environment (GitHub environment secrets/variables · Azure variables prefixed
+`DEV_` `SIT_` `UAT_` `PRD_`). Also collect `API_URL` / `FRONTEND_URL` per environment for the smoke
+test, and the **approvers** for UAT/PRD:
+`DEVPILOT_APPROVERS="lead@corp.com,[Shop]\Release Managers" bash scripts/setup-environments.sh`
+(GitHub: logins; Azure: emails and/or groups). Azure needs a PAT with Code (Read, write & manage) + Build (Read & execute) and project
 admin rights; without them each script prints the exact manual steps.
 **Why protection matters on Azure:** without a build-validation policy, `azdo.sh pr-complete` refuses to
 merge (CI would be skipped) unless `AZDO_ALLOW_UNPROTECTED=1`.

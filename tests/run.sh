@@ -209,9 +209,13 @@ assert_contains "$L" '"minimumApproverCount":1' "azure policy: 1 reviewer under 
 assert_contains "$(cat "$MOCK_LOG")" '"allowSquash":false,"allowNoFastForward":true' "azure policy: main takes merge commits only (release/hotfix PRs)"
 : > "$MOCK_LOG"
 OUT=$( cd "$D" && PATH="$MOCKBIN:$PATH" bash scripts/azdo.sh env-setup prd --approval 2>/dev/null )
-assert_contains "$OUT" "approval required" "azure: prd environment gets an approval check"
+assert_contains "$OUT" "approval by you (the PAT owner)" "azure: prd environment gets an approval check (default approver: PAT owner)"
 assert_contains "$(cat "$MOCK_LOG")" '"approvers":[{"id":"me-1"}]' "azure: approver is the PAT owner"
 assert_eq "$( cd "$D" && PATH="$MOCKBIN:$PATH" bash scripts/azdo.sh pipeline-ensure devpilot-cd azure-pipelines-cd.yml 2>/dev/null )" "55" "azure: CD pipeline created once"
+: > "$MOCK_LOG"
+OUT=$( cd "$D" && DEVPILOT_APPROVERS="ana@corp.com, [Shop]\Release Managers, nobody@x" PATH="$MOCKBIN:$PATH" bash scripts/azdo.sh env-setup uat --approval 2>&1 )
+assert_contains "$(cat "$MOCK_LOG")" '"approvers":[{"id":"id-ana40corpcom"},{"id":"id-5hop55elease20anagers"}]' "azure: several approvers (people + a group) on the approval check"
+assert_contains "$OUT" "approver 'nobody@x' not found" "azure: unknown approver is reported, not silently dropped"
 rm -rf "$D" "$MOCKBIN"; unset MOCK_LOG
 
 echo "== tracker selftest (live check, local backend) =="
@@ -342,7 +346,7 @@ assert_code "$RC" "3" "release-finish stops while the PR into main is not merged
 assert_eq "$(git -C "$W/origin.git" rev-parse -q --verify refs/tags/v1.5.0 >/dev/null && echo tagged || echo none)" "none" "nothing tagged before main has the release"
 RC=$(cd "$W/app" && PATH="$FG:$PATH" bash scripts/git-flow.sh release-finish 1.5.0 >/dev/null 2>&1; echo $?)
 assert_code "$RC" "0" "re-running release-finish completes once the PR can merge"
-assert_eq "$(git -C "$W/origin.git" rev-parse v1.5.0^{commit})" "$(git -C "$W/origin.git" rev-parse main)" "tag v1.5.0 is main's merge commit"
+assert_eq "$(git -C "$W/origin.git" rev-parse "v1.5.0^{commit}")" "$(git -C "$W/origin.git" rev-parse main)" "tag v1.5.0 is main's merge commit"
 assert_eq "$(git -C "$W/origin.git" log -1 --format=%s main)" "Merge pull request #1 from release/1.5.0" "release merged into main with a merge commit"
 assert_eq "$(git -C "$W/origin.git" log -1 --format=%s develop)" "Merge pull request #2 from release/1.5.0" "release merged back into develop through a PR"
 assert_eq "$(git -C "$W/origin.git" branch --list 'release/*' | wc -l | tr -d ' ')" "0" "release branch deleted"
@@ -351,9 +355,86 @@ assert_eq "$(git -C "$W/origin.git" branch --list 'release/*' | wc -l | tr -d ' 
   && echo hot > h.txt && echo 1.5.1 > VERSION && git add -A && git commit -qm "fix: login" ) >/dev/null 2>&1
 RC=$(cd "$W/app" && PATH="$FG:$PATH" bash scripts/git-flow.sh hotfix-finish 1.5.1 >/dev/null 2>&1; echo $?)
 assert_code "$RC" "0" "hotfix-finish goes through PRs too"
-assert_eq "$(git -C "$W/origin.git" rev-parse v1.5.1^{commit})" "$(git -C "$W/origin.git" rev-parse main)" "hotfix tagged on main"
+assert_eq "$(git -C "$W/origin.git" rev-parse "v1.5.1^{commit}")" "$(git -C "$W/origin.git" rev-parse main)" "hotfix tagged on main"
 assert_contains "$(git -C "$W/origin.git" log -1 --format=%s develop)" "hotfix/msk-9-login-fix" "hotfix merged back into develop"
 unset FAKE_GH_DIR; rm -rf "$W" "$FG"
+
+echo "== deploy templates (fake az / sqlcmd / kubectl / docker / ssh) =="
+FK=$(mktemp -d)
+for T in az sqlcmd kubectl docker ssh scp zip; do
+  cat > "$FK/$T" <<'EOF'
+#!/usr/bin/env bash
+echo "$(basename "$0") $*" >> "$FAKE_LOG"
+case " ${FAKE_FAIL:-} " in *" $(basename "$0") "*) exit 1 ;; esac
+case "$(basename "$0") $1 $2" in
+  "docker manifest inspect") [ -n "${FAKE_IMAGE_EXISTS:-}" ] && exit 0; exit 1 ;;
+  "kubectl -n"*) case "$*" in *"rollout status"*) [ -n "${FAKE_ROLLOUT_FAIL:-}" ] && exit 1 ;; esac ;;
+esac
+exit 0
+EOF
+  chmod +x "$FK/$T"
+done
+D=$(sandbox); mkdir -p "$D/.devpilot"; cp -r "$REPO/.devpilot/templates" "$D/.devpilot/"
+mkdir -p "$D/out/api" "$D/out/web/web/browser" "$D/out/db"
+echo 2.0.0 > "$D/out/VERSION"; echo '{}' > "$D/out/api/Shop.Api.runtimeconfig.json"
+echo '<html>' > "$D/out/web/web/browser/index.html"; echo 'SELECT 1' > "$D/out/db/migrations.sql"
+export FAKE_LOG="$D/fake.log"
+( cd "$D" && bash scripts/deploy-init.sh appservice >/dev/null )
+assert_eq "$([ -x "$D/deploy/deploy.sh" ] && [ -f "$D/deploy/db.sh" ] && echo yes)" "yes" "deploy-init installs deploy/deploy.sh + db.sh"
+OUT=$(cd "$D" && bash scripts/deploy-init.sh kubernetes 2>&1)
+assert_contains "$OUT" "already exists" "deploy-init never overwrites without --force"
+OUT=$(cd "$D" && PATH="$FK:$PATH" bash scripts/deploy.sh sit out 2>&1); RC=$?
+assert_code "$RC" "1" "App Service template refuses to run without its settings"
+assert_contains "$OUT" "AZURE_RESOURCE_GROUP is not set" "and names the missing setting"
+: > "$FAKE_LOG"
+OUT=$(cd "$D" && AZURE_RESOURCE_GROUP=rg-shop API_APP=shop-api WEB_APP=shop-web SLOT=staging SQL_SERVER=sql.x SQL_DATABASE=shop SQL_USER=u SQL_PASSWORD=p \
+  PATH="$FK:$PATH" bash scripts/deploy.sh sit out 2>&1); RC=$?
+L=$(cat "$FAKE_LOG")
+assert_code "$RC" "0" "App Service deploy succeeds with its settings"
+assert_contains "$L" "sqlcmd -S sql.x -d shop -U u -i" "migrations applied before the app"
+assert_contains "$L" "az webapp deploy -g rg-shop -n shop-api" "API zip-deployed"
+assert_contains "$L" "--slot staging" "deployed to the staging slot"
+assert_contains "$L" "slot swap -g rg-shop -n shop-web --slot staging --target-slot production" "slot swapped → zero downtime"
+assert_contains "$OUT" "v2.0.0" "deploys the artifact's version"
+( cd "$D" && bash scripts/deploy-init.sh kubernetes --force >/dev/null ); : > "$FAKE_LOG"
+OUT=$(cd "$D" && REGISTRY=acr.io/shop KUBE_NAMESPACE=shop-sit PATH="$FK:$PATH" bash scripts/deploy.sh sit out 2>&1); RC=$?
+L=$(cat "$FAKE_LOG")
+assert_code "$RC" "0" "Kubernetes deploy succeeds"
+assert_contains "$L" "docker push -q acr.io/shop/api:2.0.0" "API image built + pushed once per version"
+assert_contains "$L" "set image deployment/api api=acr.io/shop/api:2.0.0" "deployment rolled to the new image"
+assert_contains "$(cat "$D/out/api/Dockerfile.devpilot")" 'ENTRYPOINT ["dotnet", "Shop.Api.dll"]' "entrypoint from the published runtimeconfig"
+: > "$FAKE_LOG"
+( cd "$D" && FAKE_IMAGE_EXISTS=1 REGISTRY=acr.io/shop KUBE_NAMESPACE=shop-uat PATH="$FK:$PATH" bash scripts/deploy.sh uat out >/dev/null 2>&1 )
+assert_eq "$(grep -c 'docker build' "$FAKE_LOG")" "0" "next environment promotes the same image (no rebuild)"
+: > "$FAKE_LOG"
+OUT=$(cd "$D" && FAKE_ROLLOUT_FAIL=1 REGISTRY=acr.io/shop KUBE_NAMESPACE=shop-sit PATH="$FK:$PATH" bash scripts/deploy.sh sit out 2>&1); RC=$?
+assert_code "$RC" "1" "failed rollout fails the deploy"
+assert_contains "$(cat "$FAKE_LOG")" "rollout undo deployment/api" "and undoes the rollout"
+( cd "$D" && bash scripts/deploy-init.sh iis --force >/dev/null ); : > "$FAKE_LOG"
+OUT=$(cd "$D" && IIS_SERVER=web01 IIS_USER=deploy IIS_SSH_KEY=k IIS_API_PATH='C:/inetpub/api' IIS_API_POOL=ShopApi PATH="$FK:$PATH" bash scripts/deploy.sh sit out 2>&1); RC=$?
+assert_code "$RC" "0" "IIS deploy succeeds"
+assert_contains "$(cat "$FAKE_LOG")" "Stop-WebAppPool -Name 'ShopApi'" "IIS: app pool stopped, files mirrored, pool started"
+assert_contains "$(cat "$FAKE_LOG")" "robocopy 'C:/devpilot-releases/2.0.0/api' 'C:/inetpub/api' /MIR" "IIS: release folder mirrored into the site"
+( cd "$D" && bash scripts/deploy-init.sh appservice --force >/dev/null )
+RC=$(cd "$D" && FAKE_FAIL=az AZURE_RESOURCE_GROUP=rg API_APP=a PATH="$FK:$PATH" bash scripts/deploy.sh sit out >/dev/null 2>&1; echo $?)
+assert_code "$RC" "1" "a failing az command fails the deploy (no silent && chains)"
+( cd "$D" && bash scripts/deploy-init.sh kubernetes --force >/dev/null )
+RC=$(cd "$D" && FAKE_FAIL=docker REGISTRY=r KUBE_NAMESPACE=n PATH="$FK:$PATH" bash scripts/deploy.sh sit out >/dev/null 2>&1; echo $?)
+assert_code "$RC" "1" "a failing image build fails the deploy"
+# The generated CD build step must stop on the first failing command
+( cd "$D" && mkdir -p web && printf '{}' > web/angular.json && touch web/package.json \
+  && printf 'stack:\n  frontend: angular\n  backend: none\n' > project.config.md && bash scripts/generate-ci.sh --force --github >/dev/null 2>&1 )
+if python3 -c "import yaml" 2>/dev/null; then
+  python3 - "$D/.github/workflows/devpilot-cd.yml" > "$D/build.sh" <<'PYX'
+import sys, yaml
+jobs = yaml.safe_load(open(sys.argv[1]))["jobs"]
+print(next(s["run"] for s in jobs["build"]["steps"] if s.get("name", "").startswith("build once")))
+PYX
+  printf '#!/usr/bin/env bash\nexit 1\n' > "$FK/npm"; chmod +x "$FK/npm"
+  RC=$(cd "$D" && PATH="$FK:$PATH" bash build.sh >/dev/null 2>&1; echo $?)
+  assert_code "$RC" "1" "CD build step fails when npm ci fails (never ships without the frontend)"
+fi
+unset FAKE_LOG; rm -rf "$D" "$FK"
 
 echo "== close-delivery.sh (after merge) =="
 D=$(sandbox)
@@ -680,6 +761,17 @@ assert_contains "$OUT" "gh CLI" "update-org explains the gh requirement"
 OUT=$(bash "$REPO/scripts/update-org.sh" 2>&1); RC=$?
 assert_code "$RC" "1" "update-org without an org exits 1 with usage"
 assert_contains "$(cat "$REPO/scripts/update-org.sh")" "--update" "update-org uses --update, never delete+reinstall"
+
+echo "== update-org.sh on Azure DevOps (dry run, mocked APIs, local repo) =="
+MOCKBIN=$(mktemp -d); cp "$REPO/tests/mock-curl.sh" "$MOCKBIN/curl"; chmod +x "$MOCKBIN/curl"
+W=$(mktemp -d); git init -q --bare "$W/web.git"
+( cd "$W" && git clone -q web.git c 2>/dev/null && cd c && git config user.email t@t && git config user.name t \
+  && mkdir .devpilot && touch .devpilot/rules.md project.config.md && git add -A && git commit -qm init && git branch -M main \
+  && git push -q origin main 2>/dev/null && git push -q origin main:develop 2>/dev/null )
+OUT=$(MOCK_REPO_URL="$W/web.git" AZDO_PAT=x PATH="$MOCKBIN:$PATH" bash "$REPO/scripts/update-org.sh" https://dev.azure.com/acme --dry-run 2>&1)
+assert_contains "$OUT" "Shop/web (base: develop)" "Azure: lists project repos and targets develop over the default branch"
+assert_contains "$OUT" "would update (dry run)" "Azure: dry run changes nothing"
+rm -rf "$W" "$MOCKBIN"
 
 echo "== token-lean wiring (round 8) =="
 assert_contains "$(cat "$REPO/.claude/commands/dp-plan.md")" "scope.sh --save" "dp-plan saves the scope once"

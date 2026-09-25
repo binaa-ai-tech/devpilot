@@ -235,12 +235,21 @@ YML
 # Build steps shared by both CD flavours: out/web (Angular dist) · out/api (dotnet
 # publish) · out/db (db-package.sh: migrations.sql, rollback.sql, migrations.txt) — the one artifact promoted.
 cd_build_script() {
-  echo 'set -euo pipefail; mkdir -p out'
-  [ -n "$NG_DIR" ] && echo "(cd '$NG_DIR' && npm ci && npx ng build --configuration production) && mkdir -p out/web && cp -r '$NG_DIR/dist/.' out/web/"
+  # One command per line: under `set -e`, a failure inside an `a && b && c` chain does NOT
+  # stop the script — the build would "succeed" and ship without the frontend.
+  echo 'set -euo pipefail'
+  echo 'mkdir -p out'
+  if [ -n "$NG_DIR" ]; then
+    echo "(cd '$NG_DIR' && npm ci)"
+    echo "(cd '$NG_DIR' && npx ng build --configuration production)"
+    echo "mkdir -p out/web"
+    echo "cp -r '$NG_DIR/dist/.' out/web/"
+  fi
   if [ "$DOTNET" = 1 ]; then
     echo "dotnet publish ${API_PROJ:+'$API_PROJ' }--configuration Release --output out/api -p:Version=\"\$(bash scripts/version.sh current)\""
     if [ "$HAS_MIGRATIONS" = 1 ]; then
-      echo 'dotnet tool update --global dotnet-ef >/dev/null && export PATH="$PATH:$HOME/.dotnet/tools"'
+      echo 'dotnet tool update --global dotnet-ef >/dev/null'
+      echo 'export PATH="$PATH:$HOME/.dotnet/tools"'
       echo "bash scripts/db-package.sh out/db ${MIG_PROJ:+--project '$MIG_PROJ' }${API_PROJ:+--startup '$API_PROJ'}"
     fi
   fi
@@ -253,7 +262,8 @@ cat <<YML
 #   $BASE → DEV · release/* → SIT → UAT (approval) → PRD (approval) · hotfix/* → SIT → PRD (approval)
 #   Run manually on a tag (e.g. v1.4.0) with an environment → redeploy / roll back that environment.
 # Environments + approvals: bash scripts/setup-environments.sh
-# Per environment: secret DEPLOY_HOOK (or ship deploy/deploy.sh) · variables API_URL, FRONTEND_URL
+# Per environment: secret DEPLOY_HOOK (or deploy/deploy.sh from scripts/deploy-init.sh + its settings)
+#                  · variables API_URL, FRONTEND_URL
 name: devpilot-cd
 
 on:
@@ -315,6 +325,13 @@ YML
     "!cancelled() && needs.build.result == 'success' && ((github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/') && needs.uat.result == 'success') || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/hotfix/') && needs.sit.result == 'success') || inputs.environment == 'prd')"
 }
 
+# Settings the deploy templates read (scripts/deploy-init.sh) — passed to every deploy step;
+# unset ones are simply empty. GitHub: environment secret or variable of that name.
+DEPLOY_VARS="AZURE_CLIENT_ID AZURE_CLIENT_SECRET AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID AZURE_RESOURCE_GROUP
+API_APP WEB_APP SLOT SQL_SERVER SQL_DATABASE SQL_USER SQL_PASSWORD SQL_AUTH
+REGISTRY REGISTRY_USER REGISTRY_PASSWORD KUBE_CONFIG KUBE_NAMESPACE
+IIS_SERVER IIS_USER IIS_SSH_KEY IIS_API_PATH IIS_API_POOL IIS_WEB_PATH IIS_WEB_POOL"
+
 gh_deploy_job() {  # gh_deploy_job <env> <needs> <condition>
   local e="$1" up; up=$(printf '%s' "$1" | tr '[:lower:]' '[:upper:]')
 cat <<YML
@@ -339,6 +356,8 @@ cat <<YML
           ${up}_API_URL: \${{ vars.API_URL }}
           ${up}_FRONTEND_URL: \${{ vars.FRONTEND_URL }}
 YML
+  local v
+  for v in $DEPLOY_VARS; do printf '          %s: ${{ secrets.%s || vars.%s }}\n' "$v" "$v" "$v"; done
 }
 
 azure_cd_yml() {
@@ -347,7 +366,8 @@ cat <<YML
 #   $BASE → DEV · release/* → SIT → UAT (approval) → PRD (approval) · hotfix/* → SIT → PRD (approval)
 #   Run manually on a tag with "environment" set → redeploy / roll back that one environment.
 # Environments + approvals + this pipeline: bash scripts/setup-environments.sh
-# Variables (pipeline or library group): DEPLOY_HOOK_<ENV> (secret), <ENV>_API_URL, <ENV>_FRONTEND_URL
+# Variables (pipeline or library group): DEPLOY_HOOK_<ENV> (secret), <ENV>_API_URL, <ENV>_FRONTEND_URL,
+# and the deploy target's settings per stage, e.g. PRD_API_APP, PRD_SQL_SERVER (scripts/deploy-init.sh)
 trigger:
   branches:
     include: ["$BASE", "release/*", "hotfix/*"]
@@ -428,6 +448,8 @@ cat <<YML
                     $1_API_URL: \$($1_API_URL)
                     $1_FRONTEND_URL: \$($1_FRONTEND_URL)
 YML
+  local v
+  for v in $DEPLOY_VARS; do printf '                    %s: $(%s_%s)\n' "$v" "$1" "$v"; done
 }
 
 # write <file> <generator> — each file honours --force independently

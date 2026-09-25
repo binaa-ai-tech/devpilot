@@ -6,7 +6,7 @@
 
 You write what you need in one sentence. DevPilot plans it, writes the code, tests it, reviews it, and merges it.
 
-[![Version](https://img.shields.io/badge/version-5.3.0-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-5.4.0-blue.svg)](VERSION)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#license)
 [![Runs on](https://img.shields.io/badge/runs%20on-Claude%20Code-7c3aed.svg)](#what-you-need)
 [![Stack](https://img.shields.io/badge/stack-Angular%20%7C%20.NET%20%7C%20SQL%20Server-orange.svg)](#what-you-need)
@@ -202,7 +202,7 @@ Set it up once per repository with `/dp-setup pipelines`.
 |---------|--------------|
 | `/dp-release sit` | Creates `release/<version>` from develop and deploys to SIT |
 | `/dp-release uat` | Deploys the tested SIT build to UAT |
-| `/dp-release prd` | Merges to `main`, tags `v<version>`, and deploys to production **after you approve** |
+| `/dp-release prd` | Deploys to production **after you approve**, then merges the release into `main` and back into `develop` **through pull requests** and tags `v<version>` |
 | `/dp-release rollback` | Redeploys the previous version to production (shows the plan first, still needs approval) |
 
 **Two deliveries at the same time?** CI checks that each pull request's version is newer than `develop`'s. If another delivery merged first,
@@ -222,10 +222,15 @@ releases whatever version develop has. You can still give one: `/dp-release sit 
 <summary>One-time setup for deployments (<code>/dp-setup pipelines</code>)</summary>
 
 `/dp-setup pipelines` generates the pipelines, makes CI required on `develop` and `main`, and creates the
-`dev`, `sit`, `uat` and `prd` environments with approvals on `uat` and `prd`. Then tell it **how to deploy**, choosing one:
+`dev`, `sit`, `uat` and `prd` environments with approvals on `uat` and `prd` (choose the approvers: people or groups).
+Then pick **how to deploy**. DevPilot installs a ready-made script that you can edit afterwards:
 
-- a `deploy/deploy.sh` script in your repo. It receives the environment, the build folder (`web/`, `api/`, `db/migrations.sql`) and the version. Use it for App Service, IIS, Kubernetes, and so on.
-- a **deploy webhook** stored as the `DEPLOY_HOOK` secret on each environment.
+| Target | Command | What it does |
+|--------|---------|--------------|
+| Azure App Service | `bash scripts/deploy-init.sh appservice` | Database migrations, then zip-deploy API and web; optional staging slot plus swap for zero downtime |
+| IIS (Windows Server) | `bash scripts/deploy-init.sh iis` | Over SSH: stop the app pool, copy the files, start the app pool |
+| Kubernetes / AKS | `bash scripts/deploy-init.sh kubernetes` | Builds images once per version, updates the deployments, and undoes a failed rollout automatically |
+| Webhook | `bash scripts/deploy-init.sh hook` | Calls your `DEPLOY_HOOK` URL |
 
 Set `API_URL` and `FRONTEND_URL` on each environment too, so every deploy is followed by a health check.
 If no deploy target is set, the deploy fails with a clear message. It never pretends to succeed.
@@ -405,7 +410,11 @@ install.sh          installer and --update
 They find the right code files through a small project index (`scripts/scope.sh`) instead of reading
 the whole repository. Test output is summarized. Simple tasks run on Haiku, hard tasks on Opus.
 
-**Rolling out to many repositories:** `bash scripts/update-org.sh <github-org> --merge` opens one update PR per repository.
+**Rolling out to many repositories:** `bash scripts/update-org.sh <github-org> --merge`, or
+`AZDO_PAT=… bash scripts/update-org.sh https://dev.azure.com/<org>[/<project>] --merge`. It opens one update PR per repository, into `develop`.
+
+**Real-app check:** `tests/real-app.sh` creates a real Angular + .NET + EF Core app, installs DevPilot and runs the generated build and tests.
+It runs weekly in CI (`.github/workflows/real-app.yml`).
 
 **Contributing:** use [Conventional Commits](https://www.conventionalcommits.org), keep one change per commit, and run
 `bash tests/run.sh` before pushing.
