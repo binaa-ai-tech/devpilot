@@ -202,9 +202,11 @@ assert_code "$RC" "0" "azure: AZDO_ALLOW_UNPROTECTED=1 is the explicit opt-out"
 assert_code "$RC" "0" "azure: branch policies applied"
 L=$(cat "$MOCK_LOG")
 assert_contains "$L" '"buildDefinitionId":55' "azure policy: devpilot-ci build validation required"
-assert_contains "$L" '"allowSquash":true,"allowNoFastForward":false' "azure policy: squash merge only"
+assert_contains "$L" '"allowSquash":true,"allowNoFastForward":true' "azure policy: develop takes squash (features) + merge commits (back-merges)"
 assert_contains "$L" 'c6a1889d-b943-4856-b76f-9e46bb6b0df2' "azure policy: review comments must be resolved"
 assert_contains "$L" '"minimumApproverCount":1' "azure policy: 1 reviewer under pr-only"
+: > "$MOCK_LOG"; ( cd "$D" && PATH="$MOCKBIN:$PATH" bash scripts/azdo.sh protect main >/dev/null 2>&1 )
+assert_contains "$(cat "$MOCK_LOG")" '"allowSquash":false,"allowNoFastForward":true' "azure policy: main takes merge commits only (release/hotfix PRs)"
 : > "$MOCK_LOG"
 OUT=$( cd "$D" && PATH="$MOCKBIN:$PATH" bash scripts/azdo.sh env-setup prd --approval 2>/dev/null )
 assert_contains "$OUT" "approval required" "azure: prd environment gets an approval check"
@@ -276,14 +278,14 @@ EOF
 chmod +x "$FK/dotnet"; export FAKE_LOG="$D/dotnet.log"
 ( cd "$D" && mkdir -p src/Infra/Migrations && touch src/Infra/Infra.csproj src/Infra/Migrations/20260101000000_Init.cs \
     src/Infra/Migrations/20260101000000_Init.Designer.cs src/Infra/Migrations/AppDbContextModelSnapshot.cs \
-  && git add -A && git commit -qm "feat: init" && git tag v1.0.0 \
-  && touch src/Infra/Migrations/20260301000000_AddCsv.cs && git add -A && git commit -qm "feat: csv" )
+  && echo 1.0.0 > VERSION && git add -A && git commit -qm "feat: init" && git tag v1.0.0 \
+  && touch src/Infra/Migrations/20260301000000_AddCsv.cs && echo 1.1.0 > VERSION && git add -A && git commit -qm "feat: csv" )
 OUT=$(cd "$D" && PATH="$FK:$PATH" bash scripts/db-package.sh out/db --project src/Infra/Infra.csproj 2>&1)
 assert_contains "$OUT" "1 new migration(s) since v1.0.0" "db package diffs migrations against the previous release"
 assert_contains "$(cat "$D/out/db/migrations.txt")" "20260301000000_AddCsv" "migrations.txt lists this release's migrations"
 assert_contains "$(cat "$FAKE_LOG")" "migrations script --idempotent" "idempotent migrations.sql"
 assert_contains "$(cat "$FAKE_LOG")" "migrations script 20260301000000_AddCsv 20260101000000_Init" "rollback.sql goes back to the previous release (Designer/snapshot ignored)"
-( cd "$D" && git tag v1.1.0 && rm -rf out ); OUT=$(cd "$D" && git commit -q --allow-empty -m "fix: x" && PATH="$FK:$PATH" bash scripts/db-package.sh out/db 2>&1)
+( cd "$D" && git tag v1.1.0 && rm -rf out ); OUT=$(cd "$D" && echo 1.2.0 > VERSION && git commit -qam "fix: x" && PATH="$FK:$PATH" bash scripts/db-package.sh out/db 2>&1)
 assert_contains "$OUT" "rollback: none" "no schema change → no rollback script"
 unset FAKE_LOG; rm -rf "$D" "$FK"
 
@@ -321,6 +323,37 @@ printf 'JIRA_BASE_URL="https://acme.atlassian.net"\nJIRA_EMAIL="d@a.io"\nJIRA_AP
 assert_contains "$(cat "$MOCK_LOG")" '"issuetype":{"name":"Subtask"}' "Jira layer tasks are sub-tasks of the Story"
 assert_contains "$(cat "$MOCK_LOG")" '"summary":"[FE]CSV"' "one [FE] task (summary spaces stripped by the mock log)"
 unset MOCK_LOG; rm -rf "$D" "$MOCKBIN"
+
+echo "== release/hotfix finish through PRs (fake gh doing real merges) =="
+W=$(mktemp -d); FG=$(mktemp -d); cp "$REPO/tests/fake-gh.sh" "$FG/gh"; chmod +x "$FG/gh"; export FAKE_GH_DIR="$W/gh"
+git init -q --bare "$W/origin.git"; git clone -q "$W/origin.git" "$W/app" 2>/dev/null
+(
+  cd "$W/app" || exit 1
+  git config user.email t@t; git config user.name t
+  mkdir scripts && cp "$REPO"/scripts/*.sh scripts/
+  printf 'base_branch: develop\ngit_host: github\nmerge_policy: auto\n' > project.config.md
+  echo 1.4.0 > VERSION && git add -A && git commit -qm "chore: init" && git branch -M main && git push -q origin main 2>/dev/null
+  git checkout -q -b develop && echo 1.5.0 > VERSION && git commit -qam "feat: x" && git push -q origin develop 2>/dev/null
+  PATH="$FG:$PATH" bash scripts/git-flow.sh release-start >/dev/null 2>&1
+  echo polish > r.txt && git add r.txt && git commit -qm "fix: polish"
+) >/dev/null 2>&1
+RC=$(cd "$W/app" && FAKE_GH_BLOCK=1 PATH="$FG:$PATH" bash scripts/git-flow.sh release-finish 1.5.0 >/dev/null 2>&1; echo $?)
+assert_code "$RC" "3" "release-finish stops while the PR into main is not merged (no direct push)"
+assert_eq "$(git -C "$W/origin.git" rev-parse -q --verify refs/tags/v1.5.0 >/dev/null && echo tagged || echo none)" "none" "nothing tagged before main has the release"
+RC=$(cd "$W/app" && PATH="$FG:$PATH" bash scripts/git-flow.sh release-finish 1.5.0 >/dev/null 2>&1; echo $?)
+assert_code "$RC" "0" "re-running release-finish completes once the PR can merge"
+assert_eq "$(git -C "$W/origin.git" rev-parse v1.5.0^{commit})" "$(git -C "$W/origin.git" rev-parse main)" "tag v1.5.0 is main's merge commit"
+assert_eq "$(git -C "$W/origin.git" log -1 --format=%s main)" "Merge pull request #1 from release/1.5.0" "release merged into main with a merge commit"
+assert_eq "$(git -C "$W/origin.git" log -1 --format=%s develop)" "Merge pull request #2 from release/1.5.0" "release merged back into develop through a PR"
+assert_eq "$(git -C "$W/origin.git" branch --list 'release/*' | wc -l | tr -d ' ')" "0" "release branch deleted"
+( cd "$W/app" && git checkout -q main 2>/dev/null && git pull -q origin main 2>/dev/null \
+  && PATH="$FG:$PATH" bash scripts/git-flow.sh hotfix-start MSK-9 login-fix >/dev/null 2>&1 \
+  && echo hot > h.txt && echo 1.5.1 > VERSION && git add -A && git commit -qm "fix: login" ) >/dev/null 2>&1
+RC=$(cd "$W/app" && PATH="$FG:$PATH" bash scripts/git-flow.sh hotfix-finish 1.5.1 >/dev/null 2>&1; echo $?)
+assert_code "$RC" "0" "hotfix-finish goes through PRs too"
+assert_eq "$(git -C "$W/origin.git" rev-parse v1.5.1^{commit})" "$(git -C "$W/origin.git" rev-parse main)" "hotfix tagged on main"
+assert_contains "$(git -C "$W/origin.git" log -1 --format=%s develop)" "hotfix/msk-9-login-fix" "hotfix merged back into develop"
+unset FAKE_GH_DIR; rm -rf "$W" "$FG"
 
 echo "== close-delivery.sh (after merge) =="
 D=$(sandbox)

@@ -11,7 +11,8 @@
 # Repos + Pipelines (called by open-pr.sh and /dp-pr when the git host is Azure):
 #   pr-create <base> <title> <body-file|text> [--items "ADO-1 ADO-2"]   → PR URL
 #   pr-show <id>        STATUS= MERGE_STATUS= POLICIES_* URL= (key=value lines)
-#   pr-complete <id>    squash + delete branch via auto-complete; exit 0 merged, 3 waiting
+#   pr-complete <id> [--merge-commit] [--keep-branch]
+#                       auto-complete (squash + delete branch by default); exit 0 merged, 3 waiting
 #   pr-threads <id>     active review threads (TSV: thread-id  file:line  author  text)
 #   pr-reply <id> <thread-id> <text> [--resolve]
 #   ci <pr-id|branch> [--log]   latest pipeline run (+ failed-step log tails)
@@ -317,7 +318,8 @@ case "$cmd" in
     ;;
 
   pr-complete)
-    ID=$(_id "${1:?pr-id}")
+    ID=$(_id "${1:?pr-id}"); STRATEGY="squash"; DELETE=true
+    for O in "${@:2}"; do case "$O" in --merge-commit) STRATEGY="noFastForward" ;; --keep-branch) DELETE=false ;; esac; done
     R=$(_az GET "$REPO_API/pullrequests/$ID?$V") || exit 1
     [ "$(echo "$R" | jq -r '.status')" = "completed" ] && { echo "merged"; exit 0; }
     # Without a build-validation policy, auto-complete would merge instantly with no
@@ -331,8 +333,8 @@ case "$cmd" in
       echo "unprotected"
       exit 3
     fi
-    _az PATCH "$REPO_API/pullrequests/$ID?$V" "$(echo "$R" | jq '{autoCompleteSetBy:{id:.createdBy.id},
-      completionOptions:{mergeStrategy:"squash", deleteSourceBranch:true, transitionWorkItems:false,
+    _az PATCH "$REPO_API/pullrequests/$ID?$V" "$(echo "$R" | jq --arg s "$STRATEGY" --argjson d "$DELETE" '{autoCompleteSetBy:{id:.createdBy.id},
+      completionOptions:{mergeStrategy:$s, deleteSourceBranch:$d, transitionWorkItems:false,
       mergeCommitMessage:"\(.title) (PR \(.pullRequestId))"}}')" >/dev/null || exit 1
     WAIT="${AZDO_MERGE_WAIT:-120}"; T=0
     while [ "$T" -lt "$WAIT" ]; do
@@ -399,6 +401,8 @@ case "$cmd" in
     ;;
 
   protect)   # protect <branch> [--reviewers N] [--build <definition-id>]
+             # merge types: main → merge commit only (release/hotfix PRs); others → squash
+             # (features) + merge commit (release/hotfix back-merges)
     BR="${1:?branch}"; shift; REVIEWERS=0; BUILD=""
     while [ $# -gt 0 ]; do case "$1" in --reviewers) REVIEWERS="${2:-0}"; shift 2 ;; --build) BUILD="${2:-}"; shift 2 ;; *) shift ;; esac; done
     RID=$(bash "$0" repo-id) || exit 1
@@ -416,8 +420,13 @@ case "$cmd" in
     RC=0
     [ -n "$BUILD" ] && { upsert 0609b952-1397-4640-95ec-e00a01b2c241 "build validation: devpilot-ci required" true \
       "$(jq -n --argjson d "$BUILD" '{buildDefinitionId:$d, displayName:"devpilot-ci", queueOnSourceUpdateOnly:false, manualQueueOnly:false, validDuration:0}')" || RC=1; }
-    upsert fa4e907d-c16b-4a4c-9dfa-4916e5d171ab "squash merge only" true \
-      '{"allowSquash":true,"allowNoFastForward":false,"allowRebase":false,"allowRebaseMerge":false}' || RC=1
+    if [ "$BR" = "main" ]; then
+      upsert fa4e907d-c16b-4a4c-9dfa-4916e5d171ab "merge commits only (release/hotfix PRs)" true \
+        '{"allowSquash":false,"allowNoFastForward":true,"allowRebase":false,"allowRebaseMerge":false}' || RC=1
+    else
+      upsert fa4e907d-c16b-4a4c-9dfa-4916e5d171ab "squash (features) + merge commit (back-merges)" true \
+        '{"allowSquash":true,"allowNoFastForward":true,"allowRebase":false,"allowRebaseMerge":false}' || RC=1
+    fi
     upsert c6a1889d-b943-4856-b76f-9e46bb6b0df2 "review comments must be resolved" true '{}' || RC=1
     upsert 40e92b44-2fe1-4dd6-b3d8-74a9c21d0c6e "linked work items (advisory)" false '{}' || RC=1
     if [ "$REVIEWERS" -gt 0 ]; then

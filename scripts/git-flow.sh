@@ -11,9 +11,11 @@
 #   feature-finish                           Push & remind to open PR
 #   release-start  [version]                 Start a release branch (default: the
 #                                            version develop already carries)
-#   release-finish <version>                 Merge, tag, clean up
+#   release-finish <version> [--direct]      PR → main, tag, PR → develop, clean up
+#                  (re-runnable: each step is skipped once done; --direct = old
+#                   local merge + push, only for repos without branch protection)
 #   hotfix-start   <ticket> <description>   Start a hotfix branch
-#   hotfix-finish  <version>                 Merge, tag, clean up
+#   hotfix-finish  <version> [--direct]      same, for the current hotfix/* branch
 # =============================================================================
 set -euo pipefail
 
@@ -135,14 +137,75 @@ release_start() {
 }
 
 # =============================================================================
+# finish_via_prs <branch> <version> <Release|Hotfix>
+# Protected main/develop only change through PRs, so a release/hotfix finishes as:
+#   1. PR <branch> → main (merge commit, branch kept) · 2. tag v<version> on main
+#   3. PR <branch> → develop (merge commit)           · 4. delete <branch>
+# Every step checks whether it is already done, so re-running after a PR merges
+# (checks or an approval were pending) simply continues.
+# =============================================================================
+finish_via_prs() {
+  local branch="$1" version="$2" kind="$3" rc url lower
+  lower=$(printf '%s' "$kind" | tr '[:upper:]' '[:lower:]')
+  git fetch -q origin 2>/dev/null || true
+  git rev-parse -q --verify "origin/$branch" >/dev/null || git push -u origin "$branch" >/dev/null 2>&1 \
+    || error "$branch is not on origin and could not be pushed."
+  git checkout -q "$branch" || error "Branch $branch not found."
+
+  merged_into() { git fetch -q origin "$1" 2>/dev/null; git merge-base --is-ancestor "origin/$branch" "origin/$1" 2>/dev/null; }
+
+  section "1/4 · $branch → main"
+  if merged_into main; then info "already in main"
+  else
+    url=$(bash "$SCRIPTS_DIR/open-pr.sh" main "$kind v$version" \
+      "$kind v$version — verified on production. Merge commit (keeps git-flow history)." --merge-commit --keep-branch) && rc=0 || rc=$?
+    [ "$rc" = 1 ] && error "could not open the PR into main"
+    if ! merged_into main; then
+      warn "PR into main is open, not merged yet (checks, approval, or no gh): $url"
+      warn "When it has merged, re-run:  bash scripts/git-flow.sh ${lower}-finish $version"
+      return 3
+    fi
+  fi
+
+  section "2/4 · tag v$version"
+  if git ls-remote --exit-code --tags origin "refs/tags/v$version" >/dev/null 2>&1; then info "tag v$version already on origin"
+  else
+    git fetch -q origin main
+    git tag -a "v$version" "origin/main" -m "$kind v$version" 2>/dev/null || true
+    git push -q origin "v$version" || error "could not push tag v$version"
+    info "tagged v$version on main"
+  fi
+
+  section "3/4 · $branch → $DEVELOP"
+  if merged_into "$DEVELOP"; then info "already in $DEVELOP"
+  else
+    url=$(bash "$SCRIPTS_DIR/open-pr.sh" "$DEVELOP" "$kind v$version → $DEVELOP" \
+      "Back-merge of $kind v$version into $DEVELOP (merge commit)." --merge-commit --keep-branch) && rc=0 || rc=$?
+    [ "$rc" = 1 ] && error "could not open the PR into $DEVELOP"
+    if ! merged_into "$DEVELOP"; then
+      warn "PR into $DEVELOP is open, not merged yet (conflicts → /dp-pr): $url"
+      warn "When it has merged, re-run:  bash scripts/git-flow.sh ${lower}-finish $version"
+      return 3
+    fi
+  fi
+
+  section "4/4 · clean up"
+  git checkout -q "$DEVELOP" && git pull -q --ff-only origin "$DEVELOP" 2>/dev/null || true
+  git push -q origin --delete "$branch" 2>/dev/null || warn "remote $branch already deleted"
+  git branch -D "$branch" >/dev/null 2>&1 || true
+  section "$kind v$version complete — main tagged, $DEVELOP up to date"
+}
+
+# =============================================================================
 # release-finish <version>
 # =============================================================================
 release_finish() {
-  local version="${1:-}"
-  [[ -z "$version" ]] && error "Usage: release-finish <version>  (e.g. 1.0.0)"
+  local version="${1:-}" mode="${2:-}"
+  [[ -z "$version" ]] && error "Usage: release-finish <version> [--direct]  (e.g. 1.0.0)"
 
   local branch="release/${version}"
   require_clean_tree
+  if [ "$mode" != "--direct" ]; then finish_via_prs "$branch" "$version" Release; return $?; fi
 
   section "Finishing release: $version"
 
@@ -206,13 +269,14 @@ hotfix_start() {
 # hotfix-finish <version>
 # =============================================================================
 hotfix_finish() {
-  local version="${1:-}"
-  [[ -z "$version" ]] && error "Usage: hotfix-finish <version>  (e.g. 1.0.1)"
+  local version="${1:-}" mode="${2:-}"
+  [[ -z "$version" ]] && error "Usage: hotfix-finish <version> [--direct]  (e.g. 1.0.1)"
 
   local branch
   branch="$(current_branch)"
   [[ "$branch" != hotfix/* ]] && error "Not on a hotfix branch (current: $branch)"
   require_clean_tree
+  if [ "$mode" != "--direct" ]; then finish_via_prs "$branch" "$version" Hotfix; return $?; fi
 
   section "Finishing hotfix: $branch → v$version"
 
@@ -263,9 +327,9 @@ case "$command" in
     echo "  feature-start  <ticket> <description>   Create feature/${TICKET_PREFIX}-{ticket}-{description}"
     echo "  feature-finish                           Push branch + print PR link"
     echo "  release-start  [version]                 Create release/{version} (default: develop's version)"
-    echo "  release-finish <version>                 Merge to main+develop, tag, delete branch"
+    echo "  release-finish <version> [--direct]      PRs into main + develop, tag, delete branch"
     echo "  hotfix-start   <ticket> <description>   Create hotfix/${TICKET_PREFIX}-{ticket}-{description}"
-    echo "  hotfix-finish  <version>                 Merge to main+develop, tag, delete branch"
+    echo "  hotfix-finish  <version> [--direct]      PRs into main + develop, tag, delete branch"
     echo ""
     echo "Examples:"
     echo "  bash scripts/git-flow.sh feature-start 12 user-search"

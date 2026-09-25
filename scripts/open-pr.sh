@@ -3,8 +3,12 @@
 # open-pr.sh — open (and, per merge_policy, squash-merge) a PR on GitHub or Azure Repos.
 #
 #   open-pr.sh <base-branch> <title> <body-file|text> [--no-merge] [--items "KEY1 KEY2"]
+#              [--merge-commit] [--keep-branch]
 #
 # --items links the tracker items (Azure: work item links on the PR).
+# --merge-commit merges with a merge commit instead of squash (git-flow release/hotfix
+#   PRs into main and back into develop keep shared history); --keep-branch keeps the
+#   source branch (a release branch feeds two PRs).
 # Prints the PR URL (or a compare URL) on stdout.
 # Exit: 0 created + merged · 3 open, not merged yet (pr-only, waiting on policies/checks,
 #       or no gh → finish with the GitHub MCP tools) · 1 error
@@ -18,10 +22,12 @@ if [ -z "$BASE" ] || [ -z "$TITLE" ]; then
   exit 1
 fi
 shift 3 || shift $#
-MERGE=1; ITEMS=""
+MERGE=1; ITEMS=""; METHOD="squash"; KEEP=0
 while [ $# -gt 0 ]; do
   case "$1" in
     --no-merge) MERGE=0; shift ;;
+    --merge-commit) METHOD="merge"; shift ;;
+    --keep-branch) KEEP=1; shift ;;
     --items)    ITEMS="${2:-}"; shift 2 ;;
     *)          shift ;;
   esac
@@ -39,7 +45,8 @@ case "$(bash "$DIR/git-host.sh")" in
     PR_URL=$(bash "$DIR/azdo.sh" pr-create "$BASE" "$TITLE" "$BODY_SRC" --items "$ITEMS") || exit 1
     echo "$PR_URL"
     [ "$MERGE" = 1 ] || exit 3
-    bash "$DIR/azdo.sh" pr-complete "${PR_URL##*/}" >&2
+    AZ_OPTS=(); [ "$METHOD" = "merge" ] && AZ_OPTS+=(--merge-commit); [ "$KEEP" = 1 ] && AZ_OPTS+=(--keep-branch)
+    bash "$DIR/azdo.sh" pr-complete "${PR_URL##*/}" ${AZ_OPTS[@]+"${AZ_OPTS[@]}"} >&2
     exit $?   # 0 merged · 3 auto-complete armed · 1 conflicts/error
     ;;
   github)
@@ -50,15 +57,16 @@ case "$(bash "$DIR/git-host.sh")" in
       [ -z "$PR_URL" ] && { echo "ERROR: could not create PR for $BRANCH → $BASE" >&2; exit 1; }
       echo "$PR_URL"
       [ "$MERGE" = 1 ] || exit 3
-      gh pr merge "${PR_URL##*/}" --squash --delete-branch >/dev/null 2>&1 && exit 0
+      GH_OPTS=("--$METHOD"); [ "$KEEP" = 0 ] && GH_OPTS+=(--delete-branch)
+      gh pr merge "${PR_URL##*/}" "${GH_OPTS[@]}" >/dev/null 2>&1 && exit 0
       # Required checks still running → arm auto-merge instead of failing.
-      gh pr merge "${PR_URL##*/}" --squash --delete-branch --auto >/dev/null 2>&1 \
+      gh pr merge "${PR_URL##*/}" "${GH_OPTS[@]}" --auto >/dev/null 2>&1 \
         && echo "ℹ️  auto-merge armed — merges when required checks pass" >&2
       exit 3
     fi
     REPO_PATH=$(dp_remote_url | sed -E 's#.*github\.com[:/]##; s/\.git$//')
     echo "https://github.com/${REPO_PATH}/compare/${BASE}...${BRANCH}?expand=1"
-    echo "ℹ️  gh not available — create/merge the PR with the GitHub MCP tools (title: $TITLE)." >&2
+    echo "ℹ️  gh not available — create/merge the PR with the GitHub MCP tools (title: $TITLE, merge_method: $METHOD$([ "$KEEP" = 1 ] && echo ', keep the branch'))." >&2
     exit 3
     ;;
   *)
