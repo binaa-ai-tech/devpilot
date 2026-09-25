@@ -117,6 +117,26 @@ fetch_summary() {
 # NEVER touches your settings: project.config.md, .devpilot/config.sh,
 # and CLAUDE.md are left exactly as they are.
 # (Keep these lists in sync with STEP 9.)
+# Merge DevPilot's permission rules into an existing .claude/settings.json: adds the
+# missing allow/ask rules (routine scripts, git, npm, dotnet → no prompts; deploy,
+# rollback, repo settings, force-push → always ask). Never removes the user's rules.
+ensure_permissions() {
+  [ -f .claude/settings.json ] && command -v jq >/dev/null 2>&1 || return 0
+  local src tmp
+  src=$(mktemp); tmp=$(mktemp)
+  fetch ".claude/settings.json" "$src" >/dev/null 2>&1 || { rm -f "$src" "$tmp"; return 0; }
+  if jq --slurpfile d "$src" '
+       .permissions = (.permissions // {})
+       | .permissions.allow = (((.permissions.allow // []) + ($d[0].permissions.allow // [])) | unique)
+       | .permissions.ask   = (((.permissions.ask // [])   + ($d[0].permissions.ask // []))   | unique)' \
+       .claude/settings.json > "$tmp" 2>/dev/null; then
+    if ! cmp -s "$tmp" .claude/settings.json; then
+      mv "$tmp" .claude/settings.json; info "Permission rules merged into .claude/settings.json (fewer prompts; deploys still ask)"
+    fi
+  fi
+  rm -f "$src" "$tmp"
+}
+
 # Add the token-usage hook to an existing .claude/settings.json (never overwrites anything).
 ensure_usage_hook() {
   [ -f .claude/settings.json ] && command -v jq >/dev/null 2>&1 || return 0
@@ -196,6 +216,7 @@ run_update() {
   [ -f project.config.md ] && bash scripts/model-profiles.sh sync-agents 2>/dev/null || true
 
   ensure_usage_hook
+  ensure_permissions
 
   # Secrets + per-developer state stay out of git (config.sh may now hold Azure/Jira keys).
   touch .gitignore
@@ -751,6 +772,7 @@ if [ ! -f ".claude/settings.json" ]; then
 else
   info ".claude/settings.json exists — to enable the warm-up hook, add a SessionStart entry running: bash scripts/session-start.sh"
   ensure_usage_hook
+  ensure_permissions
 fi
 
 # CLAUDE.md — project context for Claude Code

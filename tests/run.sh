@@ -859,6 +859,43 @@ assert_contains "$(cat "$REPO/.github/pull_request_template.md")" "run-tests.sh 
 assert_contains "$(cat "$REPO/.devpilot/checklists/feature.md")" "Then \`release-finish\`: PR into \`main\`" "feature checklist: tag + main only after PRD"
 assert_contains "$(cat "$REPO/.devpilot/checklists/hotfix.md")" "A person approves **PRD**" "hotfix checklist: PRD approval before hotfix-finish"
 
+echo "== audit fixes: agents, checkpoints, permissions, toolchain detection =="
+for A in "$REPO"/.claude/agents/*.md; do
+  n=$(basename "$A" .md)
+  assert_eq "$(sed -n '2,6p' "$A" | sed -n 's/^name: //p')" "$n" "agent $n has the required name: field"
+done
+STALE_AG=$(grep -l 'team-task\|/team-ba\|/team-lead' "$REPO"/.claude/agents/*.md 2>/dev/null | tr '\n' ' ')
+assert_eq "${STALE_AG:-none}" "none" "agent descriptions name real commands only"
+for C in "$REPO"/.claude/commands/*.md "$REPO"/.devpilot/skills/*.md; do
+  for SUB in $(grep -oE 'checkpoint\.sh [a-z-]+' "$C" | awk '{print $2}' | sort -u); do
+    case "$SUB" in write|read|update|add-commit|show|latest) ok "$(basename "$C"): checkpoint.sh $SUB exists" ;;
+      *) no "$(basename "$C"): checkpoint.sh $SUB does not exist" ;; esac
+  done
+done
+SET="$(cat "$REPO/.claude/settings.json")"
+assert_contains "$SET" '"Bash(bash scripts/tracker.sh *)"' "routine DevPilot scripts run without prompts"
+assert_contains "$SET" '"Bash(bash scripts/deploy.sh *)"' "deploy is listed"
+assert_eq "$(jq -r '.permissions.allow | map(select(test("deploy\\.sh|rollback\\.sh|update-org\\.sh|--force"))) | length' "$REPO/.claude/settings.json")" "0" "deploy / rollback / org update / force-push are never auto-allowed"
+assert_eq "$(jq -r '.permissions.ask | map(select(test("deploy\\.sh"))) | length' "$REPO/.claude/settings.json")" "2" "deploy always asks (incl. CONFIRM=1)"
+MISSING=""
+for f in "$REPO"/scripts/*.sh; do
+  n=$(basename "$f")
+  jq -e --arg r "Bash(bash scripts/$n *)" '(.permissions.allow + .permissions.ask) | index($r)' "$REPO/.claude/settings.json" >/dev/null || MISSING="$MISSING $n"
+done
+assert_eq "${MISSING:-none}" "none" "every script has an allow or ask rule"
+D=$(sandbox); ( cd "$D" && mkdir -p web api && printf '{}' > web/angular.json && printf '{\n  "engines": { "node": ">=20.11" }\n}\n' > web/package.json \
+  && printf '<Project Sdk="Microsoft.NET.Sdk.Web"><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup><ItemGroup><PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="8.0.11" /></ItemGroup></Project>' > api/Api.csproj \
+  && mkdir -p api/Migrations && bash scripts/generate-ci.sh >/dev/null 2>&1 )
+CI="$(cat "$D/.github/workflows/devpilot-ci.yml" "$D/.github/workflows/devpilot-cd.yml" 2>/dev/null)"
+assert_contains "$CI" "dotnet-version: 8.0.x" ".NET SDK taken from the project's TargetFramework"
+assert_contains "$CI" "node-version: 20" "Node taken from package.json engines"
+assert_contains "$CI" "dotnet-ef --version 8.0.11" "dotnet-ef matches the project's EF Core version"
+( cd "$D" && printf '{ "sdk": { "version": "9.0.300" } }' > global.json && bash scripts/generate-ci.sh --force >/dev/null 2>&1 )
+assert_contains "$(cat "$D/.github/workflows/devpilot-ci.yml")" "dotnet-version: 9.0.x" "global.json wins for the .NET SDK"
+rm -rf "$D"
+OUT=$(printf '{"tool_input":{"file_path":"api/Migrations/20260101_Init.cs"}}' | ( D=$(mktemp -d); cd "$D" && git init -q && mkdir .devpilot && echo backend > .devpilot/.scope-lock && bash "$REPO/scripts/scope-hook.sh"; echo "rc=$?" ))
+assert_contains "$OUT" "rc=0" "backend layer lock lets the .NET agent write EF migrations"
+
 echo ""
 echo "── Results: $PASS passed, $FAIL failed ──"
 [ "$FAIL" -eq 0 ]

@@ -48,8 +48,11 @@ find_dir() {
     [ $first -eq 0 ] && expr+=(-o)
     expr+=(-name "$n"); first=0
   done
-  find . -maxdepth "$depth" \( -path ./node_modules -o -path '*/node_modules' -o -path ./.git \) -prune \
-    -o \( "${expr[@]}" \) -print 2>/dev/null | head -1 | xargs -r dirname
+  local hit
+  hit=$(find . -maxdepth "$depth" \( -path ./node_modules -o -path '*/node_modules' -o -path ./.git \) -prune \
+    -o \( "${expr[@]}" \) -print 2>/dev/null | head -1)
+  [ -n "$hit" ] && dirname "$hit"
+  return 0
 }
 
 # run_suite <name> <dir> <command...>

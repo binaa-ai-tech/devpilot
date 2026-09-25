@@ -43,7 +43,9 @@ roll() {  # roll <deployment> <container> <image>
 
 DLL=$(basename "$(find "$ART/api" -maxdepth 1 -name '*.runtimeconfig.json' | head -1)" .runtimeconfig.json)
 [ -n "$DLL" ] || { echo "❌ no *.runtimeconfig.json in $ART/api — not a dotnet publish output" >&2; exit 1; }
-image api "$ART/api" "FROM mcr.microsoft.com/dotnet/aspnet:10.0
+# Runtime image = the framework the API was published for (e.g. 8.0 for a net8.0 app).
+NETV=$(sed -n 's/.*"version"[[:space:]]*:[[:space:]]*"\([0-9]*\.[0-9]*\).*/\1/p' "$ART/api/$DLL.runtimeconfig.json" | head -1)
+image api "$ART/api" "FROM mcr.microsoft.com/dotnet/aspnet:${NETV:-10.0}
 WORKDIR /app
 COPY . .
 ENV ASPNETCORE_HTTP_PORTS=8080

@@ -38,7 +38,8 @@ FE=$(dp_cfg stack frontend); FE="${FE:-none}"
 BE=$(dp_cfg stack backend);  BE="${BE:-none}"
 
 # Where the Angular workspace lives (repo root, or e.g. src/web, ClientApp).
-NG_DIR=$(find . -name angular.json -not -path '*/node_modules/*' 2>/dev/null | head -1 | xargs -r dirname | sed 's#^\./##')
+NG_DIR=$(find . -name angular.json -not -path '*/node_modules/*' 2>/dev/null | head -1)
+[ -n "$NG_DIR" ] && NG_DIR=$(dirname "$NG_DIR" | sed 's#^\./##')
 [ -z "$NG_DIR" ] && [ -f package.json ] && NG_DIR="."
 [ "$FE" = "none" ] && NG_DIR=""
 [ "$FE" != "none" ] && [ -z "$NG_DIR" ] && NG_DIR="."
@@ -52,8 +53,30 @@ if [ "$DOTNET" = 1 ]; then
   API_PROJ=$(find . -maxdepth 5 -name '*.csproj' -not -path '*/bin/*' -not -path '*/obj/*' 2>/dev/null \
     | grep -viE 'test' | while read -r f; do grep -q 'Microsoft.NET.Sdk.Web' "$f" && echo "${f#./}"; done | head -1)
 fi
+# Toolchain versions FROM THE PROJECT (never assume the newest):
+#   .NET SDK  global.json sdk.version → else the API's <TargetFramework> (net8.0 → 8.0.x) → else 10.0.x
+#   Node      .nvmrc / .node-version → else package.json engines.node → else 22
+#   dotnet-ef the project's EF Core package version (tool and runtime must match)
+DOTNET_SDK="10.0.x"
+if [ -f global.json ] && command -v jq >/dev/null 2>&1; then
+  V=$(jq -r '.sdk.version // empty' global.json 2>/dev/null); [ -n "$V" ] && DOTNET_SDK="$(echo "$V" | cut -d. -f1-2).x"
+elif [ "$DOTNET" = 1 ]; then
+  TFM=$(grep -rhoE '<TargetFramework>net[0-9]+\.[0-9]+' --include='*.csproj' . 2>/dev/null | grep -v '/bin/\|/obj/' | head -1 | sed 's/.*net//')
+  [ -n "$TFM" ] && DOTNET_SDK="$TFM.x"
+fi
+NODE_VER="22"
+for F in "${NG_DIR:-.}/.nvmrc" "${NG_DIR:-.}/.node-version" .nvmrc .node-version; do
+  [ -f "$F" ] && { NODE_VER=$(head -1 "$F" | tr -d 'v[:space:]' | cut -d. -f1); break; }
+done
+if [ "$NODE_VER" = "22" ] && [ -n "$NG_DIR" ] && [ -f "$NG_DIR/package.json" ]; then
+  E=$(sed -n 's/.*"node"[[:space:]]*:[[:space:]]*"[^0-9]*\([0-9][0-9]*\).*/\1/p' "$NG_DIR/package.json" | head -1); [ -n "$E" ] && NODE_VER="$E"
+fi
+case "$NODE_VER" in ''|*[!0-9]*) NODE_VER="22" ;; esac
+
 # EF Core migrations may live in another project (e.g. Infrastructure) than the API.
 HAS_MIGRATIONS=0; MIG_PROJ=""
+EF_VER=$(grep -rhoE 'Include="Microsoft\.EntityFrameworkCore[A-Za-z.]*"[[:space:]]+Version="[0-9]+\.[0-9]+\.[0-9]+' --include='*.csproj' . 2>/dev/null \
+  | sed -E 's/.*Version="//' | sort -t. -k1,1nr -k2,2nr -k3,3nr | head -1)
 MIG_DIR=$(find . -maxdepth 6 -type d -name Migrations -not -path '*/bin/*' -not -path '*/obj/*' 2>/dev/null | head -1)
 if [ -n "$MIG_DIR" ] && [ "$DOTNET" = 1 ]; then
   HAS_MIGRATIONS=1
@@ -90,7 +113,7 @@ if [ -n "$NG_DIR" ]; then cat <<YML
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: $NODE_VER
           cache: npm
           cache-dependency-path: $NG_DIR/package-lock.json
       - name: npm ci (Angular)
@@ -106,11 +129,11 @@ if [ -n "$NG_DIR" ]; then cat <<YML
         run: TEST_MAX_LINES=400 bash scripts/run-tests.sh angular
 YML
 fi
-if [ "$DOTNET" = 1 ]; then cat <<'YML'
+if [ "$DOTNET" = 1 ]; then cat <<YML
 
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: $DOTNET_SDK
       - name: build (.NET)
         run: dotnet build --configuration Release
       - name: tests (.NET · xUnit + Testcontainers SQL Server)
@@ -174,7 +197,7 @@ if [ -n "$NG_DIR" ]; then cat <<YML
 
       - task: NodeTool@0
         inputs:
-          versionSpec: "22.x"
+          versionSpec: "$NODE_VER.x"
       - script: npm ci
         workingDirectory: $NG_DIR
         displayName: npm ci (Angular)
@@ -188,12 +211,12 @@ if [ -n "$NG_DIR" ]; then cat <<YML
         displayName: unit tests (Angular · Vitest)
 YML
 fi
-if [ "$DOTNET" = 1 ]; then cat <<'YML'
+if [ "$DOTNET" = 1 ]; then cat <<YML
 
       - task: UseDotNet@2
         inputs:
           packageType: sdk
-          version: 10.0.x
+          version: $DOTNET_SDK
       - script: dotnet build --configuration Release
         displayName: build (.NET)
       - script: dotnet test --configuration Release --no-build --logger "trx;LogFileName=results.trx"
@@ -248,7 +271,8 @@ cd_build_script() {
   if [ "$DOTNET" = 1 ]; then
     echo "dotnet publish ${API_PROJ:+'$API_PROJ' }--configuration Release --output out/api -p:Version=\"\$(bash scripts/version.sh current)\""
     if [ "$HAS_MIGRATIONS" = 1 ]; then
-      echo 'dotnet tool update --global dotnet-ef >/dev/null'
+      if [ -f .config/dotnet-tools.json ] && grep -q dotnet-ef .config/dotnet-tools.json; then echo 'dotnet tool restore >/dev/null'
+      else echo "dotnet tool update --global dotnet-ef${EF_VER:+ --version $EF_VER} >/dev/null"; fi
       echo 'export PATH="$PATH:$HOME/.dotnet/tools"'
       echo "bash scripts/db-package.sh out/db ${MIG_PROJ:+--project '$MIG_PROJ' }${API_PROJ:+--startup '$API_PROJ'}"
     fi
@@ -296,14 +320,14 @@ YML
 [ -n "$NG_DIR" ] && cat <<YML
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: $NODE_VER
           cache: npm
           cache-dependency-path: $NG_DIR/package-lock.json
 YML
-[ "$DOTNET" = 1 ] && cat <<'YML'
+[ "$DOTNET" = 1 ] && cat <<YML
       - uses: actions/setup-dotnet@v4
         with:
-          dotnet-version: 10.0.x
+          dotnet-version: $DOTNET_SDK
 YML
 cat <<YML
       - name: build once (web + api + db script)
@@ -392,16 +416,16 @@ stages:
             fetchDepth: 0
             fetchTags: true
 YML
-[ -n "$NG_DIR" ] && cat <<'YML'
+[ -n "$NG_DIR" ] && cat <<YML
           - task: NodeTool@0
             inputs:
-              versionSpec: "22.x"
+              versionSpec: "$NODE_VER.x"
 YML
-[ "$DOTNET" = 1 ] && cat <<'YML'
+[ "$DOTNET" = 1 ] && cat <<YML
           - task: UseDotNet@2
             inputs:
               packageType: sdk
-              version: 10.0.x
+              version: $DOTNET_SDK
 YML
 cat <<YML
           - script: |
@@ -467,5 +491,6 @@ if [ "$HOST" = "azure" ]; then write "$OUT" azure_yml; else write "$OUT" github_
 if [ "$CD" = 1 ]; then
   if [ "$HOST" = "azure" ]; then write "$OUT_CD" azure_cd_yml; else write "$OUT_CD" github_cd_yml; fi
 fi
+echo "   toolchain: .NET SDK $DOTNET_SDK · Node $NODE_VER${EF_VER:+ · dotnet-ef $EF_VER}"
 echo "   host: $HOST · angular: ${NG_DIR:-none} · api: ${API_PROJ:-${BE}} · migrations: $([ "$HAS_MIGRATIONS" = 1 ] && echo yes || echo no) · e2e: $([ "$HAS_E2E" = 1 ] && echo yes || echo no) · base: $BASE"
 echo "   Next: bash scripts/protect-branches.sh (CI required) · bash scripts/setup-environments.sh (CD approvals)"
