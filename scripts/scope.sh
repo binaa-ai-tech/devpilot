@@ -29,8 +29,10 @@ INDEX="$ROOT/docs/project-index.md"
 SHARD_DIR="$ROOT/docs/index"
 CACHE="$ROOT/docs/tasks/${SLUG}-scope.md"
 
-# Cache hit: saved scope exists and is newer than the index → reuse, zero work.
-if [ -n "$SLUG" ] && [ -f "$CACHE" ] && [ -f "$INDEX" ] && [ "$CACHE" -nt "$INDEX" ]; then
+# Cache hit: saved scope exists and the index is not newer → reuse, zero work.
+# (`! INDEX -nt CACHE`, not `CACHE -nt INDEX`: macOS bash 3.2 compares whole seconds,
+#  so a scope saved in the same second as the index still counts as fresh.)
+if [ -n "$SLUG" ] && [ -f "$CACHE" ] && [ -f "$INDEX" ] && [ ! "$INDEX" -nt "$CACHE" ]; then
   echo "♻️  cached scope (docs/tasks/${SLUG}-scope.md) — newer than the index, reusing:"
   cat "$CACHE"
   exit 0

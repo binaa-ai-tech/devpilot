@@ -651,7 +651,7 @@ assert_contains "$(grep '^model:' "$D/.claude/agents/team-ba.md")" "test-model-x
 assert_eq "$(grep -c '"test-model-x"' "$D/project.config.md")" "3" "single sets all three claude tiers"
 ( cd "$D" && bash scripts/model-profiles.sh apply claude save >/dev/null 2>&1 )   # back to a profile
 # sync-agents re-applies frontmatter from project.config.md (the --update repair path)
-( cd "$D" && sed -i 's/^model: .*/model: claude-sonnet-5/' .claude/agents/team-lead.md && bash scripts/model-profiles.sh sync-agents >/dev/null 2>&1 )
+( cd "$D" && sed -i.bak 's/^model: .*/model: claude-sonnet-5/' .claude/agents/team-lead.md && rm -f .claude/agents/team-lead.md.bak && bash scripts/model-profiles.sh sync-agents >/dev/null 2>&1 )
 assert_contains "$(grep '^model:' "$D/.claude/agents/team-lead.md")" "claude-haiku-4-5-20251001" "sync-agents restores frontmatter from config"
 # switching profile keeps a single coding_profile line
 ( cd "$D" && bash scripts/model-profiles.sh apply balanced >/dev/null 2>&1 )

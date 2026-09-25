@@ -10,6 +10,8 @@ section becomes the GitHub Release notes when the `vx.y.z` tag is pushed
 - **Azure DevOps on macOS:** `scripts/azdo.sh` failed to load under macOS's bash 3.2, so every
   Azure Boards / Azure Repos call failed, including opening PRs. Found by the live tracker self-test.
 - **Local tracker on macOS:** changing an item's status failed in the same way (`scripts/tracker.sh`).
+- **Scope cache on macOS:** a scope saved in the same second as the project index was not reused
+  (bash 3.2 compares file times in whole seconds), so it was worked out again instead of reused.
 - Installer on macOS (bash 3.2): the settings summary printed a syntax error on the "Git host" line.
   The saved setting (`git_host: auto`) was always correct; only the summary line was affected.
 - Installer printed `/dp-deliver: No such file or directory`. A comment in the generated
