@@ -455,7 +455,8 @@ It runs weekly in CI (`.github/workflows/real-app.yml`).
 `bash tests/run.sh` and `bash tests/e2e.sh` before pushing. Every change goes to `main` through a pull request.
 
 **Releasing DevPilot:** bump `VERSION` and the README badge, add the version's section to `CHANGELOG.md`, merge,
-then push the tag (`git tag v5.5.0 && git push origin v5.5.0`). The `release` workflow publishes the GitHub Release.
+then push the tag (`git tag v5.5.0 && git push origin v5.5.0`), or run the `release` workflow by hand on `main`
+(Actions → release → Run workflow), which tags `v<VERSION>` itself. Either way it publishes the GitHub Release.
 </details>
 
 ## License

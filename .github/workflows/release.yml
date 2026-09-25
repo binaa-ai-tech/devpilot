@@ -1,10 +1,13 @@
-# Publishes a GitHub Release when a version tag (v1.2.3) is pushed.
-# The notes are that version's section of CHANGELOG.md.
+# Publishes a GitHub Release with that version's section of CHANGELOG.md.
+#   - push a tag vX.Y.Z (it must match VERSION), or
+#   - run the workflow by hand on main ("Run workflow"): it tags v<VERSION> on the
+#     current commit and publishes the release — useful where you can't push tags.
 name: release
 
 on:
   push:
     tags: ['v*.*.*']
+  workflow_dispatch:
 
 permissions:
   contents: write
@@ -15,12 +18,23 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
-      - name: Check the tag matches VERSION
+      - name: Resolve the tag
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          [ "v$(cat VERSION)" = "$GITHUB_REF_NAME" ] || { echo "::error::tag $GITHUB_REF_NAME but VERSION is $(cat VERSION)"; exit 1; }
+          V="$(cat VERSION)"
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            [ "v$V" = "$GITHUB_REF_NAME" ] || { echo "::error::tag $GITHUB_REF_NAME but VERSION is $V"; exit 1; }
+          else
+            [ "$GITHUB_REF_NAME" = main ] || { echo "::error::run this workflow on main"; exit 1; }
+            if gh release view "v$V" >/dev/null 2>&1; then echo "::error::release v$V already exists"; exit 1; fi
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
       - name: Extract release notes from CHANGELOG.md
+        env:
+          V: ${{ steps.tag.outputs.version }}
         run: |
-          V="${GITHUB_REF_NAME#v}"
           awk -v v="$V" '
             index($0, "## [" v "]") == 1 { on = 1; next }
             on && /^## \[/               { exit }
@@ -30,6 +44,7 @@ jobs:
       - name: Create the release
         env:
           GH_TOKEN: ${{ github.token }}
+          V: ${{ steps.tag.outputs.version }}
         run: |
-          gh release create "$GITHUB_REF_NAME" --title "DevPilot $GITHUB_REF_NAME" \
-            --notes-file notes.md --verify-tag --latest
+          if [ "$GITHUB_EVENT_NAME" = push ]; then TARGET=(--verify-tag); else TARGET=(--target "$GITHUB_SHA"); fi
+          gh release create "v$V" --title "DevPilot v$V" --notes-file notes.md --latest "${TARGET[@]}"
