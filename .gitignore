@@ -6,11 +6,7 @@
 .env.*.local
 
 # ── Generated / transient task output ────────────────────────────────────────
-docs/fallback/
 
-# ── opencode local install (regenerate: cd .opencode && npm install) ─────────
-.opencode/node_modules/
-.opencode/package-lock.json
 
 # ── OS / editor junk ─────────────────────────────────────────────────────────
 .DS_Store

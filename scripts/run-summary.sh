@@ -79,12 +79,12 @@ OUT="$OUT_DIR/${SLUG}.md"
   echo "## Test results"
   echo "${TESTS:-_(not provided)_}"
   echo ""
-  echo "## Engines / models used"
+  echo "## Models used"
   if [ -n "${DEVPILOT_ENGINES:-}" ]; then
-    # newline- or semicolon-separated "layer: engine (model)" entries
+    # newline- or semicolon-separated "layer: model" entries
     printf '%s\n' "${DEVPILOT_ENGINES}" | tr ';' '\n' | sed 's/^[[:space:]]*/- /'
   else
-    echo "- $(bash "$ROOT/scripts/resolve-engine.sh" effective 2>/dev/null | tr '\n' ' ')"
+    bash "$ROOT/scripts/resolve-model.sh" show 2>/dev/null | sed 's/^/- /'
   fi
 } > "$OUT"
 
@@ -95,7 +95,7 @@ if [ "$POST" = "1" ]; then
 Root cause: ${ROOT_CAUSE:-n/a}
 Changed: ${CHANGED_COUNT} file(s)${STAT:+ ($STAT)}
 Commits: ${COMMIT_HASHES:-none}
-Engines: ${DEVPILOT_ENGINES:-$(bash "$ROOT/scripts/resolve-engine.sh" effective 2>/dev/null | tr '\n' ' ')}
+Models: ${DEVPILOT_ENGINES:-$(bash "$ROOT/scripts/resolve-model.sh" show 2>/dev/null | tr '\n' ' ')}
 Tests: ${TESTS:-n/a}
 Detail: ${OUT}"
   bash "$ROOT/scripts/track.sh" comment "$KEY" "$COMMENT" >/dev/null 2>&1 \

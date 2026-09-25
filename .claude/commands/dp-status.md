@@ -8,7 +8,7 @@ One window into the system. Runs the existing scripts and summarizes.
 ```bash
 bash scripts/doctor.sh
 ```
-Reports: config present, Jira/tracker reachable, git-flow branches, engine availability.
+Reports: config present, Jira/tracker reachable, git-flow branches, Claude CLI + model tiers.
 
 ## board  (task dashboard)
 ```bash
@@ -21,6 +21,6 @@ Reports: in-flight tasks, sprint state, and the current backlog index.
 ```bash
 bash scripts/metrics.sh
 ```
-Reports: task durations, throughput, engine usage.
+Reports: task durations, throughput, model usage.
 
 Print a compact summary of whichever section(s) were requested.

@@ -13,13 +13,13 @@ INTAKE → READY → SPRINT → BUILD → VERIFY → MERGE → RELEASE → OPERA
 
 | # | Phase | Driven by | Exit gate (must hold to advance) |
 |---|-------|-----------|----------------------------------|
-| 1 | **Intake** | `/dp-plan` (or `/ceo`) | Item is classified, **deduped** against `docs/backlog/index.md`, and written as Epic→Story with a self-contained brief. **Hard-gated by `scripts/jira-guard.sh assert-key`** — no branch/code until a tracker key exists. |
+| 1 | **Intake** | `/dp-refine` (or `/dp-deliver`) | Item is classified, **deduped** against `docs/backlog/index.md`, and written as Epic→Story with a self-contained brief. **Hard-gated by `scripts/jira-guard.sh assert-key`** — no branch/code until a tracker key exists. |
 | 2 | **Ready** | BA | `definition-of-ready.md` — clear, testable ACs; sized & sliced (`estimation-and-slicing.md`); no open questions. |
 | 3 | **Sprint** | `/dp-sprint` | Only READY Stories enter; sprint has a goal and a recommended run order. |
 | 4 | **Build** | `/dp-build` | One branch per sprint; layer agents stay in scope (`scope-guard`); every commit conventional, build never left red (`core-rules.md`). |
 | 5 | **Verify** | QA agent, `/dp-test` | Test cases derived per AC (`test-case-design.md`); pyramid respected (`test-strategy.md`: Vitest · xUnit + real SQL Server · Playwright UI journeys per `ui-e2e-playwright.md`); suites run token-lean via `scripts/run-tests.sh`; perf budgets proven when in scope (`performance.md`); QA verdict **PASS** per Story. |
-| 6 | **Merge** | `/dp-build` · `/dp-autofix` | The `auto-merge.md` gate ladder: build/lint/tests/audit/review/QA all green **on the PR head**. Auto-fix loop is bounded; humans merge when `merge_policy: pr-only`. |
-| 7 | **Release** | `/dp-release` | Build once, promote the same artifact DEV→SIT→UAT→PRD (`release-ops.md`); PRD always has a human approval; rollback path tested (`/dp-rollback`). |
+| 6 | **Merge** | `/dp-build` · `/dp-pr` | The `auto-merge.md` gate ladder: build/lint/tests/audit/review/QA all green **on the PR head**. Auto-fix loop is bounded; humans merge when `merge_policy: pr-only`. |
+| 7 | **Release** | `/dp-release` | Build once, promote the same artifact DEV→SIT→UAT→PRD (`release-ops.md`); PRD always has a human approval; rollback path tested (`/dp-release rollback`). |
 | 8 | **Operate** | `/dp-hotfix` · `/dp-status` | Incidents get a blameless postmortem; action items return to Intake; SLOs watched (`release-ops.md`). |
 
 A failed gate sends work **back one phase**, never forward with a TODO.
@@ -39,7 +39,7 @@ A failed gate sends work **back one phase**, never forward with a TODO.
 - **Defect standard** — a bug is a single typed `Bug` issue (no Epic→Story), routed by
   severity: **P0/P1 → `/dp-hotfix`** (branch from `main`, postmortem); **P2 → active sprint**;
   **P3 → next sprint, batched**. The P0/P1 redirect is **hard-enforced** by
-  `scripts/jira-guard.sh hotfix-gate` — `/ceo` and `/dp-plan` refuse to plan/build one. Bug
+  `scripts/jira-guard.sh hotfix-gate` — `/dp-deliver` and `/dp-refine` refuse to plan/build one. Bug
   DoD is *reproduce-before-fix*: a regression test must fail on the unfixed code, then pass
   and stay (`definition-of-done.md` Bug DoD).
 - **Security & data** — `security-scan` (threat model at design time; secrets, PII,
@@ -53,5 +53,5 @@ A failed gate sends work **back one phase**, never forward with a TODO.
 - **Token discipline** — read indexes first; load heavy skills only at the
   step that needs them (`.devpilot/skills/README.md`).
 
-New to a repo? Run `/dp-status health`, then start at Intake with `/dp-plan` —
-or say `/ceo "<what you want>"` and let the process run end to end.
+New to a repo? Run `/dp-status health`, then start at Intake with `/dp-refine` —
+or say `/dp-deliver "<what you want>"` and let the process run end to end.

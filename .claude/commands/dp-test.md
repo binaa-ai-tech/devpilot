@@ -12,12 +12,12 @@ no PR — tests are committed to the current/PR branch.
 
 ---
 
-## Step 0 — Resolve scope + engine
+## Step 0 — Resolve scope + model tier
 
 ```bash
 BASE_BRANCH=$(grep '^base_branch:' project.config.md | head -1 | sed 's/base_branch:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
 # QA is lite-tier work unless the diff is architectural
-eval "$(bash scripts/resolve-engine.sh suggest "$ARGUMENTS")"
+eval "$(bash scripts/resolve-model.sh suggest "$ARGUMENTS")"
 ```
 
 Resolve what to test:

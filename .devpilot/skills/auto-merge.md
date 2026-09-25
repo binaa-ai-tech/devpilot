@@ -1,7 +1,7 @@
 # Auto-Merge — the gates a robot must pass before merging
 
 Load when merging a PR autonomously (`merge_policy: auto`) or running
-`/dp-autofix`. Autonomy is earned per-merge by passing every gate — a robot
+`/dp-pr`. Autonomy is earned per-merge by passing every gate — a robot
 that merges on "probably fine" is a liability, not a teammate.
 
 **Autonomous, not human-gated.** Under `merge_policy: auto` the gates below are the

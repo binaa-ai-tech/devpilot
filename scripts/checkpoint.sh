@@ -1,9 +1,10 @@
 #!/usr/bin/env bash
 # =============================================================================
-# checkpoint.sh — State persistence engine for ceo resume
+# checkpoint.sh — State persistence engine for dp-deliver resume
 #
-# Writes and reads a structured JSON checkpoint so any runner (claude, opencode,
-# antigravity) can resume a task from the exact phase it left off.
+# Writes and reads a structured JSON checkpoint so an interrupted Claude run
+# (usage limit, closed session) resumes from the exact phase it left off
+# with `/dp-deliver resume`.
 #
 # Usage (write):
 #   bash scripts/checkpoint.sh write \
@@ -11,7 +12,7 @@
 #     --slug add-user-auth \
 #     --branch feature/key-123-add-user-auth \
 #     --base-branch main \
-#     --command "/ceo" \
+#     --command "/dp-deliver" \
 #     --task "Add user authentication" \
 #     --runner claude \
 #     --coding-engine claude \

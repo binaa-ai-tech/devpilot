@@ -75,114 +75,33 @@ Needs human input to resolve.
 
 ---
 
-## Part 2 — Limit Fallback & Cross-Tool Resumability
+## Part 2 — Usage limits & resumability
 
-### Trigger Signals
+### Trigger signals
+- Rate limit / 429, "overloaded", or a usage-limit message
+- Context window exhausted mid-task, or a response truncated mid-implementation
+- Repeated tool failures on the same operation
 
-You have hit a limit when you observe any of:
-- Rate limit error / 429 response
-- "Claude is currently overloaded"
-- Context window exceeded during a large task
-- Response truncated mid-implementation
-- Repeated tool call failures on the same operation
+### Recovery
+1. **Downshift first** (cheap, no stop): if the phase is running on the power tier, finish it on
+   the standard tier (`bash scripts/resolve-model.sh tier standard`) — a Sonnet finish beats a stall.
+2. **Checkpoint and stop cleanly** when the limit is hard:
+   ```bash
+   bash scripts/checkpoint.sh write \
+     --key "$KEY" --slug "$SLUG" --branch "$BRANCH" --base-branch "$BASE_BRANCH" \
+     --command "/dp-deliver" --task "$TASK" --runner claude --coding-engine claude \
+     --phase-completed "<last completed phase>" --next-phase "<phase to resume>" \
+     --agents-completed "<done agents>" --agents-remaining "<remaining agents>" \
+     --pause-reason "usage_limit"
+   ```
+   Commit and push whatever is already green on the branch so no work lives only in the session.
+3. **Report and stop:**
+   ```
+   ⚠️  USAGE LIMIT — <phase>
+   Checkpoint: docs/tasks/<KEY>-checkpoint.json   ·   Branch: <branch> (pushed)
+   Resume when the limit resets:  /dp-deliver resume
+   ```
 
-### Recovery Steps
-
-When a limit signal is detected during an **implementation phase** (Frontend, Backend, DB, Integration):
-
-**Step 1 — Read the fallback config**
-```bash
-FALLBACK_ENGINE=$(grep -A 10 '^engines:' project.config.md | grep '^\s*fallback:' | head -1 \
-  | sed 's/.*fallback:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
-FALLBACK_MODEL=$(grep -A 20 "^  ${FALLBACK_ENGINE}:" project.config.md 2>/dev/null \
-  | grep "    <agent-role>:" | head -1 | sed 's/.*:[[:space:]]*//' | tr -d '"' | awk '{print $1}')
-# e.g. for backend agent: grep '    backend:' under the fallback engine's section
-```
-
-**Step 2 — Write checkpoint (structured state)**
-
-```bash
-bash scripts/checkpoint.sh write \
-  --key "$KEY" \
-  --slug "$SLUG" \
-  --branch "$BRANCH" \
-  --base-branch "$BASE_BRANCH" \
-  --command "$COMMAND" \
-  --task "$TASK" \
-  --runner "claude" \
-  --coding-engine "$IMPL_ENGINE" \
-  --phase-completed "<last completed phase>" \
-  --next-phase "<phase to resume>" \
-  --agents-completed "<comma-separated list of done agents>" \
-  --agents-remaining "<comma-separated list of remaining agents>" \
-  --pause-reason "limit_hit"
-```
-
-The checkpoint JSON at `docs/tasks/<KEY>-checkpoint.json` stores all fields needed by any runner (Claude, opencode, antigravity) to resume without re-deriving context.
-
-**Step 3 — Write the engine-aware fallback prompt**
-
-The fallback prompt must NOT contain Claude-Code-specific instructions (no "spawn subagent_type", no "use Agent tool"). Write a self-contained brief the fallback engine can execute directly:
-
-Write `docs/fallback/<slug>-<phase>-prompt.md`:
-```markdown
-# Implementation Brief — <Phase> — <slug>
-# Runnable by: <FALLBACK_ENGINE> (no subagents, no Claude-specific tools)
-
-## What you are
-You are a coding assistant running in <FALLBACK_ENGINE> mode.
-Execute every step below using your bash tool and file editing tools.
-Do NOT spawn subagents. Do NOT use the Agent tool. You are the implementation agent.
-
-## Task
-<original task description>
-
-## Branch
-<feature branch> — check it out first:
-git checkout <branch>
-
-## What was already done
-<list files already committed — use: git log <base_branch>..HEAD --oneline>
-
-## Remaining work for <Phase>
-<exact steps still needed from the plan>
-<specific files to create or modify>
-<acceptance criteria not yet passing>
-
-## Rules
-Read .devpilot/rules.md before writing any code.
-
-## When done
-Run: <lint/build/test command>
-Commit with: <feat|fix>(<slug>): <description>
-Then: /ceo resume    (or: bash scripts/run-command.sh ceo resume)
-```
-
-**Step 4 — Report to user**
-
-```
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-⚠️  LIMIT REACHED — <Phase Name>
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
-Checkpoint saved: docs/tasks/<KEY>-checkpoint.json
-Fallback engine:  <FALLBACK_ENGINE>
-Fallback model:   <FALLBACK_MODEL>
-
-Run this now:
-  <FALLBACK_ENGINE> --model "<FALLBACK_MODEL>" < docs/fallback/<slug>-<phase>-prompt.md
-
-When done → run:
-  /ceo resume                           (from Claude Code)
-  bash scripts/run-command.sh ceo resume (from any terminal)
-━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-```
-
-Then stop. Do not attempt to continue the current phase.
-
-### What NOT to do
-
-- Never write Claude-Code-specific instructions (subagent spawning) into fallback prompts — the fallback engine cannot execute them
-- Never silently skip implementation steps to work around a limit
-- Never pretend work is done if it was cut short
-- Never open a PR if any phase fell back to an external engine and `/ceo resume` hasn't run
+### Never
+- Silently skip steps to squeeze under a limit, or claim work is done when it was cut short.
+- Open or merge a PR from a run that stopped mid-phase before `/dp-deliver resume` completes it.

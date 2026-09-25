@@ -1,6 +1,6 @@
 #!/bin/bash
 # link-jira-issues.sh — create a reversible link between two Jira issues.
-# Used by /dp-plan's merge mechanics (DUPLICATE / FOLD-IN) so nothing is ever
+# Used by /dp-refine's merge mechanics (DUPLICATE / FOLD-IN) so nothing is ever
 # silently deleted — merges are auditable and undoable.
 #
 # Usage: bash scripts/link-jira-issues.sh <FROM-KEY> <type> <TO-KEY>

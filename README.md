@@ -1,568 +1,308 @@
 <div align="center">
 
-# devpilot
+# DevPilot
 
-**Describe the work. An AI team plans it into a deduplicated Jira backlog, sprints it, and ships it — from idea to merged PR.**
+**An AI delivery team for Angular + .NET, built on Claude Code. Describe the requirement; the team refines it, builds it, tests it end to end, reviews it, and merges it.**
 
-[![Version](https://img.shields.io/badge/version-4.0.0-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-5.0.0-blue.svg)](VERSION)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#license)
-[![Engines](https://img.shields.io/badge/engines-Claude%20%7C%20OpenCode%20%7C%20Antigravity-7c3aed.svg)](#configuration)
-[![Stacks](https://img.shields.io/badge/stacks-Angular%20%7C%20.NET%20%7C%20SQL%20Server-orange.svg)](#stack-support)
+[![Runs on](https://img.shields.io/badge/runs%20on-Claude%20Code-7c3aed.svg)](#requirements)
+[![Stack](https://img.shields.io/badge/stack-Angular%20%7C%20.NET%20%7C%20SQL%20Server-orange.svg)](#stack)
 
-A portable, zero-config multi-agent orchestration layer that installs into any project in minutes.
+Installs into an existing Angular / ASP.NET Core repository in minutes and runs the same gated
+SDLC a large engineering organization would: backlog refinement, sprints, code review, QA,
+protected branches, DEV → SIT → UAT → PRD promotion, and postmortems.
 
 </div>
 
 ---
 
-## Table of Contents
+## Contents
 
-- [What is devpilot?](#what-is-devpilot)
-- [Quick Start](#quick-start)
-- [How It Works](#how-it-works)
-- [The Standard Process](#the-standard-process)
-- [Driving the Team](#driving-the-team)
-- [Daily Playbook](#daily-playbook)
-- [Command Reference](#command-reference)
-- [Adoption Guide](#adoption-guide)
+- [Why DevPilot](#why-devpilot)
+- [Quick start](#quick-start)
+- [Commands — one per team role](#commands--one-per-team-role)
+- [How a requirement flows](#how-a-requirement-flows)
+- [The delivery process](#the-delivery-process)
+- [Stack](#stack)
+- [Quality and governance gates](#quality-and-governance-gates)
+- [DevOps pipeline](#devops-pipeline)
 - [Configuration](#configuration)
-- [Stack Support](#stack-support)
-- [Quality Gates](#quality-gates)
-- [Token Efficiency](#token-efficiency)
-- [Issue Tracking](#issue-tracking)
-- [Deploy Pipeline](#deploy-pipeline)
-- [Credentials](#credentials)
-- [State Persistence](#state-persistence)
-- [Project Structure](#project-structure)
+- [Token efficiency](#token-efficiency)
+- [Issue tracking](#issue-tracking)
+- [Enterprise rollout](#enterprise-rollout)
+- [Project structure](#project-structure)
 - [Requirements](#requirements)
-- [Testing & CI](#testing--ci)
 - [Troubleshooting](#troubleshooting)
+- [Upgrading from 4.x](#upgrading-from-4x)
 - [Contributing](#contributing)
-- [License](#license)
 
 ---
 
-## What is devpilot?
-
-devpilot sits between you and your AI coding CLI and runs your work in **two phases**:
-
-1. **Plan** — you describe a feature, bug, task, or requirement; a **PM brain** dedups it against
-   your backlog (merging duplicates), then writes it into Jira as **Epic → Story** with a
-   self-contained implementation brief. No code.
-2. **Build** — it groups ready Stories into **sprints**, recommends which to run first, then a
-   structured team — **BA, Team Lead, Frontend, Backend (stack-aware), DB, Integration, QA** —
-   ships a whole sprint on one branch → one PR → `develop`.
-
-Or skip the approval step: `/ceo "…"` runs plan → sprint → build end-to-end and walks away.
-
-It is built so a **one-person team can operate like a small company**:
+## Why DevPilot
 
 | | |
 |---|---|
-| 🗂 **Jira backlog with dedup** | New items are deduped/merged against the backlog index; Stories become Epic→Story with full briefs any tool can build from. |
-| 🧠 **Task-balanced models** | `/ceo --claude` or `--opencode`; within each family the model is picked per task — power (Opus/GPT-5) vs token-saving (Haiku/4o-mini). |
-| 🪙 **Token-lean** | Agents read `core-rules` once + load heavier skills only on demand — a **75–89% cut** in per-spawn skill load, in any repo. |
-| 🛡 **Professional gates** | Definition of Ready → sized/sliced → built → tested (DoD) → security/code review → released → postmortem. |
-| 🧩 **Angular + .NET, end to end** | Angular frontend agent + .NET/SQL Server backend agent, a committed OpenAPI contract that generates the Angular client, and tests at every layer: Vitest, xUnit + real SQL Server (Testcontainers), and Playwright UI journeys. |
-| 📚 **A focused operating manual** | 23 skills, no overlap: `angular-dev`, `angular-testing`, `dotnet-api`, `efcore-sqlserver`, `dotnet-testing`, `api-contract`, `ui-e2e-playwright`, `token-lean-testing`, plus definition-of-ready/done, architecture-guard, test-case-design, test-strategy, test-guard, performance, code-review, security-scan, auto-merge, release-ops, and self-heal. The SDLC contract that ties them together: `.devpilot/process.md`. |
-| 🔔 **Operations built in** | Generated per-project CI (`devpilot-ci`) enforcing the gate ladder, one-command branch protection, and webhook/email notifications on sprint DONE / QA BLOCKED (`scripts/notify.sh`). |
-
-**Engines run the same workflow.** Claude uses subagents; opencode (GitHub Copilot) runs the
-identical steps as a single-agent loop. Jira Stories are self-contained, so any session, opencode,
-or other AI tool can pick up a sprint and build from Jira alone.
+| 🚀 **One command, requirement → merged** | `/dp-deliver "…"` runs BA → sprint → plan → Angular + .NET build → QA → review → PR → merge. It stops only for a gray-zone backlog-dedup question. |
+| 👥 **Commands map to team roles** | Product Owner, Scrum Master, developers, QA, Tech Lead, DevOps, on-call. Each role has one command, so the team adopts it without learning a new process. |
+| 🧪 **Tested at every layer** | Vitest (Angular) · xUnit + `WebApplicationFactory` on real SQL Server via Testcontainers (.NET) · OpenAPI contract checks · Playwright UI journeys with accessibility, visual, and mobile checks. |
+| 🛡 **Enterprise gates by default** | Definition of Ready/Done, test guard, severity-tagged code review, security scan, dependency audit, protected branches, and a human-approved production release. |
+| 🪙 **Token-lean** | Skills load only when needed. The index is sharded, and test output is summarized so agents read failures, not logs. Each task goes to Haiku, Sonnet, or Opus by complexity. |
+| 🗂 **A backlog that stays clean** | Every new item is checked against the backlog: duplicates are merged and overlaps folded into existing Stories. Each Jira Story carries a self-contained implementation brief. |
 
 ---
 
-## Quick Start
+## Quick start
 
-**1. Install** — run from the root of your project. The installer is interactive, so it needs a real terminal (it prompts for engine, agents, stack, etc.).
-
-**Recommended — download, then run** (works everywhere; lets you inspect the script first):
+**1. Install** from the root of your Angular / .NET repository:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/binaa-ai-tech/devpilot/main/install.sh -o /tmp/devpilot-install.sh && bash /tmp/devpilot-install.sh
 ```
 
-**Or — one-liner** (the script re-execs itself from `/dev/tty` so the prompts still work when piped):
+Non-interactive (CI, devcontainers, rolling out to many repos): append `-s -- --defaults` to a
+piped install, or run `bash install.sh --defaults`. The 6-step wizard detects your stack, enables
+the matching agents, sets the Claude model profile, tracker, and merge policy, then offers to
+generate CI and protect `develop`/`main`.
+Full walkthrough: **[docs/setup-guide.md](docs/setup-guide.md)**.
+
+**2. Verify:** `/dp-status health` (fix anything flagged with `/dp-setup fix`).
+
+**3. Deliver:**
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/binaa-ai-tech/devpilot/main/install.sh | bash
+/dp-deliver "add a CSV export to the orders page"            # → merged into develop
+/dp-deliver "add a CSV export to the orders page" --to sit   # → merged + SIT release cut
 ```
+
+**Update later**, keeping your config: `bash install.sh --update`.
+
+---
+
+## Commands — one per team role
+
+| Role | Command | What it does |
+|------|---------|--------------|
+| **Whole team** | `/dp-deliver <requirement> [--to sit]` | End to end: refine → sprint → build → test → review → merge (→ SIT). `/dp-deliver resume` continues after an interruption. |
+| **Product Owner / BA** | `/dp-refine <requirement \| Jira key>` | Classify, dedup against the backlog, write Epic → Story with testable ACs. No code. |
+| **Scrum Master** | `/dp-sprint` | Group READY Stories into sprints, recommend the run order. |
+| **Developers** | `/dp-build [sprint]` | Angular + .NET agents build the sprint in parallel on one branch → one PR. |
+| **QA** | `/dp-test [ui \| perf] [story \| PR \| diff]` | Derive cases from ACs, then write unit, integration, and Playwright tests and run them. `ui` = full UI pass. |
+| **Tech Lead** | `/dp-pr [PR]` | Apply review comments, drive CI to green (bounded), merge per policy. |
+| **DevOps** | `/dp-release <sit \| uat \| prd \| rollback> [version]` | Promote DEV → SIT → UAT → PRD, or roll production back. |
+| **On-call** | `/dp-hotfix <ticket> <slug> <version>` | Emergency fix from the deployed tag, followed by a blameless postmortem. |
+| **Everyone** | `/dp-status [health \| board \| metrics]` | Health check · task board · throughput. |
+| **Admin** | `/dp-setup [fix \| models \| wizard \| index]` | Repair config, switch the Claude model profile, refresh the index. |
+
+Agents (`team-ba`, `team-lead`, `team-frontend`, `team-dotnet`, `team-qa`) are spawned by these
+commands. You never call them directly.
+
+### Everyday situations
+
+| Situation | Type |
+|-----------|------|
+| New feature or bug | `/dp-deliver "…"` (bugs get a failing-test-first flow automatically) |
+| Approve the plan before code | `/dp-refine "…"` → `/dp-sprint` → `/dp-build` |
+| Many ideas at once | several `/dp-refine` → `/dp-sprint` → `/dp-build sprint-1` |
+| Thin tests / full UI regression | `/dp-test <story>` · `/dp-test ui <story>` |
+| PR red or has review comments | `/dp-pr <PR>` |
+| Ship to test / production | `/dp-release sit 1.4.0` → `/dp-release uat` → `/dp-release prd 1.4.0` |
+| Production incident | `/dp-hotfix …` · `/dp-release rollback` |
+| Spend too high | `/dp-setup models save` |
+
+---
+
+## How a requirement flows
+
+```
+/dp-deliver "add CSV export"
+  │
+  ├─ REFINE   BA: classify → dedup vs docs/backlog/index.md → spec + Epic→Story (Jira/GitHub/local)
+  ├─ SPRINT   feature → its own sprint · bug → the active sprint · P0/P1 → refused, use /dp-hotfix
+  ├─ PLAN     Team Lead: files per layer, API contract, test layer per AC, ADRs
+  ├─ BUILD    team-dotnet (API · EF Core · migrations · OpenAPI)  ║  team-frontend (Angular · generated client)
+  ├─ QA       case matrix per AC → Vitest · xUnit + SQL Server · Playwright journeys + axe
+  ├─ REVIEW   code-review · security · performance · architecture · test guard (strict)
+  ├─ MERGE    PR → develop, auto-merge ladder green on the head commit (bounded fix loop)
+  └─ PROMOTE  (--to sit) release branch → SIT      ·  UAT and PRD stay human-gated
+```
+
+---
+
+## The delivery process
+
+The full contract is `.devpilot/process.md`. Each phase has an exit gate, and a failed gate sends
+work **back one phase, never forward with a TODO**.
+
+| Phase | Owner / command | Exit gate |
+|-------|-----------------|-----------|
+| Intake | PO · `/dp-refine` | Classified, deduped, Epic→Story exists (hard-gated by `jira-guard.sh`) |
+| Ready | BA | Definition of Ready: testable ACs, sized, sliced |
+| Sprint | Scrum Master · `/dp-sprint` | Only READY Stories; sprint goal + run order |
+| Build | Developers · `/dp-build` | One branch per sprint; agents stay in their layer; build never red |
+| Verify | QA · `/dp-test` | Every AC tested; UI ACs have Playwright journeys; verdict PASS |
+| Merge | Tech Lead · `/dp-pr` | Auto-merge ladder green on the PR head |
+| Release | DevOps · `/dp-release` | Same artifact promoted DEV→SIT→UAT→PRD; PRD human-approved |
+| Operate | On-call · `/dp-hotfix` | Blameless postmortem; action items back to Intake |
+
+---
+
+## Stack
+
+| Layer | Technology | How it's tested |
+|-------|-----------|-----------------|
+| Frontend | Angular 21+ (standalone, signals, zoneless-ready) | Vitest + TestBed, `HttpTestingController`, harnesses |
+| Backend | ASP.NET Core (.NET 8+) — controllers or minimal APIs | xUnit unit tests + `WebApplicationFactory` integration tests |
+| Data | EF Core + SQL Server | Testcontainers (real SQL Server) + Respawn — never the InMemory provider |
+| Contract | OpenAPI committed → Angular client generated | Snapshot test + breaking-change check (`oasdiff`) |
+| UI / E2E | The running app + API | Playwright: journeys, auth-once, API seeding, axe, visual, mobile |
+
+Every suite runs through `scripts/run-tests.sh`. The full log goes to `.devpilot/logs/`; agents
+read one PASS/FAIL line plus the failures.
+
+**Skills** (`.devpilot/skills/`, 23, loaded only when needed):
+- Angular: `angular-dev`, `angular-testing`, `accessibility`
+- .NET: `dotnet-api`, `efcore-sqlserver`, `dotnet-testing`, `api-contract`
+- QA: `test-case-design`, `test-strategy`, `ui-e2e-playwright`, `token-lean-testing`, `test-guard`, `performance`
+- Gates and operations: `definition-of-ready`, `definition-of-done`, `architecture-guard`, `code-review`, `security-scan`, `auto-merge`, `release-ops`, `self-heal`, `estimation-and-slicing`, `core-rules`
+
+---
+
+## Quality and governance gates
+
+- **Definition of Ready / Done**: entry and exit gates per role.
+- **Test guard**: every changed source file has a covering test. Merge gates run it strict (`STRICT=1`).
+- **Code review**: Team Lead review with 🔴/🟡/🟢 severity. An open 🔴 blocks the merge.
+- **Security**: threat model at design time, then a diff checklist covering injection, auth and
+  ownership, secrets, PII and dependencies. `scripts/audit.sh` blocks new high or critical CVEs.
+- **API contract**: breaking changes need a new version. The spec and the Angular client land in the same PR.
+- **Auto-merge ladder**: build, tests, audit, review, QA and CI must be green **on the head commit**.
+  The fix loop is capped at 3 cycles, after which it escalates.
+- **Scope guard**: a `PreToolUse` hook blocks agents from writing outside their layer.
+- **Server-side enforcement**: a generated `devpilot-ci` workflow. Branch protection requires it on
+  `develop`/`main` and blocks force-pushes. `pr-only` additionally requires a human review.
+- **Audit trail**: `docs/tasks/<KEY>.md` holds the step log, `docs/qa/` the verdicts, and the PR body
+  the review. Each ticket gets exactly one start comment and one DONE comment.
+- **Conventional commits**: enforced by a `commit-msg` hook.
+
+---
+
+## DevOps pipeline
+
+| Stage | Command | Gate |
+|-------|---------|------|
+| DEV | automatic after merge to `develop` | CI green |
+| SIT | `/dp-release sit <version>` (or `/dp-deliver … --to sit`) | DEV smoke passed |
+| UAT | `/dp-release uat` | SIT deploy + smoke green; environment approval |
+| PRD | `/dp-release prd <version>` | UAT sign-off, human approval of the `production` environment |
+| Rollback | `/dp-release rollback [version]` | Dry run first; never rewrites history |
+| Hotfix | `/dp-hotfix <ticket> <slug> <version>` | Branch from the deployed tag; UAT before PRD |
+
+The pipeline builds the artifact once and promotes that same artifact through each environment.
+Releases use SemVer (MINOR for features, PATCH for fixes), and every release gets a changelog
+section and a tag.
 
 <details>
-<summary>Or clone and run locally</summary>
+<summary>One-time deploy setup</summary>
 
-```bash
-git clone https://github.com/binaa-ai-tech/devpilot
-bash devpilot/install.sh
-```
+GitHub Secrets: `DEPLOY_HOOK_DEV`, `DEPLOY_HOOK_SIT`, `DEPLOY_HOOK_UAT`, `DEPLOY_HOOK_PRD`.
+GitHub Environments: `dev`, `sit`, `uat`, `prd`. Put required reviewers on `uat` and `prd`.
 </details>
-
-**Non-interactive** (CI, devcontainers, many repos at once) — accept every recommended default:
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/binaa-ai-tech/devpilot/main/install.sh | bash -s -- --defaults
-```
-
-The installer (~5 minutes) detects your AI engines, scans your stack, enables only the agents you
-need, configures engine routing / **model assignment** (recommended tiers · one model for the whole
-team · a model per team role) / issue tracker / merge policy, and copies the managed files
-(`.claude/`, `.opencode/`, `.devpilot/`, `scripts/`, `AGENTS.md`, `CLAUDE.md`).
-
-**📖 Step-by-step walkthrough with a recommendation at every prompt: [docs/setup-guide.md](docs/setup-guide.md).**
-
-**2. Run your first task:**
-
-```bash
-/ceo "add rental agreement PDF export"
-```
-
-That's it — the team takes it from requirements to PR.
-
-**3. Update devpilot later** without touching your config:
-
-```bash
-bash install.sh --update   # refreshes .claude/, .devpilot/, scripts/
-                           # never overwrites project.config.md or .devpilot/config.sh
-```
-
----
-
-## How It Works
-
-```
-PLAN                                    BUILD
-/dp-plan "add PDF export"               /dp-sprint
-  → classify intent                       → group READY Stories into sprints
-  → dedup ladder:                         → recommend which to run first
-     DUPLICATE / FOLD-IN /              /dp-build sprint-1
-     RELATED / UNRELATED                  → one branch
-  → spec to git                           → Frontend · Backend · DB · Integration (parallel)
-  → Epic→Story to Jira                    → QA every AC  ·  review gate
-     (+ self-contained brief)             → one PR → develop  ·  Stories → Done
-  (auto; asks only in the gray zone)
-
-/ceo "add PDF export"  =  the whole thing, autonomous (plan → sprint → build).
-```
-
-- **Dedup brain** — each new item is matched against `docs/backlog/index.md` (small, always
-  loadable); only the top 1–3 candidate specs are read. Merges are reversible Jira links.
-- **Self-contained Jira tickets** — every Story's description is a full implementation brief
-  (ACs, scope, repo/branch, DoD), rendered as structured ADF, so any tool can build from Jira alone.
-- **Engine + model** — resolved per task by `scripts/resolve-engine.sh`; state persists in
-  `docs/tasks/` so any engine can resume where another left off.
-
----
-
-## The Standard Process
-
-devpilot is an opinionated SDLC, not just a set of commands. Every project it's installed
-into follows the same eight phases with explicit exit gates — a one-person team runs the
-same process as a software company. The full contract lives in **`.devpilot/process.md`**
-(installed into your repo); this is the shape:
-
-```
-INTAKE → READY → SPRINT → BUILD → VERIFY → MERGE → RELEASE → OPERATE
-```
-
-| Phase | Driven by | You may advance only when … |
-|-------|-----------|------------------------------|
-| **Intake** | `/dp-plan` (or `/ceo`) | the item is classified, deduped, and written as Epic→Story with a self-contained brief |
-| **Ready** | BA | ACs are clear & testable, the Story is sized and sliced (Definition of Ready) |
-| **Sprint** | `/dp-sprint` | only READY Stories are in; the sprint has a goal and run order |
-| **Build** | `/dp-build` | one branch per sprint; agents stay in their layer; build never left red |
-| **Verify** | QA, `/dp-test` | test cases derived per AC, suite green, test-guard clean, perf budgets proven when in scope; verdict **PASS** per Story |
-| **Merge** | `/dp-build` · `/dp-autofix` | the `auto-merge` gate ladder is green **on the PR head**; bounded auto-fix, never an endless loop |
-| **Release** | `/dp-release` | build once, promote the same artifact DEV→SIT→UAT→PRD; **production always gets a human** |
-| **Operate** | `/dp-hotfix` · `/dp-status` | incidents get a blameless postmortem; action items return to Intake |
-
-A failed gate sends work **back one phase — never forward with a TODO**. The gates are
-enforced by skills and scripts (`.devpilot/skills/`, `scripts/`), not by discipline alone.
-
----
-
-## Driving the Team
-
-Two ways to drive the same engine — both deduplicate the backlog and ship sprint by sprint.
-
-### Plan first, then build (approve as you go)
-
-```
-/dp-plan "add CSV export"     → dedups, writes Epic→Story (ready) + self-contained brief
-/dp-plan "export to excel"    → detects overlap → FOLD-IN to the same Story
-/dp-sprint                    → groups READY Stories, recommends sprint 1
-/dp-build sprint-1            → builds the whole sprint → one PR → develop
-```
-
-A feature, bug, issue, task, requirement, or enhancement all enter the same way — `/dp-plan`
-classifies intent and routes it. Add several over time; the backlog stays deduplicated, and a
-**Definition of Ready** gate keeps unclear Stories out of sprints.
-
-### Express — walk away
-
-```
-/ceo "add CSV export"
-```
-
-Runs plan → sprint → build end to end, autonomously. It stops only to ask **one** thing — a
-gray-zone dedup decision — then ships. Auto-merges into `develop` by default
-(`merge_policy: pr-only` requires a human merge); you review only for production.
-
-### Engine modes (per run)
-
-A leading flag picks the model **family** (no flag → `engines.coding`):
-
-| Flag | Behaviour |
-|------|-----------|
-| `/ceo --claude <task>` | Claude models, balanced per task: lite **Haiku** / standard **Sonnet** / power **Opus** |
-| `/ceo --opencode <task>` | opencode + GitHub Copilot, balanced per task: **gpt-4o-mini / gpt-4o / gpt-5** |
-
-The model is chosen **per task** by complexity (`resolve-engine.sh`) — power for architectural /
-cross-cutting work, lite for simple changes. With `--opencode`, if GitHub Copilot isn't available,
-opencode falls back to its own default model.
-
----
-
-## Daily Playbook
-
-What to type for every situation a development team meets. Each entry runs the standard
-process under the hood — you never manage the steps yourself.
-
-| Situation | Do this |
-|-----------|---------|
-| **New feature / requirement / idea** | `/ceo "describe it"` — or `/dp-plan "…"` if you want to approve the plan first |
-| **A bug** | `/ceo "users get a 500 when …"` — intent is classified automatically; bugs get a failing-test-first flow |
-| **Many ideas at once** | several `/dp-plan "…"` calls (dedup merges overlaps) → `/dp-sprint` → `/dp-build sprint-1` |
-| **"Is this already in the backlog?"** | just `/dp-plan` it — the dedup ladder answers DUPLICATE / FOLD-IN / RELATED / UNRELATED |
-| **Tests are thin / write test cases** | `/dp-test <story \| PR \| diff>` — derives a case matrix from the ACs, writes the missing tests, runs the suite |
-| **Full UI testing** | `/dp-test ui <scope>` — Playwright journeys for every user-facing AC, axe accessibility scan, visual/mobile checks |
-| **Performance worry** | `/dp-test perf <scope>` — budgeted load/stress pass; violations are blockers with numbers |
-| **PR is red in CI** | `/dp-autofix <PR>` — diagnoses logs, fixes within 3 bounded cycles, merges when green or escalates with the diagnosis |
-| **Reviewer left comments** | `/dp-review-fix <PR>` — applies each comment, replies on the threads, re-requests review |
-| **Ship to test/UAT/production** | `/dp-release sit <ver>` → `/dp-release uat` → `/dp-release prd <ver>` (prod requires your approval) |
-| **Production incident** | `/dp-hotfix <ticket> <slug> <ver>` — emergency path + blameless postmortem; `/dp-rollback [ver]` to revert |
-| **"Where is everything?"** | `/dp-status` (board) · `/dp-status health` (doctor) · `/dp-status metrics` (throughput) |
-| **Something misconfigured** | `/dp-config fix` — doctor finds it, fixes it interactively |
-| **Switch models / engine / spend** | `/dp-config models <profile>` · one model: `bash scripts/model-profiles.sh single claude <model>` |
-| **Update devpilot itself** | `bash install.sh --update` — config and credentials untouched |
-| **Update devpilot across a whole org** | `bash scripts/update-org.sh <org> [--merge] [--install-missing]` — one PR per repo, base branches only |
-
----
-
-## Command Reference
-
-**Workflow**
-
-| Command | Purpose |
-|---------|---------|
-| `/ceo [--claude \| --opencode] <description>` | Express — plan → sprint → build, end to end |
-| `/dp-plan <feature \| issue \| task \| requirement>` | PM brain: dedup against the backlog, write Epic→Story (no code). Accepts raw text or a Jira key |
-| `/dp-sprint` | Group the backlog into sprints, recommend which to run first |
-| `/dp-build [sprint]` | Build a whole sprint → one PR → develop |
-| `/dp-test [ui \| perf] [story \| PR \| diff]` | Derive test cases from ACs → write the missing tests (unit, integration, Playwright UI) → run the suite |
-| `/dp-autofix [PR]` | Drive a PR's CI to green (bounded fix loop) and merge per the `auto-merge` gate ladder |
-| `/dp-review-fix <PR>` | Read PR review comments → apply fixes → push |
-
-The five team agents (`team-ba`, `team-lead`, `team-frontend`, `team-dotnet`, `team-qa`) are spawned automatically by the workflow commands — no manual slash wrappers.
-
-**Config & deploy**
-
-| Command | Purpose |
-|---------|---------|
-| `/dp-config [models \| wizard \| index]` | Set models / re-run the wizard / refresh the project index |
-| `/dp-status [health \| board \| metrics]` | Health check · task dashboard · throughput metrics |
-| `/dp-release <sit \| uat \| prd> [version]` | Promote DEV→SIT→UAT→PRD |
-| `/dp-hotfix <ticket> <slug> <version>` · `/dp-rollback [version]` | Emergency fix · roll back |
-| `bash install.sh --update` | Refresh devpilot itself (config preserved) |
-
----
-
-## Adoption Guide
-
-How to roll devpilot into real teams — start safe, earn autonomy. Full setup detail with a
-recommendation at every prompt: **[docs/setup-guide.md](docs/setup-guide.md)**.
-
-**Stage 1 — Solo / first project (day 1).** Install with defaults (`local` tracker, `auto`
-merge). Run one small real feature through `/ceo` end to end and read the PR it produces.
-Everything is auditable: `docs/tasks/` (step log), `docs/qa/` (verdicts), the PR diff.
-
-**Stage 2 — Small team (week 1).** Switch `tracker: github` (or `jira` — guided wizard),
-generate the CI workflow and apply branch protection (the installer offers both), set
-`NOTIFY_WEBHOOK`. Keep `merge_policy: pr-only` until the team trusts the gates, then go `auto`.
-
-**Stage 3 — Enterprise / regulated.** `tracker: jira`, `merge_policy: pr-only` (1 human
-review enforced via branch protection), `balanced` or per-team models for predictable spend,
-docs `language:` for your locale. The audit trail (task logs + QA reports + two-comment
-ticket policy) is designed for compliance reviews; production releases always require a human.
-
-**Non-negotiables at every stage** — these are what make the output trustworthy:
-- Never weaken a gate to get a change through (`test-guard`, review 🔴s, `auto-merge` ladder).
-- Production (`/dp-release prd`) is always human-approved.
-- A failed gate sends work back a phase, never forward with a TODO.
 
 ---
 
 ## Configuration
 
-`project.config.md` is the single source of truth for all routing decisions. Commit it to git.
+`project.config.md` is the single source of truth. Commit it.
 
 ```yaml
 project_name: my-app
-base_branch: develop   # PRs target & DEV deploys from this; defaults to develop when it exists
-
+ticket_prefix: APP
+base_branch: develop          # PRs target this; DEV deploys from it
 tracker:
-  type: local          # local | github | jira  — local = zero setup, logs to docs/tasks/
-
-merge_policy: auto     # auto = devpilot squash-merges the PR | pr-only = a human merges
-language: en           # human language for BA/QA/review docs (code stays English)
+  type: jira                  # local | github | jira
+merge_policy: auto            # auto = the team merges green PRs · pr-only = a human merges
+language: en                  # BA/QA docs language (code stays English)
 
 stack:
-  frontend: angular    # angular | none
-  backend:  dotnet     # dotnet | none
-  database: sqlserver  # sqlserver | none
-  mobile:   none
+  frontend: angular           # angular | none
+  backend: dotnet             # dotnet | none
+  database: sqlserver         # sqlserver | none
 
-engines:
-  orchestrator: claude # always claude — Claude Code drives orchestration
-  coding: claude       # claude | opencode | antigravity
-  model_mode: recommended  # recommended (task-balanced tiers) | single (one model for
-                           # the whole team) | per-team (a model per role/layer)
-  runner: claude       # claude | opencode | antigravity | custom
-  fallback: opencode   # engine to use when the primary hits a limit
+model_policy:
+  coding_profile: auto        # auto (Opus for hard work) | balanced (no Opus) | save (Haiku-first)
+  model_mode: recommended     # recommended | single | per-team
 
-# Route a single layer to a different engine than engines.coding.
-layer_overrides:
-  frontend:    ""      # e.g. opencode → generate FE code via opencode (Copilot tiers)
-  backend:     ""
-  db:          ""
-  integration: ""
-
-# Pick a one-word PROFILE (auto | balanced | save) — a preset over the tiers below.
-# Per-task routing still chooses the tier; the profile sets which model each maps to.
-coding_profile: auto
-# Models are chosen PER TASK by complexity tier (power / standard / lite),
-# balancing capability vs token cost.
 coding_models:
   claude:
     power:    "claude-opus-5-5"            # architectural / cross-cutting / high-risk
-    standard: "claude-sonnet-5"          # normal feature & bug work
-    lite:     "claude-haiku-4-5-20251001"  # simple / mechanical / BA / QA
-  opencode:                                 # GitHub Copilot via opencode
-    power:    "github-copilot/gpt-5"
-    standard: "github-copilot/gpt-4o"
-    lite:     "github-copilot/gpt-4o-mini"
-    fallback: ""                            # used when Copilot is unavailable ("" = opencode default)
-
-agents:                                     # enable only the layers your stack needs
-  ba:          { enabled: true }
-  lead:        { enabled: true }
-  qa:          { enabled: true }
-  frontend:    { enabled: true }
-  backend:     { enabled: true }
-  db:          { enabled: true }
-  integration: { enabled: false }
+    standard: "claude-sonnet-5"            # normal feature & bug work
+    lite:     "claude-haiku-4-5-20251001"  # simple changes, BA, QA
 ```
 
-**Entry-point coupling** (enforced by `scripts/resolve-engine.sh` — the single source of truth):
-
-- **Run from Claude Code** → the whole lifecycle stays on the Claude model family. Coding is forced
-  to `claude` regardless of `engines.coding`, *unless* a `layer_overrides` entry routes a layer elsewhere.
-- **Run from OpenCode / Antigravity** → the entire lifecycle runs natively on that engine's models
-  (including local models via Ollama).
-- **Per-run override** → a leading flag on `/ceo` forces one engine across every layer for that run.
-- **Layer override** → keep orchestration + most coding on Claude, but generate one layer via, e.g.,
-  opencode + GitHub Copilot.
-
-**Three model modes** (chosen in the install wizard, switchable anytime):
-
-| `model_mode` | Meaning | Switch with |
-|--------------|---------|-------------|
-| `recommended` *(default)* | task-balanced tiers via a one-word profile | `/dp-config models save` (claude: `auto \| balanced \| save` · opencode/antigravity: `recommended \| balanced \| save`) |
-| `single` | one model for the whole team | `bash scripts/model-profiles.sh single claude claude-sonnet-5` |
-| `per-team` | a model per role (BA, Team Lead, QA, Frontend, Backend) — or per layer on a non-claude engine | edit `models.*` / `layer_models.*` → `bash scripts/model-profiles.sh sync-agents` |
-
-Profiles are presets over `power / standard / lite`; edit those tiers directly for fine control.
-Under the hood: `bash scripts/model-profiles.sh apply claude save` (and `… show` / `… opencode-list`).
-Full guidance per scenario: [docs/setup-guide.md](docs/setup-guide.md).
+Switch models anytime: `/dp-setup models <auto|balanced|save>`, one model for everyone with
+`bash scripts/model-profiles.sh single <model-id>`, or per role by editing `models.*` then running
+`bash scripts/model-profiles.sh sync-agents`. Reference: `.devpilot/config/models.md`.
 
 ---
 
-## Stack Support
+## Token efficiency
 
-DevPilot is built for **Angular + ASP.NET Core + SQL Server**. Each layer has its own agent,
-rule snippet (`.devpilot/rules/<stack>.md`, routed by `.devpilot/rules.md`), and skills.
-
-| Layer | Stack | Tests |
-|-------|-------|-------|
-| Frontend | Angular 21+ (standalone, signals) | Vitest + TestBed |
-| Backend | .NET 8+ ASP.NET Core APIs | xUnit + `WebApplicationFactory` |
-| Database | SQL Server via EF Core | Testcontainers (real SQL Server) + Respawn |
-| Contract | OpenAPI → generated Angular client | snapshot + breaking-change check |
-| UI / E2E | the running app + API | Playwright (journeys, axe a11y, visual, mobile) |
-
-Every suite runs through `scripts/run-tests.sh`: the full log goes to `.devpilot/logs/` and
-agents read only the PASS/FAIL line and the failures, which keeps test runs cheap in tokens.
+- **Skills load only when needed.** Agents read `core-rules.md` once and load a skill only at the step that needs it.
+- **Two-tier index.** `docs/project-index.md` is a small map. Per-file detail lives in shards that
+  `scope.sh` greps without spending AI tokens. Each task reads the top 3–8 files, never the whole repo.
+- **Scope once.** `scope.sh --save` persists the file list at plan time, and every later phase reuses it.
+- **Hash-gated index.** The index regenerates only when repo content changes.
+- **Summarized test output.** `run-tests.sh` returns failures only. Agents re-run just the failing tests while fixing.
+- **Per-task models.** Haiku handles light work and Opus only architectural work.
+- **Small backlog reads.** Dedup reads the backlog index plus the top 1–3 candidate specs.
 
 ---
 
-## Quality Gates
-
-The lifecycle is gated end to end — **Ready → built → tested → reviewed → released → postmortem**:
-
-- **Definition of Ready** — entry gate (`definition-of-ready.md`); a Story enters a sprint only when
-  it's clear, testable, scoped, sized, and deduped. Unclear Stories stay in the backlog.
-- **Definition of Done** — exit gate, per-role checklist (`definition-of-done.md`).
-- **Code-review gate** — Team Lead reviews with severity tags (🔴/🟡/🟢); an open 🔴 blocks the PR.
-- **Security scan + dependency audit** — `security-scan.md` checklist + `scripts/audit.sh`
-  (npm/dotnet); new high/critical CVEs block the PR.
-- **Layer disciplines** — `dotnet-api` + `api-contract` (versioned OpenAPI contracts),
-  `efcore-sqlserver` (zero-downtime migrations, fast queries), `angular-dev` + `accessibility`
-  (WCAG AA) load on demand for the layers they apply to.
-- **QA verdict** — test cases derived per AC (`test-case-design.md`, traceability matrix in the QA
-  report); every acceptance criterion has a test, every user-facing AC a Playwright journey
-  (`ui-e2e-playwright.md`); perf budgets proven when in scope (`performance.md`); PASS or BLOCKED.
-- **Test guard** — `scripts/test-guard.sh` (skill: `test-guard.md`): every changed source file has
-  a covering test or a justified exemption; merge gates run it strict (`STRICT=1`) — a gap blocks the PR.
-- **Auto-merge ladder** — `auto-merge.md`: build/tests/audit/review/QA/CI all green **on the PR head**
-  before a robot merges; `/dp-autofix` fixes red CI within a bounded loop (max 3 push-fix cycles),
-  then escalates instead of looping forever.
-- **Scope guard** — `scripts/scope-guard.sh` + a real-time `PreToolUse` hook (`scripts/scope-hook.sh`)
-  block out-of-layer writes, keeping each agent inside its layer.
-- **Server-side enforcement** — the installer generates `.github/workflows/devpilot-ci.yml`
-  (stack-aware: build → tests → test-guard → audit, regenerate with `scripts/generate-ci.sh --force`)
-  and `scripts/protect-branches.sh` requires that check on `develop`/`main` and blocks force-pushes
-  (`merge_policy: pr-only` additionally requires 1 human review).
-- **Notifications** — `scripts/notify.sh` pings your webhook (Slack/Teams/Discord-compatible) or
-  email on sprint DONE, QA BLOCKED, and autofix escalation; every event also lands in
-  `docs/tasks/notifications.log`. Never blocks a flow.
-- **Conventional commits** — a `commit-msg` git hook enforces the format locally.
-- **Incident postmortem** — `/dp-hotfix` writes a blameless postmortem; action items return to the backlog.
-
-Run `/dp-status health` before starting to catch setup problems early.
-
----
-
-## Token Efficiency
-
-Designed to stay cheap in **any** repo it's installed into:
-
-- **On-demand skills** — agents read `core-rules.md` once and pull heavier skills only at the step
-  that needs them (per core-rules rule #10). That's a **75–89% cut** in per-spawn skill load
-  vs. pre-loading; the 838-word `self-heal` loads only on a real failure, not every spawn.
-- **Two-tier index** — `docs/project-index.md` is a small bounded map; per-file detail lives in
-  `docs/index/*.md` shards that `scope.sh` greps (deterministic bash, zero AI tokens) — agents read
-  the map + the top-8 ranked results, never the whole index. Context cost per task is O(1) at any repo size.
-- **Scope once, reuse everywhere** — `scope.sh --save <slug>` persists the ranked file list to
-  `docs/tasks/<slug>-scope.md` at plan time; lead/dev/QA phases reuse it instead of re-deriving.
-- **Hash-gated index freshness** — regeneration is keyed on git content (HEAD + file-list checksum),
-  refreshed automatically by post-merge/post-checkout hooks and the SessionStart hook: a free no-op
-  when nothing changed, always trustworthy so agents never broad-scan "just in case".
-- The dedup brain reads only `docs/backlog/index.md` + the top 1–3 candidate specs.
-- **Task-balanced models** — lite tiers (Haiku / gpt-4o-mini) handle simple work so tokens go to the hard parts.
-- **Compact handoffs** — agents get a brief (ACs + files to touch), not raw document dumps.
-
----
-
-## Issue Tracking
-
-Zero setup by default. Tracking works at **two altitudes** so a task is fully auditable without
-flooding the ticket (see `core-rules` #11):
-
-- **`docs/tasks/<KEY>.md`** — the live, per-step log: who/what/when, decisions, and deviations.
-  Durable, diffable, and it survives even if the ticket is archived.
-- **The ticket** (Jira/GitHub) — only two routine comments: a **start** comment and a single
-  **DONE** summary, plus status transitions. A **QA BLOCKED** / hard-failure comment is the only
-  exception. Routine progress (plan-complete, impl-complete, QA-passed, merged) goes to the task
-  log, not the ticket — it would just duplicate the PR and the DONE block.
-
-Switch backends anytime via `scripts/track.sh` without touching a command:
+## Issue tracking
 
 | `tracker.type` | Behaviour | Setup |
 |----------------|-----------|-------|
-| `local` *(default)* | Everything in `docs/tasks/<KEY>.md` — no external service | none |
-| `github` | Start + DONE on GitHub Issues via `gh`; detail in the task log | `gh auth login` (falls back to `local`) |
-| `jira` | Start + DONE on Jira Cloud; detail in the task log | credentials in `.devpilot/config.sh` |
+| `local` *(default)* | Everything in `docs/tasks/<KEY>.md` | none |
+| `github` | GitHub Issues via `gh` | `gh auth login` |
+| `jira` | Jira Cloud: Epic → Story, sprints, ADF briefs | `bash scripts/devpilot-config.sh set jira_api_token=<token>` (validated live) |
+
+Credentials live in `.devpilot/config.sh` (gitignored), managed by `scripts/devpilot-config.sh`.
 
 ---
 
-## Deploy Pipeline
+## Enterprise rollout
 
-After CI deploys to DEV, promote through environments:
+1. **Pilot (one repo, one week).** Install with defaults and `merge_policy: pr-only`. Run real
+   Stories through `/dp-deliver` and review every PR it opens.
+2. **Team.** Switch to `tracker: jira`, apply branch protection and CI (the installer offers both),
+   add CODEOWNERS, and set `NOTIFY_WEBHOOK` to your Teams or Slack channel.
+3. **Organization.** Roll out or update every repository with one PR each:
+   `bash scripts/update-org.sh <org> --merge [--install-missing]`.
+   Move to `merge_policy: auto` once the gates have earned trust. Production stays human-approved.
 
-| Command | Stage | Trigger |
-|---------|-------|---------|
-| `/dp-release sit <version>` | SIT | DEV testing passed |
-| `/dp-release uat` | UAT | SIT QA passed |
-| `/dp-release prd <version>` | PRD | UAT signed off — **opens PR, requires your review** |
-| `/dp-hotfix <ticket> <slug> <ver>` | Emergency | Production incident |
-| `/dp-rollback [version]` | Rollback | Revert to a previous release tag |
-
-Version convention: features → bump MINOR (`1.0.0 → 1.1.0`), fixes → bump PATCH (`1.0.0 → 1.0.1`).
-
-<details>
-<summary>One-time deploy setup (GitHub secrets + environments)</summary>
-
-**GitHub Secrets** (Repo → Settings → Secrets → Actions):
-`DEPLOY_HOOK_DEV`, `DEPLOY_HOOK_SIT`, `DEPLOY_HOOK_UAT`, `DEPLOY_HOOK_PRD`
-
-**GitHub Environments** (Repo → Settings → Environments): `dev`, `sit`, `uat`, `prd`
-</details>
+These hold at every stage: never weaken a gate to get a change through, and PRD is always human-approved.
 
 ---
 
-## Credentials
-
-`scripts/devpilot-config.sh` manages all credentials in `.devpilot/config.sh` (gitignored) with
-live Jira validation. **Never edit that file by hand.**
-
-```bash
-bash scripts/devpilot-config.sh show                                # all values, tokens masked
-bash scripts/devpilot-config.sh set jira_api_token=<new-token>      # update + validate live
-bash scripts/devpilot-config.sh set jira_base_url=https://your-org.atlassian.net
-bash scripts/devpilot-config.sh validate                            # full connectivity check
-```
-
-`validate` makes a live Jira API call: `200 OK` (valid) · `401` (rotate token) · `403` (insufficient
-permissions) · `000` (network/URL issue).
-
----
-
-## State Persistence
-
-Every task that touches the checkpoint engine saves to `docs/tasks/<KEY>-checkpoint.json`. If the
-primary engine hits a rate limit, the fallback engine reads the checkpoint and resumes from the exact
-phase that was interrupted — no re-running BA, no re-generating plans.
-
-```bash
-bash scripts/checkpoint.sh show KEY-123    # inspect current state
-bash scripts/checkpoint.sh latest          # find the most recent in-progress task
-```
-
----
-
-## Project Structure
+## Project structure
 
 ```
 .claude/
-  commands/          # /ceo + /dp-* workflow, deploy & config commands
-  agents/            # team-ba, team-lead, team-frontend, team-dotnet, team-qa
-  settings.json      # SessionStart hook → scripts/session-start.sh
-.opencode/
-  config.json        # OpenCode project config — points to AGENTS.md and .devpilot/rules.md
+  commands/        # the 10 /dp-* commands
+  agents/          # team-ba · team-lead · team-frontend · team-dotnet · team-qa
+  settings.json    # SessionStart + scope-guard hooks
 .devpilot/
-  process.md         # The standard dev process — phases, gates, roles (the SDLC contract)
-  rules.md           # Router → core-rules + the snippet for your stack
-  rules/             # angular, dotnet, sqlserver
-  skills/            # Operating manual (README.md index + 23 skills)
-  config/            # models.md — model tier reference
-  templates/         # requirements, plan, qa-report, review-report, adr, jira-brief, ticket
-scripts/             # Orchestration: engine/model routing, backlog+sprint, Jira (md→ADF), deploy …
-tests/run.sh         # Script test suite (run by .github/workflows/ci.yml)
-docs/                # Per-task output: requirements, plans, qa, reviews, tasks, backlog, sprints, postmortems
-AGENTS.md            # OpenCode/Antigravity project context
-CLAUDE.md            # Claude Code project context
-project.config.md    # Per-project config — engine routing, models, stack, agents
-install.sh           # One-command installer
+  process.md       # the SDLC contract — phases, gates, roles
+  rules.md         # router → rules/angular.md · rules/dotnet.md · rules/sqlserver.md
+  skills/          # 23 skills (README.md is the index)
+  templates/       # requirements, plan, QA report, review report, ADR, Jira brief
+  config/models.md # Claude model tiers and profiles
+scripts/           # tracker (Jira/GitHub/local), git-flow, tests, CI, deploy, doctor
+docs/              # per-task output: requirements, plans, qa, reviews, tasks, backlog, sprints
+CLAUDE.md          # Claude Code project context
+project.config.md  # team + model configuration
+install.sh         # installer and --update
 ```
 
 ---
@@ -571,64 +311,55 @@ install.sh           # One-command installer
 
 | Tool | Required | Purpose |
 |------|----------|---------|
-| [Claude Code](https://claude.ai/code) | Yes | Orchestration — BA, planning, QA, review |
-| `git` | Yes | Branch management |
-| [GitHub CLI (`gh`)](https://cli.github.com) | Optional | PR auto-merge; without it `open-pr.sh` prints a compare URL |
-| `jq` or `python3` | Optional | JSON operations in checkpoint/config scripts |
-| [OpenCode](https://opencode.ai) | Optional | If `engines.coding: opencode` or `/ceo --opencode` |
-| Antigravity | Optional | If `engines.coding: antigravity` |
-
----
-
-## Testing & CI
-
-**For your project** — the installer generates a stack-aware `devpilot-ci` workflow (Node, .NET,
-Python, Go, Java) that runs the gate ladder on every PR, and can apply branch protection so the
-check is required. `/dp-autofix` drives that same check to green and merges.
-
-**For devpilot itself** — it ships its own test suite:
-
-```bash
-bash tests/run.sh    # exercises run-mode, track, scope, scope-guard, open-pr, resolve-engine, …
-```
-
-`.github/workflows/ci.yml` is cost-tiered: pull requests run only the cheap gate (`shellcheck` +
-bash syntax checks + the suite), while the full pipeline runs on push to `base_branch` after a PR
-merges — so PR iterations stay fast and expensive workflows fire once per merge.
+| [Claude Code](https://claude.ai/code) (CLI, desktop, IDE, or web) | Yes | Runs the whole team |
+| `git` | Yes | Branching and releases |
+| [GitHub CLI](https://cli.github.com) `gh` | Recommended | PR automation (Claude Code on the web uses the GitHub MCP tools instead) |
+| .NET SDK, Node.js, Docker | For your project | Build and test; Docker runs the SQL Server test container |
+| `jq` or `python3` | Optional | Checkpoint and config scripts |
 
 ---
 
 ## Troubleshooting
 
-First move for anything odd: `/dp-status health` — every warning prints its exact fix, and
-`/dp-config fix` applies them interactively.
+Start with `/dp-status health`. Every warning prints its fix, and `/dp-setup fix` applies them.
 
 | Symptom | Fix |
 |---------|-----|
-| "ready to run /ceo" but warnings listed | `/dp-config fix` — repairs missing config values one by one |
-| Jira tickets not created / 401 | `bash scripts/devpilot-config.sh validate` → rotate token: `… set jira_api_token=<token>` (tracker falls back to local logs meanwhile — nothing is lost) |
-| Agent model ≠ config (drift after update) | `bash scripts/model-profiles.sh sync-agents` |
-| Scope results look wrong / stale index | `bash scripts/generate-project-index.sh --force` (normally auto-refreshed, hash-gated) |
-| test-guard blocks a file that truly needs no test | write the one-line justified exemption in the PR description — never weaken `STRICT=1` |
-| PR can't merge, `gh` missing | install GitHub CLI + `gh auth login`; without it `open-pr.sh` prints the compare URL to merge manually |
-| Claude hit a rate limit mid-task | nothing to do — checkpoint saved, fallback engine prompt printed; resume with `/ceo resume` |
-| CI red on a devpilot-generated workflow | `/dp-autofix <PR>` — it reads the failed logs and drives it green within bounded cycles |
-| Wrong stack detected at install | edit `stack:` in `project.config.md`, then `bash scripts/generate-ci.sh --force` |
-| Want to see what it's costing | `/dp-status metrics` · switch spend: `/dp-config models save` |
+| Jira 401 / tickets not created | `bash scripts/devpilot-config.sh validate`, then rotate the token (tracking falls back to local meanwhile) |
+| Agent model differs from config | `bash scripts/model-profiles.sh sync-agents` |
+| Stale scope results | `bash scripts/generate-project-index.sh --force` |
+| Test guard blocks a file that needs no test | Justify the exemption in the PR description. Never drop `STRICT=1` |
+| Integration tests fail with a Docker error | Start Docker. Testcontainers needs it, and the InMemory provider is not a substitute |
+| Hit a Claude usage limit mid-run | Nothing is lost: work is checkpointed and pushed. Run `/dp-deliver resume` after the reset |
+| CI red on the PR | `/dp-pr <PR>` |
+| Doctor warns about a legacy `engines:` block | Delete it from `project.config.md`; models live under `model_policy` / `coding_models` |
+
+---
+
+## Upgrading from 4.x
+
+DevPilot 5 runs on Claude only and uses role-based command names. `bash install.sh --update`
+installs the new commands and removes the retired files. Then delete the old `engines:`,
+`layer_overrides:`, `layer_models:` and `fallback:` blocks from `project.config.md` and add
+`model_policy:` (see [Configuration](#configuration)).
+
+| 4.x | 5.x |
+|-----|-----|
+| `/ceo` | `/dp-deliver` |
+| `/dp-plan` | `/dp-refine` |
+| `/dp-autofix`, `/dp-review-fix` | `/dp-pr` |
+| `/dp-rollback` | `/dp-release rollback` |
+| `/dp-config` | `/dp-setup` |
+| `--claude` / `--opencode`, OpenCode, Antigravity, `AGENTS.md`, `scripts/ceo.sh` | removed |
 
 ---
 
 ## Contributing
 
-1. Branch from `main` — `feature/<slug>` or `fix/<slug>`. Never commit to `main` directly.
-2. Keep changes focused; one concern per commit.
-3. Use [Conventional Commits](https://www.conventionalcommits.org) — `feat:`, `fix:`, `chore:`, etc.
-   (enforced by the local `commit-msg` hook).
-4. Run `bash tests/run.sh` and make sure it passes before opening a PR.
-5. Open a PR against `main`; CI must be green.
-
----
+1. Branch from `main` (`feature/<slug>` or `fix/<slug>`) and keep one concern per commit.
+2. Use [Conventional Commits](https://www.conventionalcommits.org).
+3. Run `bash tests/run.sh` before opening a PR. CI runs shellcheck, a bash syntax check and the suite.
 
 ## License
 
-[MIT](#license) — use freely in any project, commercial or otherwise.
+[MIT](#license). Use it freely in any project, commercial or otherwise.

@@ -4,7 +4,7 @@
 > Stack-specific rules live in `.devpilot/rules/<stack>.md` — read only yours.
 
 1. **No pauses.** Make reasonable assumptions; document them. Never ask
-   "should I continue?". In autonomous runs (`/ceo`, `merge_policy: auto`) **never
+   "should I continue?". In autonomous runs (`/dp-deliver`, `merge_policy: auto`) **never
    pause for the user to manually test, verify, review, or approve before merging** —
    the `team-qa` agent + automated suite are the test gate, and `auto-merge.md` is the
    merge gate. The only legitimate stop is a gray-zone dedup question or a red gate the

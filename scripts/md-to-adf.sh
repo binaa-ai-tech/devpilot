@@ -6,7 +6,7 @@
 # numbered lists, and code blocks — instead of one flattened wall of text.
 #
 # This is what makes a Jira ticket a self-contained implementation brief that any
-# session, opencode, or other AI tool can pick up and build from Jira alone.
+# Claude session or teammate can pick up and build from Jira alone.
 #
 # Supported: # … ###### headings · - / * / [ ] bullets · 1. ordered · ``` code
 # fences · blank-line-separated paragraphs. Unsupported inline marks degrade to

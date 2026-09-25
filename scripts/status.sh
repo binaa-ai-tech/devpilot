@@ -41,5 +41,5 @@ done
 echo ""
 INPROG=$(grep -ls '^status: in-progress' "$DIR"/*.md 2>/dev/null | grep -v checkpoint | wc -l | tr -d ' ')
 echo "$rows task(s) shown · ${INPROG:-0} in progress"
-[ "${INPROG:-0}" != "0" ] && echo "Resume an interrupted task with: /ceo resume"
+[ "${INPROG:-0}" != "0" ] && echo "Resume an interrupted task with: /dp-deliver resume"
 exit 0

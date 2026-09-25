@@ -1,12 +1,12 @@
 # Implementation Brief — build this Story from Jira alone
 
-> This description is self-contained: any session, opencode, or other AI tool can
+> This description is self-contained: any Claude session or teammate can
 > implement it from Jira without the originating chat. Everything needed is below
 > or linked in the repo.
 
-## How to implement (any AI tool)
+## How to implement
 - Repo: `<git-remote-url>` · Base branch: `<base_branch>` · Work branch: `feature/<KEY>-<slug>`
-- Engine: pick per `engines.coding` (Claude or opencode/Copilot). Model balances power vs token by complexity.
+- Run it: `/dp-build` (or `/dp-deliver <KEY>`) in Claude Code. The model tier is picked per task by complexity.
 - Apply skills: `core-rules` (trace every change to an AC) → layer skills as needed
   (Angular: `angular-dev`, `angular-testing`, `accessibility`; .NET: `dotnet-api`, `efcore-sqlserver`,
   `dotnet-testing`; both: `api-contract`, `security-scan`, `performance`, `architecture-guard`)

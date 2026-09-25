@@ -9,7 +9,7 @@ Each skill is a short, principle-driven playbook. **Token discipline: agents rea
 |-------|---------|
 | `core-rules.md` | The non-negotiables: autonomy, spec-first, scope, typing, verification, logging. |
 
-## Planning / PM (BA / Team Lead — `/dp-plan`, `/dp-sprint`)
+## Planning / PM (BA / Team Lead — `/dp-refine`, `/dp-sprint`)
 | Skill | Purpose |
 |-------|---------|
 | `definition-of-ready.md` | Entry gate — a Story enters a sprint only when clear, testable, sized, deduped. |

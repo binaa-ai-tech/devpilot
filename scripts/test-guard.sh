@@ -44,7 +44,7 @@ is_test_file() {
 }
 
 is_exempt() {
-  printf '%s' "$1" | grep -qiE '(migrations?/|(^|/)(docs|perf|scripts|\.github|\.claude|\.devpilot|\.opencode)/|\.md$|\.json$|\.ya?ml$|\.toml$|\.lock$|\.csproj$|\.sln$|\.config$|\.props$|\.s?css$|\.html$|\.svg$|\.env|\.gitignore|\.d\.ts$|\.g\.cs$|\.designer\.cs$|generated|(^|/)(main|program|index|app\.config|app\.routes)\.(ts|cs|py|go|java)$|module\.ts$)'
+  printf '%s' "$1" | grep -qiE '(migrations?/|(^|/)(docs|perf|scripts|\.github|\.claude|\.devpilot)/|\.md$|\.json$|\.ya?ml$|\.toml$|\.lock$|\.csproj$|\.sln$|\.config$|\.props$|\.s?css$|\.html$|\.svg$|\.env|\.gitignore|\.d\.ts$|\.g\.cs$|\.designer\.cs$|generated|(^|/)(main|program|index|app\.config|app\.routes)\.(ts|cs|py|go|java)$|module\.ts$)'
 }
 
 # All test-ish files in the repo, once (tracked files only — cheap and exact).

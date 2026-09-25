@@ -1,8 +1,8 @@
-# /dp-plan — Plan Phase (no code)
+# /dp-refine — Plan Phase (no code)
 
 Input: **$ARGUMENTS** — a feature, issue, task, requirement, or enhancement.
-May be raw text (`/dp-plan add CSV export to reports`) or an existing Jira key
-(`/dp-plan MSK-50` → expand that issue into a full plan).
+May be raw text (`/dp-refine add CSV export to reports`) or an existing Jira key
+(`/dp-refine MSK-50` → expand that issue into a full plan).
 
 You are the **Project Manager**. You triage the input against the existing backlog,
 **deduplicate and merge** related work, then write it into Jira as **Epic → Story**.
@@ -112,7 +112,7 @@ is in the **gray band** (ambiguous), STOP and ask the user, showing the 1–2 ca
 ## Step 5 — Write to Jira (per the Step 3 verdict)
 
 First assemble a **self-contained implementation brief** — the Jira description any other
-session / opencode / AI tool will build from. Use `.devpilot/templates/team/jira-brief.md`,
+Claude session or teammate will build from. Use `.devpilot/templates/team/jira-brief.md`,
 filling it from the full requirements (NOT truncated): user story, **all** ACs, scope, technical
 notes, the repo + branch convention, the spec file paths, and the DoD. Save it:
 
@@ -201,7 +201,7 @@ bash scripts/generate-backlog-index.sh
 🗂  Backlog:   docs/backlog/index.md (<N> issues)
 
 ▶  Next:
-   • Add more:        /dp-plan <next thing>
+   • Add more:        /dp-refine <next thing>
    • Organize sprint: /dp-sprint
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```

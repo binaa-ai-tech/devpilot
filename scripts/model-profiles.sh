@@ -1,42 +1,30 @@
 #!/usr/bin/env bash
 # =============================================================================
-# model-profiles.sh — named model presets for devpilot ("powerful + easy").
+# model-profiles.sh — named Claude model presets for devpilot ("powerful + easy").
 #
 # A *profile* is a one-word preset over the power/standard/lite tiers that the
-# routing brain (resolve-engine.sh) already understands. The user picks one
-# profile; per-task tier selection keeps working unchanged — the profile only
-# decides which model each tier resolves to.
+# per-task router (resolve-model.sh) understands. The user picks one profile;
+# per-task tier selection keeps working unchanged — the profile only decides
+# which Claude model each tier resolves to.
 #
-# Claude profiles
 #   auto      power=opus    standard=sonnet  lite=haiku   ← Opus for hard tasks (default)
 #   balanced  power=sonnet  standard=sonnet  lite=haiku   ← no Opus, solid everywhere
 #   save      power=sonnet  standard=haiku   lite=haiku   ← token-saving; Sonnet only when complex
 #
-# opencode / antigravity profiles (mapped onto whatever the CLI reports live)
-#   recommended  strongest coder / solid all-round / fast-cheap
-#   balanced     solid all-round everywhere
-#   save         fast-cheap everywhere
-# antigravity has no curated fallback ids (unknown when the CLI is absent), so its
-# tiers map from the live `antigravity model list` only, and stay blank otherwise.
-#
 # Usage
-#   model-profiles.sh claude-map      <auto|balanced|save>        → POWER/STANDARD/LITE + BA/LEAD/QA
-#   model-profiles.sh opencode-list                               → one available model id per line
-#   model-profiles.sh opencode-map    <recommended|balanced|save> → POWER/STANDARD/LITE
-#   model-profiles.sh antigravity-list                            → one available model id per line
-#   model-profiles.sh antigravity-map <recommended|balanced|save> → POWER/STANDARD/LITE
-#   model-profiles.sh apply  <claude|opencode|antigravity> <profile>  → write project.config.md in place
-#   model-profiles.sh single <claude|opencode|antigravity> <model>    → ONE model for the whole team
-#   model-profiles.sh show                                        → current profile + resolved models
+#   model-profiles.sh claude-map <auto|balanced|save>  → POWER/STANDARD/LITE + BA/LEAD/QA
+#   model-profiles.sh apply  <profile>                 → write project.config.md + agent frontmatter
+#   model-profiles.sh single <model-id>                → ONE model for the whole team
+#   model-profiles.sh sync-agents                      → re-apply models.* to .claude/agents/*.md
+#   model-profiles.sh show                             → current profile + tiers
+# (`apply claude <profile>` / `single claude <model>` are accepted for compatibility.)
 #
-# Model modes (recorded as engines.model_mode by install.sh):
+# Model modes (recorded as model_policy.model_mode):
 #   recommended — task-balanced tiers via a named profile (apply …)
 #   single      — one model everywhere (single …)
-#   per-team    — per-role models: edit models.* / layer_models.* in
-#                 project.config.md, then run `model-profiles.sh sync-agents`
+#   per-team    — per-role models: edit models.* in project.config.md, then sync-agents
 #
-# NOTE: the Claude/opencode mapping tables below are intentionally also inlined
-# in install.sh (STEP 5/7). Keep the two in sync if you change a profile.
+# NOTE: the profile table below is also inlined in install.sh — keep them in sync.
 # =============================================================================
 set -uo pipefail
 
@@ -61,79 +49,10 @@ claude_map() {
   printf 'POWER=%s\nSTANDARD=%s\nLITE=%s\nBA=%s\nLEAD=%s\nQA=%s\n' "$P" "$S" "$L" "$BA" "$LEAD" "$QA"
 }
 
-# ── live opencode model ids (empty if opencode is unavailable) ──────────────────
-opencode_list() {
-  command -v opencode >/dev/null 2>&1 || return 0
-  { opencode models 2>/dev/null; opencode model list 2>/dev/null; } \
-    | grep -oE '[A-Za-z0-9._-]+/[A-Za-z0-9._:-]+' \
-    | sort -u
-}
-
-# pick <fallback-literal> <preferred-substring...>
-# echoes the first available model id whose text contains a preferred substring,
-# else the fallback literal (so installs still work when opencode isn't present).
-_oc_pick() {
-  local fallback="$1"; shift
-  local avail p hit
-  avail="$(opencode_list)"
-  for p in "$@"; do
-    hit="$(printf '%s\n' "$avail" | grep -iF "$p" | head -1)"
-    [ -n "$hit" ] && { printf '%s\n' "$hit"; return; }
-  done
-  printf '%s\n' "$fallback"
-}
-
-# ── opencode profile → tier models (chosen from the live list) ──────────────────
-opencode_map() {
-  local profile="${1:-recommended}"
-  local P S L
-  case "$profile" in
-    recommended)
-      P="$(_oc_pick 'github-copilot/gpt-5'      'gpt-5.4' 'gpt-5')"
-      S="$(_oc_pick 'github-copilot/gpt-4o'     'gpt-4o' 'gpt-4.1')"
-      L="$(_oc_pick 'github-copilot/gpt-4o-mini' 'mini' 'flash')" ;;
-    balanced)
-      P="$(_oc_pick 'github-copilot/gpt-4o'     'gpt-4o' 'gpt-4.1')"
-      S="$(_oc_pick 'github-copilot/gpt-4o'     'gpt-4o' 'gpt-4.1')"
-      L="$(_oc_pick 'github-copilot/gpt-4o-mini' 'mini' 'flash')" ;;
-    save)
-      P="$(_oc_pick 'github-copilot/gpt-4o-mini' 'mini' 'flash')"
-      S="$(_oc_pick 'github-copilot/gpt-4o-mini' 'mini' 'flash')"
-      L="$(_oc_pick 'github-copilot/gpt-4o-mini' 'mini' 'flash')" ;;
-    *) echo "Unknown opencode profile: $profile (use recommended|balanced|save)" >&2; return 1 ;;
-  esac
-  printf 'POWER=%s\nSTANDARD=%s\nLITE=%s\n' "$P" "$S" "$L"
-}
-
-# ── live antigravity model ids (empty if antigravity is unavailable) ────────────
-antigravity_list() {
-  command -v antigravity >/dev/null 2>&1 || return 0
-  { antigravity model list 2>/dev/null; antigravity models 2>/dev/null; } \
-    | grep -oE '[A-Za-z0-9._-]+/[A-Za-z0-9._:-]+|(gemini|claude|gpt|o[0-9])[A-Za-z0-9._:-]*' \
-    | sort -u
-}
-
-# ── antigravity profile → tier models (chosen from the live list; blank if absent) ──
-# No curated fallbacks: antigravity model ids aren't known when the CLI is missing,
-# so unmatched tiers stay empty rather than guessing an id.
-antigravity_map() {
-  local profile="${1:-recommended}"
-  local avail P S L
-  avail="$(antigravity_list)"
-  _ag() { local p hit; for p in "$@"; do hit="$(printf '%s\n' "$avail" | grep -iF "$p" | head -1)"; [ -n "$hit" ] && { printf '%s\n' "$hit"; return; }; done; printf '%s\n' ""; }
-  case "$profile" in
-    recommended) P="$(_ag ultra pro opus large)"; S="$(_ag pro flash)";            L="$(_ag flash mini lite nano)" ;;
-    balanced)    P="$(_ag pro flash)";            S="$(_ag pro flash)";            L="$(_ag flash mini lite nano)" ;;
-    save)        P="$(_ag flash mini lite nano)"; S="$(_ag flash mini lite nano)"; L="$(_ag flash mini lite nano)" ;;
-    *) echo "Unknown antigravity profile: $profile (use recommended|balanced|save)" >&2; return 1 ;;
-  esac
-  printf 'POWER=%s\nSTANDARD=%s\nLITE=%s\n' "$P" "$S" "$L"
-}
-
 # ── project.config.md writers ───────────────────────────────────────────────────
 require_config() { [ -f "$CONFIG" ] || { echo "project.config.md not found at $ROOT" >&2; exit 1; }; }
 
-# Replace power/standard/lite under coding_models.<family>
+# Replace power/standard/lite under coding_models.<family> (family = claude)
 _set_coding_tiers() {
   local fam="$1" P="$2" S="$3" L="$4" tmp
   tmp="$(mktemp "${CONFIG}.tmp.XXXXXX")"
@@ -168,7 +87,7 @@ _set_orchestrator_tier1() {
   ' "$CONFIG" > "$tmp" && mv "$tmp" "$CONFIG"
 }
 
-# Set or insert engines.model_mode (idempotent) — recommended | single | per-team
+# Set or insert model_policy.model_mode (idempotent) — recommended | single | per-team
 _set_model_mode() {
   local mode="$1" tmp
   tmp="$(mktemp "${CONFIG}.tmp.XXXXXX")"
@@ -180,13 +99,12 @@ _set_model_mode() {
   else
     awk -v m="$mode" '
       { print }
-      /^engines:/ { ineng = 1 }
-      ineng && /^[[:space:]]+coding:[[:space:]]/ { print "  model_mode: " m; ineng = 0 }
+      /^model_policy:/ { print "  model_mode: " m }
     ' "$CONFIG" > "$tmp" && mv "$tmp" "$CONFIG"
   fi
 }
 
-# Set or insert engines.coding_profile (idempotent)
+# Set or insert model_policy.coding_profile (idempotent)
 _set_coding_profile() {
   local profile="$1" tmp
   tmp="$(mktemp "${CONFIG}.tmp.XXXXXX")"
@@ -197,11 +115,10 @@ _set_coding_profile() {
       { print }
     ' "$CONFIG" > "$tmp" && mv "$tmp" "$CONFIG"
   else
-    # Insert right after engines.coding.
+    # Insert right after the model_policy: header.
     awk -v p="$profile" '
       { print }
-      /^engines:/ { ineng = 1 }
-      ineng && /^[[:space:]]+coding:[[:space:]]/ { print "  coding_profile: " p; ineng = 0 }
+      /^model_policy:/ { print "  coding_profile: " p }
     ' "$CONFIG" > "$tmp" && mv "$tmp" "$CONFIG"
   fi
 }
@@ -244,73 +161,44 @@ sync_agents() {
 
 apply() {
   require_config
-  local family="${1:-}" profile="${2:-}"
-  [ -z "$family" ] || [ -z "$profile" ] && { echo "Usage: model-profiles.sh apply <claude|opencode> <profile>" >&2; exit 1; }
-
-  case "$family" in
-    claude)
-      eval "$(claude_map "$profile")" || exit 1
-      _set_coding_tiers claude "$POWER" "$STANDARD" "$LITE"
-      _set_orchestrator_tier1 ba         "$BA"
-      _set_orchestrator_tier1 team_lead  "$LEAD"
-      _set_orchestrator_tier1 qa         "$QA"
-      # Dev agents do standard-tier implementation work → follow the standard tier.
-      _set_orchestrator_tier1 frontend_dev "$STANDARD"
-      _set_orchestrator_tier1 backend_dev  "$STANDARD"
-      _sync_agent team-ba.md   "$BA"
-      _sync_agent team-lead.md "$LEAD"
-      _sync_agent team-qa.md   "$QA"
-      _sync_agent team-frontend.md "$STANDARD"
-      _sync_agent team-dotnet.md   "$STANDARD"
-      _set_coding_profile "$profile"
-      _set_model_mode "recommended"
-      echo "✅ Claude profile '$profile' applied  (power=$POWER  standard=$STANDARD  lite=$LITE)"
-      ;;
-    opencode)
-      eval "$(opencode_map "$profile")" || exit 1
-      _set_coding_tiers opencode "$POWER" "$STANDARD" "$LITE"
-      _set_coding_profile "$profile"
-      _set_model_mode "recommended"
-      echo "✅ opencode profile '$profile' applied  (power=$POWER  standard=$STANDARD  lite=$LITE)"
-      command -v opencode >/dev/null 2>&1 || echo "ℹ️  opencode not installed — used recommended defaults; re-run after install to pick from your live model list."
-      ;;
-    antigravity)
-      eval "$(antigravity_map "$profile")" || exit 1
-      _set_coding_tiers antigravity "$POWER" "$STANDARD" "$LITE"
-      _set_coding_profile "$profile"
-      _set_model_mode "recommended"
-      echo "✅ antigravity profile '$profile' applied  (power=${POWER:-<unset>}  standard=${STANDARD:-<unset>}  lite=${LITE:-<unset>})"
-      command -v antigravity >/dev/null 2>&1 || echo "ℹ️  antigravity not installed — tiers left blank; re-run after install to pick from your live model list."
-      ;;
-    *) echo "Unknown family: $family (use claude|opencode|antigravity)" >&2; exit 1 ;;
-  esac
+  [ "${1:-}" = "claude" ] && shift          # legacy form: apply claude <profile>
+  local profile="${1:-}"
+  [ -z "$profile" ] && { echo "Usage: model-profiles.sh apply <auto|balanced|save>" >&2; exit 1; }
+  eval "$(claude_map "$profile")" || exit 1
+  _set_coding_tiers claude "$POWER" "$STANDARD" "$LITE"
+  _set_orchestrator_tier1 ba         "$BA"
+  _set_orchestrator_tier1 team_lead  "$LEAD"
+  _set_orchestrator_tier1 qa         "$QA"
+  # Dev agents do standard-tier implementation work → follow the standard tier.
+  _set_orchestrator_tier1 frontend_dev "$STANDARD"
+  _set_orchestrator_tier1 backend_dev  "$STANDARD"
+  _sync_agent team-ba.md   "$BA"
+  _sync_agent team-lead.md "$LEAD"
+  _sync_agent team-qa.md   "$QA"
+  _sync_agent team-frontend.md "$STANDARD"
+  _sync_agent team-dotnet.md   "$STANDARD"
+  _set_coding_profile "$profile"
+  _set_model_mode "recommended"
+  echo "✅ Claude profile '$profile' applied  (power=$POWER  standard=$STANDARD  lite=$LITE)"
 }
 
-# One model for the whole team (model_mode: single).
-# claude family → all tiers + every agent's frontmatter; other families → all tiers.
+# One model for the whole team (model_mode: single): all tiers + every agent's frontmatter.
 single() {
   require_config
-  local family="${1:-}" model="${2:-}"
-  { [ -z "$family" ] || [ -z "$model" ]; } && { echo "Usage: model-profiles.sh single <claude|opencode|antigravity> <model-id>" >&2; exit 1; }
-
-  case "$family" in
-    claude)
-      _set_coding_tiers claude "$model" "$model" "$model"
-      for agent in ba team_lead qa frontend_dev backend_dev; do
-        _set_orchestrator_tier1 "$agent" "$model"
-      done
-      for f in team-ba.md team-lead.md team-qa.md team-frontend.md team-dotnet.md; do
-        _sync_agent "$f" "$model"
-      done
-      ;;
-    opencode|antigravity)
-      _set_coding_tiers "$family" "$model" "$model" "$model"
-      ;;
-    *) echo "Unknown family: $family (use claude|opencode|antigravity)" >&2; exit 1 ;;
-  esac
+  [ "${1:-}" = "claude" ] && shift          # legacy form: single claude <model>
+  local model="${1:-}"
+  [ -z "$model" ] && { echo "Usage: model-profiles.sh single <model-id>" >&2; exit 1; }
+  _set_coding_tiers claude "$model" "$model" "$model"
+  local agent f
+  for agent in ba team_lead qa frontend_dev backend_dev; do
+    _set_orchestrator_tier1 "$agent" "$model"
+  done
+  for f in team-ba.md team-lead.md team-qa.md team-frontend.md team-dotnet.md; do
+    _sync_agent "$f" "$model"
+  done
   _set_coding_profile "single"
   _set_model_mode "single"
-  echo "✅ single-model mode: every $family tier (and team agent, for claude) → $model"
+  echo "✅ single-model mode: every tier and team agent → $model"
 }
 
 show() {
@@ -327,16 +215,12 @@ show() {
 CMD="${1:-}"; shift || true
 case "$CMD" in
   claude-map)        claude_map "$@" ;;
-  opencode-list)     opencode_list ;;
-  opencode-map)      opencode_map "$@" ;;
-  antigravity-list)  antigravity_list ;;
-  antigravity-map)   antigravity_map "$@" ;;
   apply)             apply "$@" ;;
   single)            single "$@" ;;
   sync-agents)       sync_agents ;;
   show)              show ;;
   *)
-    echo "Usage: model-profiles.sh <claude-map <profile> | opencode-list | opencode-map <profile> | antigravity-list | antigravity-map <profile> | apply <family> <profile> | single <family> <model> | sync-agents | show>" >&2
+    echo "Usage: model-profiles.sh <claude-map <profile> | apply <profile> | single <model> | sync-agents | show>" >&2
     exit 1
     ;;
 esac

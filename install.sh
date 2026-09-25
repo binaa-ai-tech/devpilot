@@ -12,12 +12,10 @@
 #
 # This installs:
 #   .claude/          — Claude Code commands + agent definitions
-#   .opencode/        — opencode project config + AGENTS.md
 #   .devpilot/        — shared rules, prompts, templates, skills
-#   scripts/          — git-flow, Jira, deploy helpers
-#   AGENTS.md         — project context (opencode / antigravity)
+#   scripts/          — git-flow, Jira, test, deploy helpers
 #   CLAUDE.md         — project context (Claude Code)
-#   project.config.md — engine + model config (edit with /dp-config wizard)
+#   project.config.md — team + Claude model config (edit with /dp-setup wizard)
 # =============================================================================
 set -euo pipefail
 
@@ -117,7 +115,7 @@ fetch_summary() {
 # ── Update mode ──────────────────────────────────────────────────────────────
 # `bash install.sh --update` refreshes the managed devpilot files in place and
 # NEVER touches your settings: project.config.md, .devpilot/config.sh,
-# AGENTS.md, and CLAUDE.md are left exactly as they are.
+# and CLAUDE.md are left exactly as they are.
 # (Keep these lists in sync with STEP 9.)
 run_update() {
   echo ""
@@ -129,9 +127,9 @@ run_update() {
   TEMPLATE_TEAM="requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md jira-brief.md"
   SKILLS="core-rules.md definition-of-ready.md estimation-and-slicing.md architecture-guard.md angular-dev.md angular-testing.md accessibility.md dotnet-api.md efcore-sqlserver.md dotnet-testing.md api-contract.md test-case-design.md test-strategy.md ui-e2e-playwright.md token-lean-testing.md test-guard.md performance.md code-review.md security-scan.md definition-of-done.md auto-merge.md release-ops.md self-heal.md README.md"
   CHECKLISTS="feature.md bugfix.md hotfix.md"
-  CMDS="ceo.md dp-plan.md dp-sprint.md dp-build.md dp-release.md dp-rollback.md dp-hotfix.md dp-status.md dp-config.md dp-review-fix.md dp-test.md dp-autofix.md"
+  CMDS="dp-deliver.md dp-refine.md dp-sprint.md dp-build.md dp-test.md dp-pr.md dp-release.md dp-hotfix.md dp-status.md dp-setup.md"
   AGENTS_LIST="team-lead.md team-ba.md team-frontend.md team-dotnet.md team-qa.md"
-  SCRIPTS="git-flow.sh new-feature.sh run-command.sh resolve-engine.sh model-profiles.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh create-jira-ticket.sh create-jira-epic.sh update-jira-status.sh update-jira-description.sh add-jira-comment.sh generate-project-index.sh generate-backlog-index.sh jira-sprint.sh link-jira-issues.sh md-to-adf.sh jira-describe.sh ceo.sh dp-plan.sh dp-sprint.sh dp-build.sh dp-release.sh dp-status.sh dp-config.sh"
+  SCRIPTS="git-flow.sh new-feature.sh resolve-model.sh model-profiles.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh track.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh create-jira-ticket.sh create-jira-epic.sh update-jira-status.sh update-jira-description.sh add-jira-comment.sh generate-project-index.sh generate-backlog-index.sh jira-sprint.sh link-jira-issues.sh md-to-adf.sh jira-describe.sh"
 
   info "Refreshing .devpilot/rules..."
   fetch ".devpilot/rules.md" ".devpilot/rules.md"
@@ -166,6 +164,10 @@ run_update() {
     prompts/team/backend-agent.md"
   for f in $RETIRED; do rm -f ".devpilot/$f"; done
   rm -f .claude/agents/team-backend.md
+  # Retired in the Claude-only move (OpenCode/Antigravity support + renamed commands).
+  for f in ceo.md dp-plan.md dp-config.md dp-autofix.md dp-review-fix.md dp-rollback.md; do rm -f ".claude/commands/$f"; done
+  for f in run-command.sh run-mode.sh resolve-engine.sh ceo.sh dp-plan.sh dp-build.sh dp-sprint.sh dp-release.sh dp-status.sh dp-config.sh; do rm -f "scripts/$f"; done
+  rm -rf .opencode
 
   # Refetching the agent files above reset their model: frontmatter to repo
   # defaults — re-sync it from the user's project.config.md so their chosen
@@ -211,7 +213,7 @@ echo "  Project:  $PROJECT_ROOT"
 if [ "$DEVPILOT_DEFAULTS" = 1 ]; then
   echo "  Mode:     non-interactive (--defaults) — every recommendation accepted"
 else
-  echo "  Setup:    8 short steps (~5 min) · Enter accepts the recommended default"
+  echo "  Setup:    6 short steps (~4 min) · Enter accepts the recommended default"
   echo "  Safety:   nothing is written until you confirm the summary at the end"
 fi
 echo ""
@@ -219,17 +221,13 @@ echo ""
 # ═════════════════════════════════════════════════════════════════════════════
 # STEP 1 — SYSTEM SCAN
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 1/8 · System scan — AI tools"
+section "STEP 1/6 · System scan — AI tools"
 
 HAS_CLAUDE=false
-HAS_OPENCODE=false
-HAS_ANTIGRAVITY=false
 HAS_GH=false
 HAS_GIT=false
 
-command -v claude       &>/dev/null && HAS_CLAUDE=true       && echo "  ✅ claude       — Claude Code CLI"           || echo "  ⚠️  claude       — not found (install for Claude agent mode)"
-command -v opencode     &>/dev/null && HAS_OPENCODE=true     && echo "  ✅ opencode     — GitHub Copilot models"      || echo "  ⚠️  opencode     — not found"
-command -v antigravity  &>/dev/null && HAS_ANTIGRAVITY=true  && echo "  ✅ antigravity  — antigravity AI"              || echo "  ⚠️  antigravity  — not found"
+command -v claude       &>/dev/null && HAS_CLAUDE=true       && echo "  ✅ claude       — Claude Code CLI"           || echo "  ❌ claude       — not found (DevPilot runs on Claude Code: https://claude.ai/code)"
 command -v gh           &>/dev/null && HAS_GH=true           && echo "  ✅ gh           — GitHub CLI (PR automation)" || echo "  ❌ gh           — not found (install for PR automation)"
 command -v git          &>/dev/null && HAS_GIT=true          && echo "  ✅ git"                                        || echo "  ❌ git          — REQUIRED"
 command -v jq           &>/dev/null                          && echo "  ✅ jq"                                        || echo "  ⚠️  jq           — not found (some scripts limited)"
@@ -240,19 +238,15 @@ if [ "$HAS_GIT" = false ]; then
   exit 1
 fi
 
-if [ "$HAS_CLAUDE" = false ] && [ "$HAS_OPENCODE" = false ] && [ "$HAS_ANTIGRAVITY" = false ]; then
-  echo ""
-  echo "  ❌ No AI CLI found. Install at least one:"
-  echo "     claude       — https://claude.ai/code"
-  echo "     opencode     — https://opencode.ai"
-  echo "     antigravity  — https://antigravity.ai"
-  exit 1
+if [ "$HAS_CLAUDE" = false ]; then
+  warn "Claude Code CLI not found — DevPilot runs inside Claude Code (CLI, desktop, IDE, or claude.ai/code)."
+  warn "Install it from https://claude.ai/code; continuing so the files are ready when you do."
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════
 # STEP 2 — PROJECT STACK SCAN
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 2/8 · Project stack scan"
+section "STEP 2/6 · Project stack scan"
 
 DETECT_FRONTEND="none"
 DETECT_BACKEND="none"
@@ -296,7 +290,7 @@ fi
 # ═════════════════════════════════════════════════════════════════════════════
 # STEP 3 — AGENT TEAM
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 3/8 · Agent team"
+section "STEP 3/6 · Agent team"
 
 AGENT_FRONTEND="false"; AGENT_BACKEND="false"; AGENT_DB="false"; AGENT_INTEGRATION="false"
 [ "$DETECT_FRONTEND" != "none" ]  && AGENT_FRONTEND="true"
@@ -321,101 +315,21 @@ if [[ "${ACCEPT_TEAM:-Y}" =~ ^[Nn] ]]; then
 fi
 
 # ═════════════════════════════════════════════════════════════════════════════
-# STEP 4 — CODING ENGINE
+# STEP 4 — MODEL ASSIGNMENT (Claude: recommended tiers · one model · per-team)
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 4/8 · Coding engine — who writes the code"
-
-CODING_ENGINE="claude"
-FALLBACK_ENGINE="none"
-
-echo ""
-echo "  [1] claude       — Claude subagents write all code (fully automatic, no terminal steps)"
-echo "  [2] opencode     — Claude orchestrates; opencode writes code (GitHub Copilot models)"
-echo "  [3] antigravity  — Claude orchestrates; antigravity writes code"
-echo ""
-
-if [ "$HAS_CLAUDE" = true ] && [ "$HAS_OPENCODE" = false ] && [ "$HAS_ANTIGRAVITY" = false ]; then
-  DEFAULT_ENG=1
-elif [ "$HAS_OPENCODE" = true ] && [ "$HAS_CLAUDE" = false ]; then
-  DEFAULT_ENG=2
-elif [ "$HAS_ANTIGRAVITY" = true ] && [ "$HAS_CLAUDE" = false ]; then
-  DEFAULT_ENG=3
-else
-  DEFAULT_ENG=1
-fi
-
-ask "  Choice [$DEFAULT_ENG]: "; read -r ENG_CHOICE
-case "${ENG_CHOICE:-$DEFAULT_ENG}" in
-  2) CODING_ENGINE="opencode" ;;
-  3) CODING_ENGINE="antigravity" ;;
-  *) CODING_ENGINE="claude" ;;
-esac
-
-# Fallback engine
-if [ "$CODING_ENGINE" = "claude" ]; then
-  if [ "$HAS_OPENCODE" = true ] || [ "$HAS_ANTIGRAVITY" = true ]; then
-    echo ""
-    echo "  Fallback when Claude hits limits:"
-    echo "  [1] opencode    [2] antigravity    [3] none"
-    ask "  Choice [1]: "; read -r FB_CHOICE
-    case "${FB_CHOICE:-1}" in
-      2) FALLBACK_ENGINE="antigravity" ;;
-      3) FALLBACK_ENGINE="none" ;;
-      *) FALLBACK_ENGINE="${HAS_OPENCODE:+opencode}"; [ "$FALLBACK_ENGINE" = "" ] && FALLBACK_ENGINE="antigravity" ;;
-    esac
-  fi
-elif [ "$CODING_ENGINE" = "opencode" ] && [ "$HAS_ANTIGRAVITY" = true ]; then
-  echo ""
-  ask "  Fallback when opencode hits limits? (antigravity) [Y/n]: "; read -r v
-  [[ "${v:-Y}" =~ ^[Yy] ]] && FALLBACK_ENGINE="antigravity" || FALLBACK_ENGINE="none"
-elif [ "$CODING_ENGINE" = "antigravity" ] && [ "$HAS_OPENCODE" = true ]; then
-  echo ""
-  ask "  Fallback when antigravity hits limits? (opencode) [Y/n]: "; read -r v
-  [[ "${v:-Y}" =~ ^[Yy] ]] && FALLBACK_ENGINE="opencode" || FALLBACK_ENGINE="none"
-fi
-
-info "Coding engine: $CODING_ENGINE  (fallback: $FALLBACK_ENGINE)"
-
-# ═════════════════════════════════════════════════════════════════════════════
-# STEP 5 — MODEL ASSIGNMENT (recommended tiers · one model · per-team)
-# ═════════════════════════════════════════════════════════════════════════════
-section "STEP 5/8 · Model assignment"
+section "STEP 4/6 · Claude model assignment"
 
 # NOTE: profile mappings mirror scripts/model-profiles.sh — keep them in sync.
 CL_OPUS="claude-opus-5-5"; CL_SONNET="claude-sonnet-5"; CL_HAIKU="claude-haiku-4-5-20251001"
 
 CL_POWER="$CL_OPUS"; CL_STANDARD="$CL_SONNET"; CL_LITE="$CL_HAIKU"
-OC_POWER="github-copilot/gpt-5"; OC_STANDARD="github-copilot/gpt-4o"; OC_LITE="github-copilot/gpt-4o-mini"; OC_FALLBACK=""
-AG_POWER=""; AG_STANDARD=""; AG_LITE=""
-CODING_PROFILE="auto"; OC_PROFILE="recommended"; AG_PROFILE="recommended"
+CODING_PROFILE="auto"
 MODEL_MODE="recommended"
 
-# Orchestrator tiers — tier1 follows the choices below; tier2/tier3 are
-# sensible Copilot/free fallbacks the user rarely needs to edit by hand.
-T1_BA="$CL_HAIKU";   T2_BA="copilot: Gemini 3.5 Flash"; T3_BA="free: DeepSeek V4 Flash Free"
-T1_LEAD="$CL_SONNET"; T2_LEAD="copilot: Gemini 2.5 Pro"; T3_LEAD="free: DeepSeek V4 Flash Free"
-T1_QA="$CL_HAIKU";   T2_QA="copilot: GPT-5-mini";        T3_QA="free: Nemotron 3 Super Free"
+# Role models — follow the choices below.
+T1_BA="$CL_HAIKU"; T1_LEAD="$CL_SONNET"; T1_QA="$CL_HAIKU"
 # Dev agent role models (synced into .claude/agents/*.md frontmatter in STEP 12)
 T1_FE_DEV="$CL_SONNET"; T1_BE_DEV="$CL_SONNET"
-# Per-layer model pins (written to layer_models; used by per-team mode with a
-# non-claude coding engine — resolve-engine.sh honors them over the tier system)
-LM_FE=""; LM_BE=""; LM_DB=""; LM_INT=""
-
-# Live model lists (used by every mode when opencode/antigravity is in play)
-OC_AVAIL=""
-if command -v opencode >/dev/null 2>&1; then
-  OC_AVAIL=$( { opencode models 2>/dev/null; opencode model list 2>/dev/null; } \
-    | grep -oE '[A-Za-z0-9._-]+/[A-Za-z0-9._:-]+' | sort -u || true )
-fi
-AG_AVAIL=""
-if command -v antigravity >/dev/null 2>&1; then
-  AG_AVAIL=$( { antigravity model list 2>/dev/null; antigravity models 2>/dev/null; } \
-    | grep -oE '[A-Za-z0-9._-]+/[A-Za-z0-9._:-]+|(gemini|claude|gpt|o[0-9])[A-Za-z0-9._:-]*' | sort -u || true )
-fi
-# *_pick <fallback-literal> <preferred-substring...> → first available match, else fallback
-oc_pick() { local fb="$1"; shift; local p hit; for p in "$@"; do hit=$(printf '%s\n' "$OC_AVAIL" | grep -iF -e "$p" | head -1 || true); [ -n "$hit" ] && { echo "$hit"; return; }; done; echo "$fb"; }
-ag_pick() { local fb="$1"; shift; local p hit; for p in "$@"; do hit=$(printf '%s\n' "$AG_AVAIL" | grep -iF -e "$p" | head -1 || true); [ -n "$hit" ] && { echo "$hit"; return; }; done; echo "$fb"; }
-
 # Map a Claude profile → coding tiers + orchestrator tier1 (mirrors model-profiles.sh).
 claude_profile_apply() {
   case "$1" in
@@ -482,75 +396,10 @@ if [ "$MODEL_MODE" = "recommended" ]; then
   claude_profile_apply "$CODING_PROFILE"
   info "Claude profile: $CODING_PROFILE  (per-task routing still applies)"
 
-  # opencode profile — populated from the live model list when opencode exists
-  if [ "$CODING_ENGINE" = "opencode" ] || [ "$FALLBACK_ENGINE" = "opencode" ]; then
-    echo ""
-    echo "  opencode — GitHub Copilot models:"
-    if [ -n "$OC_AVAIL" ]; then
-      echo "  Detected in your opencode:"
-      printf '%s\n' "$OC_AVAIL" | head -20 | sed 's/^/    • /'
-    else
-      echo "  (opencode not detected — using recommended Copilot defaults; re-run /dp-config models later)"
-    fi
-    echo "    [1] recommended — strongest coder / solid / fast-cheap  (recommended)"
-    echo "    [2] balanced    — solid all-round everywhere"
-    echo "    [3] save        — fast & cheap everywhere"
-    echo "    [4] custom      — pick each tier yourself"
-    ask "  Choice [1]: "; read -r OP_CHOICE
-    case "${OP_CHOICE:-1}" in
-      2) OC_PROFILE="balanced"
-         OC_POWER=$(oc_pick "github-copilot/gpt-4o" gpt-4o gpt-4.1); OC_STANDARD=$(oc_pick "github-copilot/gpt-4o" gpt-4o gpt-4.1); OC_LITE=$(oc_pick "github-copilot/gpt-4o-mini" -mini flash) ;;
-      3) OC_PROFILE="save"
-         OC_POWER=$(oc_pick "github-copilot/gpt-4o-mini" -mini flash); OC_STANDARD=$(oc_pick "github-copilot/gpt-4o-mini" -mini flash); OC_LITE=$(oc_pick "github-copilot/gpt-4o-mini" -mini flash) ;;
-      4) OC_PROFILE="custom"
-         ask "  Power model    [$OC_POWER]: ";    read -r v; [ -n "$v" ] && OC_POWER="$v"
-         ask "  Standard model [$OC_STANDARD]: "; read -r v; [ -n "$v" ] && OC_STANDARD="$v"
-         ask "  Lite model     [$OC_LITE]: ";     read -r v; [ -n "$v" ] && OC_LITE="$v" ;;
-      *) OC_PROFILE="recommended"
-         OC_POWER=$(oc_pick "github-copilot/gpt-5" gpt-5.4 gpt-5); OC_STANDARD=$(oc_pick "github-copilot/gpt-4o" gpt-4o gpt-4.1); OC_LITE=$(oc_pick "github-copilot/gpt-4o-mini" -mini flash) ;;
-    esac
-    ask "  Fallback when Copilot unavailable [blank = opencode default]: "; read -r v; OC_FALLBACK="$v"
-    info "opencode profile: $OC_PROFILE  (power=$OC_POWER  standard=$OC_STANDARD  lite=$OC_LITE)"
-  fi
-
-  # antigravity profile — populated from the live model list when present
-  if [ "$CODING_ENGINE" = "antigravity" ] || [ "$FALLBACK_ENGINE" = "antigravity" ]; then
-    echo ""
-    echo "  antigravity — models:"
-    if [ -n "$AG_AVAIL" ]; then
-      echo "  Detected in your antigravity:"
-      printf '%s\n' "$AG_AVAIL" | head -20 | sed 's/^/    • /'
-    else
-      echo "  (antigravity not detected — leaving tiers blank; set them with /dp-config models after install)"
-    fi
-    echo "    [1] recommended — strongest reasoning / solid / fast  (recommended)"
-    echo "    [2] balanced    — solid all-round everywhere"
-    echo "    [3] save        — fast & cheap everywhere"
-    echo "    [4] custom      — pick each tier yourself"
-    ask "  Choice [1]: "; read -r AGP_CHOICE
-    case "${AGP_CHOICE:-1}" in
-      2) AG_PROFILE="balanced"
-         AG_POWER=$(ag_pick "" pro flash); AG_STANDARD=$(ag_pick "" pro flash); AG_LITE=$(ag_pick "" flash -mini lite nano) ;;
-      3) AG_PROFILE="save"
-         AG_POWER=$(ag_pick "" flash -mini lite nano); AG_STANDARD=$(ag_pick "" flash -mini lite nano); AG_LITE=$(ag_pick "" flash -mini lite nano) ;;
-      4) AG_PROFILE="custom"
-         ask "  Power model    [$AG_POWER]: ";    read -r v; [ -n "$v" ] && AG_POWER="$v"
-         ask "  Standard model [$AG_STANDARD]: "; read -r v; [ -n "$v" ] && AG_STANDARD="$v"
-         ask "  Lite model     [$AG_LITE]: ";     read -r v; [ -n "$v" ] && AG_LITE="$v" ;;
-      *) AG_PROFILE="recommended"
-         AG_POWER=$(ag_pick "" ultra pro opus large); AG_STANDARD=$(ag_pick "" pro flash); AG_LITE=$(ag_pick "" flash -mini lite nano) ;;
-    esac
-    info "antigravity profile: $AG_PROFILE  (power=${AG_POWER:-<set later>}  standard=${AG_STANDARD:-<set later>}  lite=${AG_LITE:-<set later>})"
-  fi
-
 # ── Mode: single — one model for the whole team ────────────────────────────────
 elif [ "$MODEL_MODE" = "single" ]; then
   echo ""
-  if [ "$CODING_ENGINE" = "claude" ]; then
-    echo "  One Claude model for the whole team (orchestration + all coding):"
-  else
-    echo "  One Claude model for orchestration (BA · Team Lead · QA · review):"
-  fi
+  echo "  One Claude model for the whole team (orchestration + all coding):"
   claude_model_menu
   pick_claude_model "Model" "$CL_SONNET"
   M="$PICKED_MODEL"
@@ -560,118 +409,40 @@ elif [ "$MODEL_MODE" = "single" ]; then
   info "Claude: every role → $M"
   [ "$M" = "$CL_OPUS" ] && warn "Opus everywhere is the highest-cost choice — 'recommended' mode gives Opus only to hard tasks."
 
-  if [ "$CODING_ENGINE" = "opencode" ] || [ "$FALLBACK_ENGINE" = "opencode" ]; then
-    echo ""
-    [ -n "$OC_AVAIL" ] && { echo "  Detected in your opencode:"; printf '%s\n' "$OC_AVAIL" | head -20 | sed 's/^/    • /'; }
-    OC_DEF=$(oc_pick "github-copilot/gpt-4o" gpt-4o gpt-4.1)
-    ask "  One opencode model for coding [$OC_DEF]: "; read -r v; OCM="${v:-$OC_DEF}"
-    OC_POWER="$OCM"; OC_STANDARD="$OCM"; OC_LITE="$OCM"; OC_PROFILE="single"
-    ask "  Fallback when Copilot unavailable [blank = opencode default]: "; read -r v; OC_FALLBACK="$v"
-    info "opencode: every layer → $OCM"
-  fi
-  if [ "$CODING_ENGINE" = "antigravity" ] || [ "$FALLBACK_ENGINE" = "antigravity" ]; then
-    echo ""
-    [ -n "$AG_AVAIL" ] && { echo "  Detected in your antigravity:"; printf '%s\n' "$AG_AVAIL" | head -20 | sed 's/^/    • /'; }
-    AG_DEF=$(ag_pick "" pro flash)
-    ask "  One antigravity model for coding [${AG_DEF:-set later}]: "; read -r v; AGM="${v:-$AG_DEF}"
-    AG_POWER="$AGM"; AG_STANDARD="$AGM"; AG_LITE="$AGM"; AG_PROFILE="single"
-    info "antigravity: every layer → ${AGM:-<set later>}"
-  fi
 
 # ── Mode: per-team — a model per role ──────────────────────────────────────────
 else
   echo ""
-  echo "  Pick a model per role. Orchestration roles are always Claude;"
-  echo "  dev roles run on your coding engine ($CODING_ENGINE)."
+  echo "  Pick a Claude model per role:"
   echo ""
   claude_model_menu
   pick_claude_model "BA (requirements, dedup)     " "$CL_HAIKU";  T1_BA="$PICKED_MODEL"
   pick_claude_model "Team Lead (plans, review)    " "$CL_SONNET"; T1_LEAD="$PICKED_MODEL"
   pick_claude_model "QA (test design, verdict)    " "$CL_HAIKU";  T1_QA="$PICKED_MODEL"
-
-  if [ "$CODING_ENGINE" = "claude" ]; then
-    pick_claude_model "Frontend developer           " "$CL_SONNET"; T1_FE_DEV="$PICKED_MODEL"
-    pick_claude_model "Backend developer (BE/DB/INT)" "$CL_SONNET"; T1_BE_DEV="$PICKED_MODEL"
-    # Escalation tiers still exist for cross-cutting work; keep the auto defaults.
-  else
-    echo ""
-    echo "  Dev layers run on $CODING_ENGINE — pin a model per layer"
-    echo "  (written to layer_models; wins over the tier system):"
-    if [ "$CODING_ENGINE" = "opencode" ]; then
-      [ -n "$OC_AVAIL" ] && { echo "  Detected in your opencode:"; printf '%s\n' "$OC_AVAIL" | head -20 | sed 's/^/    • /'; }
-      LAYER_DEF=$(oc_pick "github-copilot/gpt-4o" gpt-4o gpt-4.1)
-    else
-      [ -n "$AG_AVAIL" ] && { echo "  Detected in your antigravity:"; printf '%s\n' "$AG_AVAIL" | head -20 | sed 's/^/    • /'; }
-      LAYER_DEF=$(ag_pick "" pro flash)
-    fi
-    if [ "$AGENT_FRONTEND" = "true" ]; then
-      ask "  Frontend layer model [${LAYER_DEF:-set later}]: "; read -r v; LM_FE="${v:-$LAYER_DEF}"
-    fi
-    if [ "$AGENT_BACKEND" = "true" ]; then
-      ask "  Backend layer model  [${LAYER_DEF:-set later}]: "; read -r v; LM_BE="${v:-$LAYER_DEF}"
-    fi
-    [ "$AGENT_DB" = "true" ]          && { ask "  DB layer model       [${LM_BE:-${LAYER_DEF:-set later}}]: "; read -r v; LM_DB="${v:-${LM_BE:-$LAYER_DEF}}"; }
-    [ "$AGENT_INTEGRATION" = "true" ] && { ask "  Integration model    [${LM_BE:-${LAYER_DEF:-set later}}]: "; read -r v; LM_INT="${v:-${LM_BE:-$LAYER_DEF}}"; }
-    [ "$CODING_ENGINE" = "opencode" ] && { ask "  Fallback when Copilot unavailable [blank = opencode default]: "; read -r v; OC_FALLBACK="$v"; }
-  fi
-  CODING_PROFILE="per-team"; OC_PROFILE="per-team"; AG_PROFILE="per-team"
-  info "Per-team models: BA=$T1_BA · Lead=$T1_LEAD · QA=$T1_QA · FE=${LM_FE:-$T1_FE_DEV} · BE=${LM_BE:-$T1_BE_DEV}"
+  pick_claude_model "Frontend developer (Angular) " "$CL_SONNET"; T1_FE_DEV="$PICKED_MODEL"
+  pick_claude_model "Backend developer (.NET/SQL) " "$CL_SONNET"; T1_BE_DEV="$PICKED_MODEL"
+  CODING_PROFILE="per-team"
+  info "Per-team models: BA=$T1_BA · Lead=$T1_LEAD · QA=$T1_QA · FE=$T1_FE_DEV · BE=$T1_BE_DEV"
 fi
 
-# The profile recorded in project.config.md = the ACTIVE coding engine's profile.
 ACTIVE_PROFILE="$CODING_PROFILE"
-[ "$CODING_ENGINE" = "opencode" ]    && ACTIVE_PROFILE="$OC_PROFILE"
-[ "$CODING_ENGINE" = "antigravity" ] && ACTIVE_PROFILE="$AG_PROFILE"
 
 # ═════════════════════════════════════════════════════════════════════════════
-# STEP 6 — TERMINAL RUNNER (which AI CLI runs /ceo from scripts/)
+# STEP 5 — TEAM MODELS (derived from the model assignment in STEP 4)
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 6/8 · Terminal runner"
+section "STEP 5/6 · Team models — review"
 
-RUNNER_CLI="claude"
-
-echo ""
-echo "  How will you run commands from the terminal? (bash scripts/ceo.sh)"
-echo "  Inside Claude Code: slash commands always work natively."
-echo ""
-echo "  [1] claude       — Claude Code CLI"
-echo "  [2] opencode     — opencode CLI"
-echo "  [3] antigravity  — antigravity CLI"
-echo "  [4] same as coding engine"
-echo ""
-
-DEFAULT_RUNNER=1
-[ "$CODING_ENGINE" = "opencode" ]     && DEFAULT_RUNNER=2
-[ "$CODING_ENGINE" = "antigravity" ]  && DEFAULT_RUNNER=3
-[ "$HAS_CLAUDE" = false ] && [ "$HAS_OPENCODE" = true ]    && DEFAULT_RUNNER=2
-[ "$HAS_CLAUDE" = false ] && [ "$HAS_ANTIGRAVITY" = true ] && DEFAULT_RUNNER=3
-
-ask "  Choice [$DEFAULT_RUNNER]: "; read -r RUNNER_CHOICE
-case "${RUNNER_CHOICE:-$DEFAULT_RUNNER}" in
-  2) RUNNER_CLI="opencode" ;;
-  3) RUNNER_CLI="antigravity" ;;
-  4) RUNNER_CLI="$CODING_ENGINE" ;;
-  *) RUNNER_CLI="claude" ;;
-esac
-
-info "Runner: $RUNNER_CLI"
-
-# ═════════════════════════════════════════════════════════════════════════════
-# STEP 7 — TEAM MODELS (derived from the model assignment in STEP 5)
-# ═════════════════════════════════════════════════════════════════════════════
-section "STEP 7/8 · Team models — review"
-
-# tier2/tier3 stay as Copilot/free fallbacks. Fine-tune later: /dp-config wizard.
+# Fine-tune later: /dp-setup models.
 info "BA        → $T1_BA"
 info "Team Lead → $T1_LEAD"
 info "QA        → $T1_QA"
-info "Frontend  → ${LM_FE:-$T1_FE_DEV}"
-info "Backend   → ${LM_BE:-$T1_BE_DEV}"
+info "Frontend  → $T1_FE_DEV"
+info "Backend   → $T1_BE_DEV"
 
 # ═════════════════════════════════════════════════════════════════════════════
-# STEP 8 — PROJECT IDENTITY
+# STEP 6 — PROJECT IDENTITY
 # ═════════════════════════════════════════════════════════════════════════════
-section "STEP 8/8 · Project identity & policies"
+section "STEP 6/6 · Project identity & policies"
 
 DEFAULT_NAME=$(basename "$PROJECT_ROOT")
 ask "  Project name [$DEFAULT_NAME]: ";    read -r PROJECT_NAME;   [ -z "$PROJECT_NAME" ]   && PROJECT_NAME="$DEFAULT_NAME"
@@ -752,11 +523,9 @@ echo ""
 printf "  %-18s %s\n" "Project"        "$PROJECT_NAME  ($DETECTED_TYPE)"
 printf "  %-18s %s\n" "Ticket prefix"  "$TICKET_PREFIX"
 printf "  %-18s %s\n" "Base branch"    "$BASE_BRANCH"
-printf "  %-18s %s\n" "Coding engine"  "$CODING_ENGINE  (fallback: $FALLBACK_ENGINE)"
 printf "  %-18s %s\n" "Model mode"     "$MODEL_MODE  (profile: $ACTIVE_PROFILE)"
 printf "  %-18s %s\n" "BA / Lead / QA" "$T1_BA · $T1_LEAD · $T1_QA"
-printf "  %-18s %s\n" "Frontend / BE"  "${LM_FE:-$T1_FE_DEV} · ${LM_BE:-$T1_BE_DEV}"
-printf "  %-18s %s\n" "Runner"         "$RUNNER_CLI"
+printf "  %-18s %s\n" "Frontend / BE"  "$T1_FE_DEV · $T1_BE_DEV"
 printf "  %-18s %s\n" "Tracker"        "$TRACKER_TYPE$([ "$TRACKER_TYPE" = jira ] && [ -n "$JIRA_TOKEN_IN" ] && echo ' (credentials captured)')"
 printf "  %-18s %s\n" "Merge policy"   "$MERGE_POLICY"
 printf "  %-18s %s\n" "Docs language"  "$DOC_LANGUAGE"
@@ -767,7 +536,7 @@ AGENT_LIST="BA · Lead · QA"
 [ "$AGENT_INTEGRATION" = "true" ] && AGENT_LIST="$AGENT_LIST · Integration"
 printf "  %-18s %s\n" "Team"           "$AGENT_LIST"
 echo ""
-echo "  Everything above is changeable later — /dp-config (or edit project.config.md)."
+echo "  Everything above is changeable later — /dp-setup (or edit project.config.md)."
 echo ""
 ask "  Install with these settings? [Y/n]: "; read -r CONFIRM_INSTALL
 if [[ "${CONFIRM_INSTALL:-Y}" =~ ^[Nn] ]]; then
@@ -784,10 +553,9 @@ section "Installing devpilot files..."
 # Create directory structure
 mkdir -p .devpilot/{prompts/team,templates/team,checklists,skills,config}
 mkdir -p .claude/commands .claude/agents
-mkdir -p .opencode
 mkdir -p scripts
 mkdir -p .github/ISSUE_TEMPLATE
-mkdir -p docs/{requirements,plans,qa,reviews,adrs,domain-models,fallback,implementation,tasks}
+mkdir -p docs/{requirements,plans,qa,reviews,adrs,domain-models,tasks}
 
 # .devpilot — shared rules, prompts, templates, skills
 info "Installing .devpilot/..."
@@ -903,9 +671,8 @@ fetch ".devpilot/config/models.md" ".devpilot/config/models.md"
 
 # .claude/ — Claude Code commands + agent definitions
 info "Installing .claude/..."
-for f in ceo.md dp-plan.md dp-sprint.md dp-build.md \
-         dp-release.md dp-rollback.md dp-hotfix.md \
-         dp-status.md dp-config.md dp-review-fix.md dp-test.md dp-autofix.md; do
+for f in dp-deliver.md dp-refine.md dp-sprint.md dp-build.md dp-test.md dp-pr.md \
+         dp-release.md dp-hotfix.md dp-status.md dp-setup.md; do
   fetch ".claude/commands/$f" ".claude/commands/$f"
 done
 
@@ -921,19 +688,6 @@ else
   info ".claude/settings.json exists — to enable the warm-up hook, add a SessionStart entry running: bash scripts/session-start.sh"
 fi
 
-# .opencode/ — opencode project config
-info "Installing .opencode/..."
-fetch ".opencode/config.json" ".opencode/config.json"
-fetch ".opencode/README.md"   ".opencode/README.md"
-
-# AGENTS.md — project context for opencode + antigravity
-if [ ! -f "AGENTS.md" ]; then
-  fetch "AGENTS.md" "AGENTS.md"
-  info "AGENTS.md created"
-else
-  info "AGENTS.md already exists — skipping (edit manually if needed)"
-fi
-
 # CLAUDE.md — project context for Claude Code
 if [ ! -f "CLAUDE.md" ]; then
   fetch "CLAUDE.md" "CLAUDE.md"
@@ -942,17 +696,15 @@ fi
 
 # scripts/
 info "Installing scripts/..."
-for f in git-flow.sh new-feature.sh run-command.sh resolve-engine.sh model-profiles.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh \
-          run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh \
+for f in git-flow.sh new-feature.sh resolve-model.sh model-profiles.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh \
+          track.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh \
           doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh \
           deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh \
           create-jira-ticket.sh create-jira-epic.sh \
           update-jira-status.sh update-jira-description.sh \
           add-jira-comment.sh generate-project-index.sh \
           generate-backlog-index.sh jira-sprint.sh link-jira-issues.sh \
-          md-to-adf.sh jira-describe.sh \
-          ceo.sh dp-plan.sh dp-sprint.sh dp-build.sh \
-          dp-release.sh dp-status.sh dp-config.sh; do
+          md-to-adf.sh jira-describe.sh; do
   fetch "scripts/$f" "scripts/$f"
   chmod +x "scripts/$f" 2>/dev/null || true
 done
@@ -969,13 +721,13 @@ done
 [ ! -f ".commitlintrc.json" ] && fetch ".commitlintrc.json" ".commitlintrc.json"
 [ ! -f ".env.example" ]       && fetch ".env.example"       ".env.example"
 
-for d in requirements plans qa reviews adrs domain-models fallback implementation tasks; do
+for d in requirements plans qa reviews adrs domain-models tasks; do
   touch "docs/$d/.gitkeep"
 done
 
 # .gitignore additions
 if [ -f ".gitignore" ]; then
-  for entry in ".devpilot/config.sh" ".devpilot/.scope-lock" ".env" ".env.local" "docs/fallback/" ".devpilot/logs/" "docs/index/.state" "docs/project-index.md" "docs/index/*.md"; do
+  for entry in ".devpilot/config.sh" ".devpilot/.scope-lock" ".env" ".env.local" ".devpilot/logs/" "docs/index/.state" "docs/project-index.md" "docs/index/*.md"; do
     grep -qF "$entry" .gitignore || echo "$entry" >> .gitignore
   done
 fi
@@ -987,7 +739,7 @@ section "Writing project.config.md..."
 
 cat > project.config.md << CONFIGEOF
 # Project Configuration
-# Generated by devpilot install.sh — edit with /dp-config wizard
+# Generated by devpilot install.sh — edit with /dp-setup wizard
 
 ## Project Identity
 
@@ -1032,40 +784,13 @@ agents:
   integration:  { enabled: $AGENT_INTEGRATION }
   qa:           { enabled: true }
 
-## Engines
-#
-# orchestrator — always Claude (BA · planning · QA · review)
-# coding       — who writes implementation code: claude | opencode | antigravity
-# model_mode   — how models map to the team:
-#                  recommended — task-balanced tiers via a named profile (default)
-#                  single      — one model everywhere (model-profiles.sh single <family> <model>)
-#                  per-team    — per-role models (models.* + layer_models.*; then model-profiles.sh sync-agents)
-# runner       — which AI CLI runs /ceo from bash scripts
-# fallback     — coding engine fallback when primary hits limits
+## Claude Models — task-balanced (DevPilot runs on Claude only)
+# model_mode — recommended (profile tiers) · single (one model) · per-team (edit models.*, then sync-agents)
+# Tiers are picked per task by scripts/resolve-model.sh. Change: /dp-setup models <auto|balanced|save>
 
-engines:
-  orchestrator: claude
-  coding: $CODING_ENGINE
+model_policy:
+  coding_profile: $ACTIVE_PROFILE
   model_mode: $MODEL_MODE
-  coding_profile: $ACTIVE_PROFILE   # auto|balanced|save (claude) · recommended|balanced|save|custom (opencode/antigravity) · single|per-team — change: /dp-config models <profile>
-  runner: $RUNNER_CLI
-  fallback: $FALLBACK_ENGINE
-
-## Layer-Specific Model Pins (model_mode: per-team)
-# Pin a model id per layer — read by resolve-engine.sh, wins over the tier
-# system below. Claude-family per-team picks live in .claude/agents/*.md
-# frontmatter (and models.frontend_dev / models.backend_dev) instead.
-
-layer_models:
-  frontend:    "$LM_FE"
-  backend:     "$LM_BE"
-  db:          "$LM_DB"
-  integration: "$LM_INT"
-
-## Coding Engine Models — task-balanced tiers (power / standard / lite)
-# Models are chosen per task by complexity (resolve-engine.sh), balancing power
-# against token cost. Run: opencode model list   or   antigravity model list.
-# Edit these anytime with: /dp-config models
 
 coding_models:
   claude:
@@ -1073,35 +798,18 @@ coding_models:
     standard: "$CL_STANDARD"
     lite:     "$CL_LITE"
 
-  opencode:
-    power:    "$OC_POWER"
-    standard: "$OC_STANDARD"
-    lite:     "$OC_LITE"
-    fallback: "$OC_FALLBACK"   # used when GitHub Copilot is unavailable ("" = opencode default)
-
-  antigravity:
-    power:    "$AG_POWER"
-    standard: "$AG_STANDARD"
-    lite:     "$AG_LITE"
-
 ## Model Routing — Claude team roles (tier1 syncs to .claude/agents frontmatter
 ## via: bash scripts/model-profiles.sh sync-agents)
 
 models:
   ba:
     tier1: $T1_BA
-    tier2: "$T2_BA"
-    tier3: "$T3_BA"
 
   team_lead:
     tier1: $T1_LEAD
-    tier2: "$T2_LEAD"
-    tier3: "$T3_LEAD"
 
   qa:
     tier1: $T1_QA
-    tier2: "$T2_QA"
-    tier3: "$T3_QA"
 
   frontend_dev:
     tier1: $T1_FE_DEV
@@ -1109,27 +817,12 @@ models:
   backend_dev:
     tier1: $T1_BE_DEV
 
-## Fallback Behavior
-
-fallback:
-  auto_on_limit: true
-  save_path: docs/fallback
-  resume_command: "/ceo resume"
+## Usage limits
+# A run that hits a Claude usage limit checkpoints to docs/tasks/<KEY>-checkpoint.json;
+# `/dp-deliver resume` continues from the exact phase once the limit resets.
 CONFIGEOF
 
 info "project.config.md written"
-
-# ═════════════════════════════════════════════════════════════════════════════
-# STEP 11 — UPDATE OPENCODE CONFIG (model default)
-# ═════════════════════════════════════════════════════════════════════════════
-if [ -f ".opencode/config.json" ] && command -v jq &>/dev/null; then
-  DEFAULT_OC_MODEL="${OC_STANDARD:-}"   # opencode standard-tier model from the profile
-  if [ "$CODING_ENGINE" = "opencode" ] && [ -n "$DEFAULT_OC_MODEL" ]; then
-    jq --arg m "$DEFAULT_OC_MODEL" '.model = $m' .opencode/config.json > .opencode/config.json.tmp \
-      && mv .opencode/config.json.tmp .opencode/config.json
-    info ".opencode/config.json → model: $DEFAULT_OC_MODEL"
-  fi
-fi
 
 # ═════════════════════════════════════════════════════════════════════════════
 # STEP 12 — SYNC AGENT FRONTMATTER
@@ -1231,18 +924,15 @@ echo -e "${BOLD}━━━━━━━━━━━━━━━━━━━━━�
 echo ""
 echo "  Project:        $PROJECT_NAME ($DETECTED_TYPE)"
 echo "  Base branch:    $BASE_BRANCH"
-echo "  Coding engine:  $CODING_ENGINE  (fallback: $FALLBACK_ENGINE)"
-echo "  Runner:         $RUNNER_CLI"
+echo "  Models:         Claude · $MODEL_MODE ($ACTIVE_PROFILE)"
 echo ""
 echo "  Installed:"
 echo "    .claude/commands/    — slash commands for Claude Code"
 echo "    .claude/agents/      — agent definitions"
-echo "    .opencode/           — opencode project config"
-echo "    AGENTS.md            — project context (opencode / antigravity)"
 echo "    CLAUDE.md            — project context (Claude Code)"
 echo "    .devpilot/           — rules, templates, skills"
 echo "    scripts/             — git-flow, Jira, deploy helpers"
-echo "    project.config.md    — engine + model config"
+echo "    project.config.md    — team + Claude model config"
 echo ""
 echo "  ── Next steps ──────────────────────────────────────────"
 echo ""
@@ -1272,31 +962,17 @@ echo ""
 echo "  ── Start working ───────────────────────────────────────"
 echo ""
 
-if [ "$HAS_CLAUDE" = true ]; then
-echo "  From Claude Code:"
-echo "    /ceo your feature or bug description"
+echo "  In Claude Code (CLI, desktop, IDE, or claude.ai/code):"
+echo "    /dp-deliver \"your feature or bug\"        — requirement → merged into $BASE_BRANCH"
+echo "    /dp-deliver \"…\" --to sit                 — …and cut the SIT release"
+echo "    /dp-refine → /dp-sprint → /dp-build → /dp-pr   — the same flow, one role at a time"
 echo ""
-fi
-
-if [ "$RUNNER_CLI" = "opencode" ] || [ "$HAS_OPENCODE" = true ]; then
-echo "  From opencode terminal:"
-echo "    bash scripts/ceo.sh \"your feature or bug description\""
-echo "    opencode < .claude/commands/ceo.md      (pipe command directly)"
-echo ""
-fi
-
-if [ "$RUNNER_CLI" = "antigravity" ] || [ "$HAS_ANTIGRAVITY" = true ]; then
-echo "  From antigravity terminal:"
-echo "    bash scripts/ceo.sh \"your feature or bug description\""
-echo "    antigravity < .claude/commands/ceo.md   (pipe command directly)"
-echo ""
-fi
 
 echo "  ── Change config anytime ───────────────────────────────"
 echo ""
-echo "    /dp-config fix          — doctor finds missing/invalid config, fixes interactively"
-echo "    /dp-config wizard       — re-run engine + model wizard"
-echo "    /dp-config models       — switch model mode / profile / per-layer models"
+echo "    /dp-setup fix          — doctor finds missing/invalid config, fixes interactively"
+echo "    /dp-setup wizard       — re-run the configuration wizard"
+echo "    /dp-setup models       — switch Claude model profile (auto | balanced | save)"
 echo "    Edit project.config.md directly"
 echo ""
 

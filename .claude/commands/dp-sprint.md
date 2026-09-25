@@ -31,7 +31,7 @@ one valid sprint.
 
 **Readiness gate.** Apply `.devpilot/skills/definition-of-ready.md`: only Stories that are
 **ready** may enter a sprint. List any `needs grooming` Stories separately with what's missing —
-they stay in the backlog until groomed (via `/dp-plan`), never sprinted unclear.
+they stay in the backlog until groomed (via `/dp-refine`), never sprinted unclear.
 
 ---
 
@@ -54,13 +54,13 @@ bash scripts/jira-sprint.sh assign "$SPRINT_ID" <KEY1> <KEY2> <KEY3> ...
 ```
 
 **Keep each Story self-contained.** For every Story assigned, make sure its Jira description is
-the full implementation brief (set at `/dp-plan` time). If a Story is missing one — or its brief
+the full implementation brief (set at `/dp-refine` time). If a Story is missing one — or its brief
 predates this sprint — refresh it so any external tool can build from Jira alone:
 ```bash
 for KEY in <KEY1> <KEY2> ...; do
   # ensure docs/tasks/${KEY}-brief.md exists & has Sprint: <sprint name>, then:
   bash scripts/jira-describe.sh "$KEY" "docs/tasks/${KEY}-brief.md"
-  bash scripts/add-jira-comment.sh "$KEY" "🗂 Added to sprint <sprint name>. Self-contained brief is in the description — implementable from Jira by any session/opencode/AI tool."
+  bash scripts/add-jira-comment.sh "$KEY" "🗂 Added to sprint <sprint name>. Self-contained brief is in the description — implementable from Jira by any Claude session or teammate."
 done
 ```
 

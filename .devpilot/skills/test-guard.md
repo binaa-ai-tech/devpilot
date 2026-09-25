@@ -8,7 +8,7 @@ every changed source file has a covering test, run by `scripts/test-guard.sh`.
 ## When to run
 - **Developers** — before the final commit of a layer's work:
   `bash scripts/test-guard.sh` (report mode).
-- **Merge gates** — `/dp-build` review gate, `/dp-autofix` local ladder, and the
+- **Merge gates** — `/dp-build` review gate, `/dp-pr` local ladder, and the
   `auto-merge.md` ladder run it strict: `STRICT=1 bash scripts/test-guard.sh`
   — any gap blocks the merge.
 - **QA** — confirm the guard is clean before issuing a PASS verdict.

@@ -3,7 +3,7 @@
 #
 # Sets a Jira issue's description from a markdown FILE, rendered as structured ADF
 # (headings, lists, code) via md-to-adf.sh — so the ticket is a complete,
-# self-contained implementation brief any session / opencode / AI tool can build
+# self-contained implementation brief any Claude session or teammate can build
 # from Jira alone. Use this instead of update-jira-description.sh for rich specs.
 set -euo pipefail
 

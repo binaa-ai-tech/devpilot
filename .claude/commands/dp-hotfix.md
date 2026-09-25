@@ -12,7 +12,7 @@ manual approval gate. Skips the backlog/sprint machinery — this is an emergenc
    ```bash
    bash scripts/git-flow.sh hotfix-start <ticket> <slug>
    ```
-3. **Implement** the minimal fix per the resolved engine (`engines.coding`). Minimum diff —
+3. **Implement** the minimal fix with the `team-dotnet` / `team-frontend` agent for the affected layer. Minimum diff —
    no refactoring under pressure. Follow the debugging method in `.devpilot/skills/self-heal.md` (Part 0) first.
 4. **Self-review:** `git diff main...HEAD` — confirm scope is tight.
 5. **Finish:**
@@ -24,7 +24,7 @@ manual approval gate. Skips the backlog/sprint machinery — this is an emergenc
 7. **Close ticket** + verify on production.
 8. **Postmortem** — apply the incidents section of `.devpilot/skills/release-ops.md`. Write a blameless
    postmortem to `docs/postmortems/<ticket>-<slug>.md` (timeline, root cause, action items),
-   and turn each action item into a backlog Story via `/dp-plan`. Skip only for trivial
+   and turn each action item into a backlog Story via `/dp-refine`. Skip only for trivial
    internal-only blips.
 
 ## Rules
