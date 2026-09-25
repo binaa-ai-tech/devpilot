@@ -189,7 +189,82 @@ assert_contains "$L" '"deleteSourceBranch":true' "azure: source branch deleted o
 ( cd "$D" && sed -i.bak 's/^merge_policy:.*/merge_policy: pr-only/' project.config.md; rm -f "$MOCK_LOG.merged" )
 ( cd "$D" && PATH="$MOCKBIN:$PATH" bash scripts/open-pr.sh develop "t" "b" >/dev/null 2>&1 ); RC=$?
 assert_code "$RC" "3" "pr-only: PR opened, never merged"
+# Safety: no build-validation policy → never auto-complete (CI would be skipped)
+( cd "$D" && sed -i.bak 's/^merge_policy:.*/merge_policy: auto/' project.config.md; rm -f "$MOCK_LOG.merged" )
+OUT=$( cd "$D" && MOCK_NO_POLICY=1 PATH="$MOCKBIN:$PATH" bash scripts/azdo.sh pr-complete 77 2>/dev/null ); RC=$?
+assert_code "$RC" "3" "azure: unprotected target branch → PR not auto-completed"
+assert_eq "$OUT" "unprotected" "azure: reports the missing build policy"
+OUT=$( cd "$D" && MOCK_NO_POLICY=1 AZDO_ALLOW_UNPROTECTED=1 PATH="$MOCKBIN:$PATH" bash scripts/azdo.sh pr-complete 77 2>/dev/null ); RC=$?
+assert_code "$RC" "0" "azure: AZDO_ALLOW_UNPROTECTED=1 is the explicit opt-out"
+# Branch policies + environments
+: > "$MOCK_LOG"
+( cd "$D" && PATH="$MOCKBIN:$PATH" bash scripts/azdo.sh protect develop --reviewers 1 --build 55 >/dev/null 2>&1 ); RC=$?
+assert_code "$RC" "0" "azure: branch policies applied"
+L=$(cat "$MOCK_LOG")
+assert_contains "$L" '"buildDefinitionId":55' "azure policy: devpilot-ci build validation required"
+assert_contains "$L" '"allowSquash":true,"allowNoFastForward":false' "azure policy: squash merge only"
+assert_contains "$L" 'c6a1889d-b943-4856-b76f-9e46bb6b0df2' "azure policy: review comments must be resolved"
+assert_contains "$L" '"minimumApproverCount":1' "azure policy: 1 reviewer under pr-only"
+: > "$MOCK_LOG"
+OUT=$( cd "$D" && PATH="$MOCKBIN:$PATH" bash scripts/azdo.sh env-setup prd --approval 2>/dev/null )
+assert_contains "$OUT" "approval required" "azure: prd environment gets an approval check"
+assert_contains "$(cat "$MOCK_LOG")" '"approvers":[{"id":"me-1"}]' "azure: approver is the PAT owner"
+assert_eq "$( cd "$D" && PATH="$MOCKBIN:$PATH" bash scripts/azdo.sh pipeline-ensure devpilot-cd azure-pipelines-cd.yml 2>/dev/null )" "55" "azure: CD pipeline created once"
 rm -rf "$D" "$MOCKBIN"; unset MOCK_LOG
+
+echo "== tracker selftest (live check, local backend) =="
+D=$(sandbox)
+OUT=$(cd "$D" && bash scripts/tracker.sh selftest 2>&1); RC=$?
+assert_code "$RC" "0" "selftest passes end to end on a working tracker"
+assert_contains "$OUT" "Epic closes with its last Story" "selftest checks Epic auto-close"
+assert_contains "$OUT" "close the sprint" "selftest checks sprint close"
+assert_eq "$(ls "$D/docs/tasks" 2>/dev/null | wc -l | tr -d ' ')" "0" "selftest cleans up after itself"
+rm -rf "$D"
+
+echo "== CD: deploy.sh / smoke.sh / pipelines =="
+MOCKBIN=$(mktemp -d); cp "$REPO/tests/mock-curl.sh" "$MOCKBIN/curl"; chmod +x "$MOCKBIN/curl"
+D=$(sandbox); mkdir -p "$D/out"; echo 3.1.0 > "$D/out/VERSION"
+OUT=$(cd "$D" && bash scripts/deploy.sh sit out 2>&1); RC=$?
+assert_code "$RC" "1" "deploy with no target fails loudly (never a fake success)"
+assert_contains "$OUT" "DEPLOY_HOOK" "deploy explains how to add a target"
+assert_code "$(cd "$D" && CI= TF_BUILD= bash scripts/deploy.sh prd out >/dev/null 2>&1; echo $?)" "1" "production from a terminal needs CONFIRM=1"
+OUT=$(cd "$D" && DEPLOY_HOOK_SIT=https://hooks.example/sit PATH="$MOCKBIN:$PATH" bash scripts/deploy.sh sit out 2>&1); RC=$?
+assert_code "$RC" "0" "deploy via webhook"
+assert_contains "$OUT" "v3.1.0 live on SIT" "deploys the version stamped in the artifact"
+OUT=$(cd "$D" && DEPLOY_HOOK='$(DEPLOY_HOOK_UAT)' bash scripts/deploy.sh uat out 2>&1); RC=$?
+assert_code "$RC" "1" "an undefined Azure \$(VAR) is treated as no hook"
+mkdir -p "$D/deploy"; printf 'echo "custom $1 $2 $3"\n' > "$D/deploy/deploy.sh"
+OUT=$(cd "$D" && bash scripts/deploy.sh uat out 2>&1)
+assert_contains "$OUT" "custom uat out 3.1.0" "project deploy/deploy.sh receives env, artifact, version"
+OUT=$(cd "$D" && SIT_API_URL=https://health.example PATH="$MOCKBIN:$PATH" bash scripts/smoke.sh sit); RC=$?
+assert_code "$RC" "0" "smoke passes on a healthy API"
+OUT=$(cd "$D" && MOCK_CODE=503 SMOKE_RETRIES=1 SIT_API_URL=https://health.example PATH="$MOCKBIN:$PATH" bash scripts/smoke.sh sit); RC=$?
+assert_code "$RC" "1" "smoke fails on an unhealthy API"
+( cd "$D" && mkdir -p web api/Migrations && printf '{}' > web/angular.json && touch web/package.json \
+  && printf '<Project Sdk="Microsoft.NET.Sdk.Web"/>' > api/Api.csproj && bash scripts/generate-ci.sh >/dev/null 2>&1 )
+CD="$(cat "$D/.github/workflows/devpilot-cd.yml" 2>/dev/null)"
+assert_contains "$CD" "upload-artifact" "GitHub CD builds once and uploads the artifact"
+assert_contains "$CD" "bash scripts/deploy.sh prd out" "GitHub CD promotes the same artifact to prd"
+assert_contains "$CD" "name: prd" "prd runs in the approval-gated environment"
+assert_contains "$CD" "needs.uat.result == 'success'" "prd only after UAT on release branches"
+assert_contains "$CD" "migrations script --idempotent" "CD ships an idempotent EF migration script"
+assert_contains "$CD" "workflow_dispatch" "manual run on a tag = redeploy / rollback"
+( cd "$D" && git remote add origin https://dev.azure.com/a/P/_git/r && bash scripts/generate-ci.sh >/dev/null 2>&1 )
+AZCD="$(cat "$D/azure-pipelines-cd.yml" 2>/dev/null)"
+assert_contains "$AZCD" "stage: PRD" "Azure CD has a PRD stage"
+assert_contains "$AZCD" "environment: prd" "Azure PRD uses the approval-gated environment"
+assert_contains "$AZCD" "download: current" "Azure stages deploy the one published artifact"
+if python3 -c "import yaml" 2>/dev/null; then
+  for F in .github/workflows/devpilot-ci.yml .github/workflows/devpilot-cd.yml azure-pipelines.yml azure-pipelines-cd.yml; do
+    assert_code "$(python3 -c "import yaml,sys; yaml.safe_load(open(sys.argv[1]))" "$D/$F" 2>/dev/null; echo $?)" "0" "$F is valid YAML"
+  done
+fi
+assert_contains "$(cat "$REPO/.claude/commands/dp-release.md")" "devpilot-cd" "dp-release drives the CD pipeline"
+assert_contains "$(cat "$REPO/.claude/commands/dp-setup.md")" "## pipelines" "dp-setup sets up pipelines"
+for F in deploy-dev deploy-sit deploy-uat deploy-prd; do
+  assert_eq "$([ -e "$REPO/scripts/$F.sh" ] && echo present || echo gone)" "gone" "$F.sh placeholder retired"
+done
+rm -rf "$D" "$MOCKBIN"
 
 echo "== close-delivery.sh (after merge) =="
 D=$(sandbox)

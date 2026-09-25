@@ -243,5 +243,16 @@ case "$cmd" in
     fi
     ;;
 
+  delete)
+    _req DELETE "$API/issue/${1:?KEY}?deleteSubtasks=true" >/dev/null || exit 1
+    echo "🗑 ${1} deleted" >&2
+    ;;
+  sprint-delete)
+    SPRINT="${1:?sprint}"
+    if [ -n "$(_board_id)" ]; then _req DELETE "$AGILE/sprint/$SPRINT" >/dev/null || exit 1
+    else VID=$(_version_id "$SPRINT"); [ -n "$VID" ] && { _req DELETE "$API/version/$VID" >/dev/null || exit 1; }; fi
+    echo "🗑 sprint $SPRINT deleted" >&2
+    ;;
+
   *) echo "Usage: jira.sh <ping|new|show|search|list|status|comment|describe|link|url|ref|sprint-*> …" >&2; exit 2 ;;
 esac

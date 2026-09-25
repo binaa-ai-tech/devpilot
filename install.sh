@@ -129,7 +129,7 @@ run_update() {
   CHECKLISTS="feature.md bugfix.md hotfix.md"
   CMDS="dp-deliver.md dp-plan.md dp-sprint.md dp-build.md dp-test.md dp-pr.md dp-release.md dp-hotfix.md dp-status.md dp-setup.md"
   AGENTS_LIST="team-lead.md team-ba.md team-frontend.md team-dotnet.md team-qa.md"
-  SCRIPTS="git-flow.sh new-feature.sh resolve-model.sh model-profiles.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh devpilot-lib.sh tracker.sh jira.sh azdo.sh github.sh git-host.sh version.sh close-delivery.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh generate-project-index.sh generate-backlog-index.sh md-to-adf.sh"
+  SCRIPTS="git-flow.sh new-feature.sh resolve-model.sh model-profiles.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh devpilot-lib.sh tracker.sh jira.sh azdo.sh github.sh git-host.sh version.sh close-delivery.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy.sh smoke.sh setup-environments.sh generate-project-index.sh generate-backlog-index.sh md-to-adf.sh"
 
   info "Refreshing .devpilot/rules..."
   fetch ".devpilot/rules.md" ".devpilot/rules.md"
@@ -172,6 +172,8 @@ run_update() {
   for f in track.sh jira-guard.sh jira-sprint.sh create-jira-ticket.sh create-jira-epic.sh update-jira-status.sh \
            update-jira-description.sh add-jira-comment.sh link-jira-issues.sh jira-describe.sh; do rm -f "scripts/$f"; done
   rm -f .devpilot/templates/team/jira-brief.md
+  # Replaced by deploy.sh + smoke.sh and the generated devpilot-cd pipeline.
+  for f in deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh; do rm -f "scripts/$f"; done
 
   # Refetching the agent files above reset their model: frontmatter to repo
   # defaults — re-sync it from the user's project.config.md so their chosen
@@ -740,7 +742,7 @@ for f in git-flow.sh new-feature.sh resolve-model.sh model-profiles.sh preflight
           devpilot-config.sh devpilot-lib.sh tracker.sh jira.sh azdo.sh github.sh git-host.sh version.sh close-delivery.sh \
           open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh \
           doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh \
-          deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh \
+          deploy.sh smoke.sh setup-environments.sh \
           generate-project-index.sh generate-backlog-index.sh md-to-adf.sh; do
   fetch "scripts/$f" "scripts/$f"
   chmod +x "scripts/$f" 2>/dev/null || true
@@ -921,9 +923,9 @@ if [ -f "$CI_FILE" ]; then
   CI_GENERATED=1
 else
   echo ""
-  echo "  A GitHub Actions workflow enforces the gate ladder on every PR:"
-  echo "  build → tests → test-guard (strict) → dependency audit."
-  ask "  Generate $CI_FILE? [Y/n]: "; read -r CI_CHOICE
+  echo "  CI enforces the gate ladder on every PR (build → tests → test-guard → audit);"
+  echo "  CD builds once and promotes DEV → SIT → UAT → PRD with approvals on UAT + PRD."
+  ask "  Generate the CI + CD pipelines ($CI_FILE + CD)? [Y/n]: "; read -r CI_CHOICE
   if [[ ! "${CI_CHOICE:-Y}" =~ ^[Nn] ]]; then
     bash scripts/generate-ci.sh && CI_GENERATED=1
   else
@@ -947,6 +949,15 @@ else
   [ "$CI_GENERATED" = 1 ] && info "Branch protection needs gh authenticated — later: gh auth login && bash scripts/protect-branches.sh"
 fi
 
+if [ "$CI_GENERATED" = 1 ]; then
+  echo ""
+  echo "  Deployment environments dev · sit · uat · prd (approvals on uat + prd) for the CD pipeline."
+  ask "  Create them now? [Y/n]: "; read -r ENV_CHOICE
+  if [[ ! "${ENV_CHOICE:-Y}" =~ ^[Nn] ]]; then bash scripts/setup-environments.sh || true
+  else info "Skipped — later: bash scripts/setup-environments.sh  (or /dp-setup pipelines)"; fi
+  info "Tell the pipeline how to deploy: deploy/deploy.sh, or a DEPLOY_HOOK secret per environment (/dp-setup pipelines)"
+fi
+
 # ═════════════════════════════════════════════════════════════════════════════
 # STEP 14 — TRACKER VALIDATION (live, only when credentials were captured)
 # ═════════════════════════════════════════════════════════════════════════════
@@ -960,6 +971,9 @@ if [ "$TRK_CREDS" = 1 ]; then
   fi
   if bash scripts/tracker.sh setup "$TRACKER_TYPE" "${SETUP_ARGS[@]}"; then
     info "$TRACKER_TYPE connection OK"
+    echo "  A live self-test creates a test Epic, Story and sprint, walks them to Done, then deletes them."
+    ask "  Run it now? [Y/n]: "; read -r ST_CHOICE
+    [[ ! "${ST_CHOICE:-Y}" =~ ^[Nn] ]] && { bash scripts/tracker.sh selftest || warn "Self-test found problems — see above (/dp-setup tracker test to re-run)"; }
   else
     warn "$TRACKER_TYPE validation FAILED — fix it anytime with /dp-setup tracker"
   fi

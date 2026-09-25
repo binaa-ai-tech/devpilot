@@ -149,7 +149,7 @@ case "$cmd" in
     TYPE="${1:?type}"; SUMMARY="${2:?summary}"; BODY="${3:-}"; PARENT="${4:-}"; TAGS="${5:-}"
     case "$TYPE" in
       Epic) WIT="Epic" ;;
-      Bug)  if _types | grep -qx "Bug"; then WIT="Bug"; else WIT=$(_story_type); TAGS="bug${TAGS:+,$TAGS}"; fi ;;
+      Bug)  ALL=$(_types); if printf '%s\n' "$ALL" | grep -qx "Bug"; then WIT="Bug"; else WIT=$(_story_type); TAGS="bug${TAGS:+,$TAGS}"; fi ;;
       Task) WIT="Task" ;;
       *)    WIT=$(_story_type) ;;
     esac
@@ -276,6 +276,15 @@ case "$cmd" in
       | jq -r '.value[] | [.name, (.attributes.timeFrame // "-"), .path] | @tsv'
     ;;
 
+  delete)   # to the Boards recycle bin (restorable)
+    _az DELETE "$P/_apis/wit/workitems/$(_id "${1:?KEY}")?$V" >/dev/null || exit 1
+    echo "🗑 ${1} deleted (recycle bin)" >&2
+    ;;
+  sprint-delete)
+    _az DELETE "$P/_apis/wit/classificationnodes/Iterations/$(dp_urlenc "${1:?sprint}")?$V" >/dev/null || exit 1
+    echo "🗑 iteration ${1} deleted" >&2
+    ;;
+
   # ── Repos ──────────────────────────────────────────────────────────────────
   pr-create)
     BASE="${1:?base}"; TITLE="${2:?title}"; BODY="${3:-}"; shift 3 || true; ITEMS=""
@@ -311,6 +320,17 @@ case "$cmd" in
     ID=$(_id "${1:?pr-id}")
     R=$(_az GET "$REPO_API/pullrequests/$ID?$V") || exit 1
     [ "$(echo "$R" | jq -r '.status')" = "completed" ] && { echo "merged"; exit 0; }
+    # Without a build-validation policy, auto-complete would merge instantly with no
+    # server-side CI. Refuse unless explicitly allowed.
+    PID=$(echo "$R" | jq -r '.repository.project.id')
+    BUILDS=$(_az GET "$RP/_apis/policy/evaluations?artifactId=$(dp_urlenc "vstfs:///CodeReview/CodeReviewId/$PID/$ID")&api-version=7.1-preview.1" 2>/dev/null \
+      | jq '[.value[]? | select(.configuration.type.id == "0609b952-1397-4640-95ec-e00a01b2c241" and .configuration.isBlocking)] | length' 2>/dev/null)
+    if [ "${BUILDS:-0}" -eq 0 ] && [ "${AZDO_ALLOW_UNPROTECTED:-0}" != "1" ]; then
+      echo "not merged: '$(echo "$R" | jq -r '.targetRefName | sub("refs/heads/"; "")')' has no required build validation, so CI would be skipped." >&2
+      echo "  Fix once: bash scripts/protect-branches.sh   (or AZDO_ALLOW_UNPROTECTED=1 to merge on local gates only)" >&2
+      echo "unprotected"
+      exit 3
+    fi
     _az PATCH "$REPO_API/pullrequests/$ID?$V" "$(echo "$R" | jq '{autoCompleteSetBy:{id:.createdBy.id},
       completionOptions:{mergeStrategy:"squash", deleteSourceBranch:true, transitionWorkItems:false,
       mergeCommitMessage:"\(.title) (PR \(.pullRequestId))"}}')" >/dev/null || exit 1
@@ -360,5 +380,77 @@ case "$cmd" in
     fi
     ;;
 
-  *) echo "Usage: azdo.sh <ping|new|show|search|list|status|comment|describe|link|url|ref|sprint-*|pr-*|ci> …" >&2; exit 2 ;;
+  # ── Governance: pipelines, branch policies, environments ───────────────────
+  repo-id)
+    _az GET "$REPO_API?$V" | jq -r '.id'
+    ;;
+
+  pipeline-ensure)   # pipeline-ensure <name> <yaml-path> → definition id (creates it once)
+    NAME="${1:?name}"; YML="${2:?yaml path}"
+    RID=$(bash "$0" repo-id) || exit 1
+    ID=$(_az GET "$RP/_apis/pipelines?$V" | jq -r --arg n "$NAME" '.value[] | select(.name == $n) | .id' | head -1)
+    if [ -z "$ID" ]; then
+      ID=$(_az POST "$RP/_apis/pipelines?$V" "$(jq -n --arg n "$NAME" --arg p "/${YML#/}" --arg r "$RID" \
+        '{name:$n, configuration:{type:"yaml", path:$p, repository:{id:$r, type:"azureReposGit"}}}')" | jq -r '.id // empty')
+      [ -n "$ID" ] || die "could not create pipeline '$NAME' — is $YML committed on the default branch?"
+      echo "  ✚ pipeline $NAME ($YML)" >&2
+    fi
+    echo "$ID"
+    ;;
+
+  protect)   # protect <branch> [--reviewers N] [--build <definition-id>]
+    BR="${1:?branch}"; shift; REVIEWERS=0; BUILD=""
+    while [ $# -gt 0 ]; do case "$1" in --reviewers) REVIEWERS="${2:-0}"; shift 2 ;; --build) BUILD="${2:-}"; shift 2 ;; *) shift ;; esac; done
+    RID=$(bash "$0" repo-id) || exit 1
+    SCOPE=$(jq -n --arg r "$RID" --arg b "refs/heads/$BR" '[{repositoryId:$r, refName:$b, matchKind:"exact"}]')
+    EXISTING=$(_az GET "$RP/_apis/git/policy/configurations?repositoryId=$RID&refName=$(dp_urlenc "refs/heads/$BR")&$V" 2>/dev/null || echo '{"value":[]}')
+    upsert() {  # upsert <type-guid> <label> <blocking> <settings-json>
+      local body id
+      body=$(jq -n --arg t "$1" --argjson b "$3" --argjson s "$4" --argjson scope "$SCOPE" \
+        '{isEnabled:true, isBlocking:$b, type:{id:$t}, settings:($s + {scope:$scope})}') \
+        && [ -n "$body" ] || { echo "  ❌ $BR — $2 (bad policy body)" >&2; return 1; }
+      id=$(echo "$EXISTING" | jq -r --arg t "$1" '[.value[] | select(.type.id == $t)] | first | .id // empty')
+      if [ -n "$id" ]; then _az PUT "$RP/_apis/policy/configurations/$id?$V" "$body" >/dev/null && echo "  ✅ $BR — $2 (updated)"
+      else _az POST "$RP/_apis/policy/configurations?$V" "$body" >/dev/null && echo "  ✅ $BR — $2"; fi
+    }
+    RC=0
+    [ -n "$BUILD" ] && { upsert 0609b952-1397-4640-95ec-e00a01b2c241 "build validation: devpilot-ci required" true \
+      "$(jq -n --argjson d "$BUILD" '{buildDefinitionId:$d, displayName:"devpilot-ci", queueOnSourceUpdateOnly:false, manualQueueOnly:false, validDuration:720}')" || RC=1; }
+    upsert fa4e907d-c16b-4a4c-9dfa-4916e5d171ab "squash merge only" true \
+      '{"allowSquash":true,"allowNoFastForward":false,"allowRebase":false,"allowRebaseMerge":false}' || RC=1
+    upsert c6a1889d-b943-4856-b76f-9e46bb6b0df2 "review comments must be resolved" true '{}' || RC=1
+    upsert 40e92b44-2fe1-4dd6-b3d8-74a9c21d0c6e "linked work items (advisory)" false '{}' || RC=1
+    if [ "$REVIEWERS" -gt 0 ]; then
+      upsert fa6ba251-8c60-4a0b-bf2e-3ea6e0b34e98 "$REVIEWERS approving reviewer(s)" true \
+        "$(jq -n --argjson n "$REVIEWERS" '{minimumApproverCount:$n, creatorVoteCounts:false, allowDownvotes:false, resetOnSourcePush:true}')" || RC=1
+    fi
+    exit $RC
+    ;;
+
+  env-setup)   # env-setup <name> [--approval] → create the Pipelines environment (+ approval check)
+    NAME="${1:?environment}"; APPROVAL="${2:-}"
+    ENV=$(_az GET "$RP/_apis/distributedtask/environments?name=$(dp_urlenc "$NAME")&api-version=7.1-preview.1" | jq '.value[0] // empty')
+    [ -z "$ENV" ] && ENV=$(_az POST "$RP/_apis/distributedtask/environments?api-version=7.1-preview.1" \
+      "$(jq -n --arg n "$NAME" '{name:$n, description:"DevPilot delivery stage"}')")
+    EID=$(echo "$ENV" | jq -r '.id // empty'); [ -n "$EID" ] || die "could not create environment $NAME"
+    if [ "$APPROVAL" = "--approval" ]; then
+      HAS=$(_az GET "$RP/_apis/pipelines/checks/configurations?resourceType=environment&resourceId=$EID&api-version=7.1-preview.1" \
+        | jq '[.value[] | select(.type.name == "Approval")] | length')
+      if [ "${HAS:-0}" -eq 0 ]; then
+        ME=$(_az GET "$R_ORG/_apis/connectionData" | jq -r '.authenticatedUser.id')
+        _az POST "$RP/_apis/pipelines/checks/configurations?api-version=7.1-preview.1" "$(jq -n --arg me "$ME" --arg id "$EID" --arg n "$NAME" '
+          {type:{id:"8C6F20A7-A545-4486-9777-F762FAFE0D4D", name:"Approval"},
+           settings:{approvers:[{id:$me}], executionOrder:"anyOrder", minRequiredApprovers:0,
+                     instructions:"DevPilot: approve only after the previous stage is verified.", blockedApprovers:[]},
+           resource:{type:"environment", id:$id, name:$n}, timeout:43200}')" >/dev/null || exit 1
+        echo "  ✅ environment $NAME — approval required (add more approvers in Pipelines → Environments)"
+      else
+        echo "  ✅ environment $NAME — approval already configured"
+      fi
+    else
+      echo "  ✅ environment $NAME"
+    fi
+    ;;
+
+  *) echo "Usage: azdo.sh <ping|new|show|search|list|status|comment|describe|link|url|ref|sprint-*|pr-*|ci|repo-id|pipeline-ensure|protect|env-setup> …" >&2; exit 2 ;;
 esac

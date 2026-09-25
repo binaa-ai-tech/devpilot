@@ -19,10 +19,17 @@ process, not from skipping steps.
 - One release = one tag = one changelog section.
 
 ## Promotion gates (never skip an environment)
-1. **DEV** — auto-deploys from the base branch after CI; smoke test.
-2. **SIT** (`/dp-release sit <version>`) — release branch cut; QA verifies.
-3. **UAT** (`/dp-release uat`) — stakeholder sign-off.
-4. **PRD** (`/dp-release prd <version>`) — production PR; **always a human approval**.
+The `devpilot-cd` pipeline (`generate-ci.sh`) builds **once** per branch and promotes that artifact
+(`out/web`, `out/api`, `out/db/migrations.sql`, `out/VERSION`) with `scripts/deploy.sh <env>` +
+`scripts/smoke.sh <env>`; environments and approvals come from `setup-environments.sh`.
+1. **DEV** — auto-deploys from the base branch after merge; smoke test.
+2. **SIT** (`/dp-release sit`) — release branch cut from develop's version; auto-deploy; QA verifies.
+3. **UAT** (`/dp-release uat`) — the same run, behind a human **approval**; stakeholder sign-off.
+4. **PRD** (`/dp-release prd`) — the same run, behind a human **approval**; tag + merge to `main` only
+   after PRD is verified, so the tag is what is live. Hotfixes: SIT → PRD.
+5. **Rollback** — rerun the pipeline on the previous tag for `prd` (still approval-gated).
+A deploy target must exist (`deploy/deploy.sh` or a `DEPLOY_HOOK` secret); `deploy.sh` never
+reports success without one. DevPilot never approves a deployment.
 Before PRD: migrations idempotent and applied in order (`efcore-sqlserver`), backward compatible
 or a written cutover plan, rollback plan written (revert tag / down-migration / flag off),
 changelog + version bumped.

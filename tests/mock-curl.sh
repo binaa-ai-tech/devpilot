@@ -53,6 +53,22 @@ body() {
                                                 ST=active; [ -f "${MOCK_LOG:-/tmp/x}.merged" ] && ST=completed
                                                 echo "{\"pullRequestId\":77,\"status\":\"$ST\",\"mergeStatus\":\"succeeded\",\"title\":\"t\",\"createdBy\":{\"id\":\"u1\"},\"repository\":{\"project\":{\"id\":\"p1\"}}}" ;;
     "PATCH "*/pullrequests/77\?*)               touch "${MOCK_LOG:-/tmp/x}.merged"; echo '{}' ;;
+    "GET "*/_apis/policy/evaluations*)          if [ -n "${MOCK_NO_POLICY:-}" ]; then echo '{"value":[]}'
+                                                else echo '{"value":[{"status":"approved","configuration":{"isBlocking":true,"type":{"id":"0609b952-1397-4640-95ec-e00a01b2c241","displayName":"Build"}}}]}'; fi ;;
+    "GET "*/_apis/git/policy/configurations*)   echo '{"value":[]}' ;;
+    "POST "*/_apis/policy/configurations*)      echo '{"id":1}' ;;
+    "PUT "*/_apis/policy/configurations/*)      echo '{"id":1}' ;;
+    "GET "*/_apis/pipelines\?*)                 echo '{"value":[]}' ;;
+    "POST "*/_apis/pipelines\?*)                echo '{"id":55}' ;;
+    "GET "*/_apis/distributedtask/environments*)  echo '{"value":[]}' ;;
+    "POST "*/_apis/distributedtask/environments*) echo '{"id":9,"name":"x"}' ;;
+    "GET "*/_apis/pipelines/checks/configurations*)  echo '{"value":[]}' ;;
+    "POST "*/_apis/pipelines/checks/configurations*) echo '{"id":3}' ;;
+    "GET "*/_apis/connectionData*)              echo '{"authenticatedUser":{"id":"me-1"}}' ;;
+    "GET "*/_apis/git/repositories/*)           echo '{"id":"repo-1"}' ;;
+    "DELETE "*)                                 echo '' ;;
+    "POST "*hooks.example*)                     echo '{"ok":true}' ;;
+    "GET "*health.example*)                     echo 'ok' ;;
     # ── GitHub ──────────────────────────────────────────────────────────────
     "GET "*/repos/*/milestones/*)               echo '{"open_issues":0}' ;;
     "POST "*/repos/*/milestones)                echo '{"number":3}' ;;

@@ -6,7 +6,7 @@
 
 You write what you need in one sentence. DevPilot plans it, writes the code, tests it, reviews it, and merges it.
 
-[![Version](https://img.shields.io/badge/version-5.1.0-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-5.2.0-blue.svg)](VERSION)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#license)
 [![Runs on](https://img.shields.io/badge/runs%20on-Claude%20Code-7c3aed.svg)](#what-you-need)
 [![Stack](https://img.shields.io/badge/stack-Angular%20%7C%20.NET%20%7C%20SQL%20Server-orange.svg)](#what-you-need)
@@ -188,28 +188,39 @@ bash scripts/run-tests.sh all        # or: angular | dotnet | e2e
 
 ```
 develop ──(automatic)──► DEV ──/dp-release sit──► SIT ──/dp-release uat──► UAT ──/dp-release prd──► PRODUCTION
-                                                                                         ▲
-                                                                          a person must approve
+                                                                  ▲                       ▲
+                                                         a person approves       a person approves
 ```
+
+The app is **built once** per release, and that exact build moves from SIT to UAT to production. What you tested is what goes live.
+After production is verified, DevPilot merges the release into `main` and tags it, so the tag always matches what's running.
+Set it up once per repository with `/dp-setup pipelines`.
 
 | Command | What it does |
 |---------|--------------|
 | `/dp-release sit` | Creates `release/<version>` from develop and deploys to SIT |
 | `/dp-release uat` | Deploys the tested SIT build to UAT |
 | `/dp-release prd` | Merges to `main`, tags `v<version>`, and deploys to production **after you approve** |
-| `/dp-release rollback` | Goes back to the previous production version (shows the plan first) |
+| `/dp-release rollback` | Redeploys the previous version to production (shows the plan first, still needs approval) |
 
 **Version numbers are automatic.** Every `/dp-deliver` bumps develop's version (new feature → `1.4.0` → `1.5.0`,
 bug fix → `1.4.0` → `1.4.1`) in `package.json`, `.csproj` / `Directory.Build.props` and `VERSION`. `/dp-release sit`
 releases whatever version develop has. You can still give one: `/dp-release sit 2.0.0`.
 
 <details>
-<summary>One-time setup for deployments</summary>
+<summary>One-time setup for deployments (<code>/dp-setup pipelines</code>)</summary>
 
-**GitHub:** add the secrets `DEPLOY_HOOK_DEV`, `DEPLOY_HOOK_SIT`, `DEPLOY_HOOK_UAT`, `DEPLOY_HOOK_PRD`, and the
-environments `dev`, `sit`, `uat`, `prd`. Set required reviewers on `uat` and `prd`.
+`/dp-setup pipelines` generates the pipelines, makes CI required on `develop` and `main`, and creates the
+`dev`, `sit`, `uat` and `prd` environments with approvals on `uat` and `prd`. Then tell it **how to deploy**, choosing one:
 
-**Azure DevOps:** create the Pipelines environments `dev`, `sit`, `uat`, `prd`, and add an *Approvals* check on `uat` and `prd`.
+- a `deploy/deploy.sh` script in your repo. It receives the environment, the build folder (`web/`, `api/`, `db/migrations.sql`) and the version. Use it for App Service, IIS, Kubernetes, and so on.
+- a **deploy webhook** stored as the `DEPLOY_HOOK` secret on each environment.
+
+Set `API_URL` and `FRONTEND_URL` on each environment too, so every deploy is followed by a health check.
+If no deploy target is set, the deploy fails with a clear message. It never pretends to succeed.
+
+On **Azure DevOps**, these steps need a PAT with Code (Read, write & manage) and Build (Read & execute), plus project admin rights.
+Without them, each step prints what to click instead.
 </details>
 
 ---
@@ -231,7 +242,8 @@ It never deletes or weakens a test to make it pass.
 
 For extra safety, the installer generates the CI pipeline for your git host and protects `develop` and `main`,
 so CI must pass before anything is merged. On **GitHub** that's `.github/workflows/devpilot-ci.yml` plus branch protection.
-On **Azure Repos** it's `azure-pipelines.yml`, plus the branch policies to set (Build validation, squash merge only).
+On **Azure Repos** it's `azure-pipelines.yml` plus branch policies: CI required, squash merge only, and comments resolved.
+If a branch has no CI policy, DevPilot refuses to auto-merge into it, because CI would be skipped.
 
 ---
 
@@ -268,7 +280,9 @@ Change it with `/dp-setup models balanced`.
 ### Connect Jira, Azure DevOps, or GitHub
 
 Run `/dp-setup tracker` and pick one. DevPilot asks for the values below, tests the connection, and saves them in
-`.devpilot/config.sh`, which is **never committed**.
+`.devpilot/config.sh`, which is **never committed**. It then runs a **live self-test** (`/dp-setup tracker test`):
+it creates a test Epic, Story and sprint in your real project, moves them to Done, checks the Epic and sprint close,
+and deletes them. This way permission problems show up now, not in the middle of a delivery.
 
 | Tracker | What you need | Sprints become |
 |---------|---------------|----------------|
@@ -309,7 +323,9 @@ Azure Repos uses the same `AZDO_PAT`.
 |---------|----------|
 | Tickets are not created in Jira / Azure DevOps | `/dp-setup tracker` tests and fixes the connection. Until then, tickets are kept locally in `docs/tasks/`, so nothing is lost. |
 | I don't want to use a tracker | Answer **Continue without a tracker** once, or set `tracker.when_unconfigured: skip`. |
-| Azure DevOps PR is open but not merged | Auto-complete is on: it merges as soon as the branch policies pass. Check with `/dp-pr <id>`. |
+| Azure DevOps PR is open but not merged | Auto-complete is on: it merges as soon as the branch policies pass. Check with `/dp-pr <id>`. If it says `unprotected`, run `/dp-setup pipelines`. |
+| A deploy failed with "No deploy target" | Add `deploy/deploy.sh` or a `DEPLOY_HOOK` secret for that environment (`/dp-setup pipelines`). |
+| Not sure the tracker is set up right | `/dp-setup tracker test` runs a full test on your real tracker and cleans up. |
 | The version didn't change | `versioning.bump` is `off` in `project.config.md`, or the PR hasn't merged yet. |
 | API tests fail with a Docker error | Start Docker Desktop. The tests need a real SQL Server. |
 | Claude hit a usage limit in the middle of a task | Nothing is lost. Wait for the limit to reset, then run `/dp-deliver resume`. |

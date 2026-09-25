@@ -18,7 +18,7 @@ The end-to-end SDLC contract (phases, gates, roles) lives in `.devpilot/process.
 | DevOps | `/dp-release <sit\|uat\|prd\|rollback> [version]` | Promote DEV→SIT→UAT→PRD, or roll back. PRD is always human-approved. |
 | On-call | `/dp-hotfix <ticket> <slug> <version>` | Emergency fix from the deployed tag + postmortem. |
 | Everyone | `/dp-status [health\|board\|metrics]` | Health · board · throughput. |
-| Admin | `/dp-setup [fix\|tracker\|models\|wizard\|index]` | Repair config, connect Jira / Azure DevOps / GitHub, switch Claude model profile, refresh index. |
+| Admin | `/dp-setup [fix\|tracker\|pipelines\|models\|wizard\|index]` | Repair config, connect + self-test Jira / Azure DevOps / GitHub, set up CI/CD + approvals, switch Claude model profile, refresh index. |
 
 ---
 
@@ -50,6 +50,7 @@ Merges are reversible tracker links + one Story with combined ACs.
 | Work tracker | Jira · Azure DevOps Boards · GitHub Issues · local (`docs/tasks/`) | `scripts/tracker.sh` (backends `jira.sh` · `azdo.sh` · `github.sh`) |
 | Git host | GitHub (`gh` / GitHub MCP) · Azure Repos (`azdo.sh`, auto-complete) | `scripts/git-host.sh` → `open-pr.sh` |
 | Version | `VERSION` · `Directory.Build.props` · `package.json` · `*.csproj` | `scripts/version.sh` |
+| Delivery pipeline | `devpilot-cd`: build once → DEV → SIT → UAT → PRD (approvals on UAT/PRD) | `generate-ci.sh` · `deploy.sh` · `smoke.sh` · `setup-environments.sh` |
 
 Never call a backend directly from a command — always `tracker.sh`. Secrets live in the gitignored
 `.devpilot/config.sh`; same-named environment variables override it.

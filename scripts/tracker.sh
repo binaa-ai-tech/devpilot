@@ -15,6 +15,7 @@
 #   use <type>            switch tracker.type
 #   setup <type> [KEY=VALUE ...]   store credentials, switch, verify live
 #   ping                  live connection test · type · configured
+#   selftest [--keep]     live end-to-end run on the real tracker (create → sprint → close → clean up)
 #
 # Work items (every backend):
 #   new <Epic|Story|Bug|Task> <summary> <body-file|text> [parent] [labels]  → KEY
@@ -172,6 +173,8 @@ local_cmd() {
     comment)  local_append "$1" "$(printf '%s' "$2" | head -1)"; log "💬 comment → $1" ;;
     describe) local_append "$1" "Description updated$( [ -f "$2" ] && echo " from $2")"; log "📝 description → $1" ;;
     link)     local_append "$1" "$2 → $3"; local_append "$3" "linked from $1 ($2)"; log "🔗 $1 $2 → $3" ;;
+    delete)   rm -f "$TASKS/$1.md"; log "🗑 $1 deleted" ;;
+    sprint-delete) rm -f "$(local_sprint_file "$1")"; log "🗑 sprint $1 deleted" ;;
     url)      echo "docs/tasks/$1.md" ;;
     ref)      echo "$1" ;;
     sprint-create)
@@ -322,7 +325,63 @@ case "$cmd" in
     [ $# -ge 2 ] || { log "Usage: tracker.sh new <Epic|Story|Bug|Task> <summary> <body-file|text> [parent] [labels]"; exit 1; }
     backend new "$@"
     ;;
-  show|status|comment|describe|link|url|ref|list) backend "$cmd" "$@" ;;
+  show|status|comment|describe|link|url|ref|list|delete) backend "$cmd" "$@" ;;
+
+  selftest)
+    # Live end-to-end check of the configured tracker: create → link → sprint → move →
+    # close → clean up, exactly the calls /dp-deliver makes. --keep leaves the items.
+    KEEP=0; [ "${1:-}" = "--keep" ] && KEEP=1
+    T=$(effective_type); FAILS=0; STAMP=$(date '+%Y%m%d-%H%M%S'); E=""; K=""; SP=""
+    step() {  # step <label> <command...>  → ✅/❌ and keeps going
+      local label="$1"; shift
+      if OUT=$("$@" 2>&1); then printf '  ✅ %s\n' "$label"; return 0; fi
+      printf '  ❌ %s\n     %s\n' "$label" "$(printf '%s' "$OUT" | tail -2 | tr '\n' ' ')"; FAILS=$((FAILS + 1)); return 1
+    }
+    echo "── tracker self-test: $T ─────────────────────────────"
+    [ "$T" != "$(configured_type)" ] && echo "  ⚠️  $(configured_type) is configured but has no credentials — testing local instead"
+    step "connect (ping)" backend ping
+    if E=$(backend new Epic "[DevPilot self-test] epic $STAMP" "Created by tracker.sh selftest — safe to delete." 2>/dev/null) && [ -n "$E" ]; then
+      echo "  ✅ create Epic → $E"
+    else echo "  ❌ create Epic"; FAILS=$((FAILS + 1)); fi
+    if [ -n "$E" ] && K=$(backend new Story "[DevPilot self-test] story $STAMP" "$(printf '## Acceptance\n- self-test')" "$E" 2>/dev/null) && [ -n "$K" ]; then
+      echo "  ✅ create Story under the Epic → $K"
+    else echo "  ❌ create Story under the Epic"; FAILS=$((FAILS + 1)); fi
+    if [ -n "$K" ]; then
+      # Capture first: `… | grep -q` under pipefail fails on SIGPIPE even when it matches.
+      SHOW=$(backend show "$E" 2>/dev/null)
+      if [[ "$(printf '%s\n' "$SHOW" | sed -n '/^Children:/,$p')" == *"$K"* ]]; then echo "  ✅ Epic lists the Story as a child (dedup sees child tasks)"
+      else echo "  ❌ Epic does not list the Story as a child"; FAILS=$((FAILS + 1)); fi
+      FOUND=0
+      for _ in 1 2 3 4; do HITS=$(bash "$0" search "self-test story $STAMP" 2>/dev/null); [[ "$HITS" == *"$K"* ]] && { FOUND=1; break; }; sleep 5; done
+      [ "$FOUND" = 1 ] && echo "  ✅ search finds it (dedup)" || echo "  ⚠️  search did not find it yet (index delay is normal on Jira/GitHub — re-run later)"
+      if SP=$(backend sprint-create "devpilot-selftest-$STAMP" 2>/dev/null) && [ -n "$SP" ]; then echo "  ✅ create sprint → $SP"
+      else echo "  ❌ create sprint"; FAILS=$((FAILS + 1)); SP=""; fi
+      [ -n "$SP" ] && step "add the Story to the sprint" backend sprint-assign "$SP" "$K"
+      step "move to In Progress" backend status "$K" "In Progress"
+      step "comment" backend comment "$K" "DevPilot self-test comment"
+      step "update the description (brief)" backend describe "$K" "$(printf '## Brief\nUpdated by the self-test.')"
+      step "close the Story (Done)" backend status "$K" "Done"
+      bash "$0" close-parent "$E" >/dev/null 2>&1
+      EST=$(backend show "$E" 2>/dev/null | sed -n 's/^State:[[:space:]]*//p' | head -1 | tr '[:upper:]' '[:lower:]')
+      if [[ "$EST" =~ ^(done|closed|resolved|completed)$ ]]; then
+        echo "  ✅ Epic closes with its last Story"
+      else echo "  ❌ Epic did not close after its last Story"; FAILS=$((FAILS + 1)); fi
+      if [ -n "$SP" ]; then
+        R=$(backend sprint-close "$SP" 2>&1); RC=$?
+        if [ "$RC" = 0 ]; then echo "  ✅ close the sprint"
+        else echo "  ❌ close the sprint ($R)"; FAILS=$((FAILS + 1)); fi
+      fi
+    fi
+    if [ "$KEEP" = 0 ]; then
+      for X in $K $E; do backend delete "$X" >/dev/null 2>&1 || echo "  ⚠️  could not delete $X — remove it by hand"; done
+      [ -n "$SP" ] && { backend sprint-delete "$SP" >/dev/null 2>&1 || echo "  ⚠️  could not delete sprint $SP — remove it by hand"; }
+      echo "  🧹 test items removed"
+    else echo "  📌 kept: $E $K ${SP:+sprint $SP}"; fi
+    echo "──────────────────────────────────────────────────────"
+    if [ "$FAILS" = 0 ]; then echo "✅ $T works end to end — /dp-deliver can plan, sprint and close here."; exit 0; fi
+    echo "❌ $FAILS step(s) failed — usually permissions (create/transition/delete, sprint admin) or the board's workflow."
+    exit 1
+    ;;
 
   search)
     TEXT="${1:?Usage: tracker.sh search <text>}"

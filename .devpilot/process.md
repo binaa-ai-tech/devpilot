@@ -19,7 +19,7 @@ INTAKE → READY → SPRINT → BUILD → VERIFY → MERGE → RELEASE → OPERA
 | 4 | **Build** | `/dp-build` | One branch per sprint; layer agents stay in scope (`scope-guard`); every commit conventional, build never left red (`core-rules.md`). |
 | 5 | **Verify** | QA agent, `/dp-test` | Test cases derived per AC (`test-case-design.md`); pyramid respected (`test-strategy.md`: Vitest · xUnit + real SQL Server · Playwright UI journeys per `ui-e2e-playwright.md`); suites run token-lean via `scripts/run-tests.sh`; perf budgets proven when in scope (`performance.md`); QA verdict **PASS** per Story. |
 | 6 | **Merge** | `/dp-build` · `/dp-pr` | Version bumped from `develop`'s version (feature → minor, bug → patch) and the PR titled `[vX.Y.Z]`; the `auto-merge.md` gate ladder all green **on the PR head**; squash-merge; then items **Done**, Epic Done when its children are, sprint closed when empty (`close-delivery.sh`). Fix loop bounded; humans merge when `merge_policy: pr-only`. |
-| 7 | **Release** | `/dp-release` | Build once, promote the same artifact DEV→SIT→UAT→PRD (`release-ops.md`); PRD always has a human approval; rollback path tested (`/dp-release rollback`). |
+| 7 | **Release** | `/dp-release` | `devpilot-cd` builds once and promotes the same artifact DEV→SIT→UAT→PRD with smoke tests (`deploy.sh`, `smoke.sh`); UAT and PRD wait for a human approval; tag + `main` only after PRD is verified; rollback = the pipeline on the previous tag (`release-ops.md`). |
 | 8 | **Operate** | `/dp-hotfix` · `/dp-status` | Incidents get a blameless postmortem; action items return to Intake; SLOs watched (`release-ops.md`). |
 
 A failed gate sends work **back one phase**, never forward with a TODO.

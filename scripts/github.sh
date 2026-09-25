@@ -163,5 +163,15 @@ $TEXT"
     _api GET "repos/$SLUG/milestones?state=open" | jq -r '.[] | [.number, .state, .title] | @tsv'
     ;;
 
+  delete)   # REST cannot delete issues — close as not planned instead
+    N=$(_n "${1:?KEY}")
+    _api PATCH "repos/$SLUG/issues/$N" '{"state":"closed","state_reason":"not_planned"}' >/dev/null || exit 1
+    echo "🗑 GH-$N closed (issues cannot be deleted via the API)" >&2
+    ;;
+  sprint-delete)
+    _api DELETE "repos/$SLUG/milestones/${1:?milestone}" >/dev/null || exit 1
+    echo "🗑 milestone ${1} deleted" >&2
+    ;;
+
   *) echo "Usage: github.sh <ping|new|show|search|list|status|comment|describe|link|url|ref|sprint-*> …" >&2; exit 2 ;;
 esac

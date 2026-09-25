@@ -1,6 +1,6 @@
 # /dp-setup — Admin: configure DevPilot
 
-Usage: **/dp-setup [section]** — `fix` · `tracker [jira|azure|github|local]` · `models [profile]` · `wizard` · `index` · empty = show current config.
+Usage: **/dp-setup [section]** — `fix` · `tracker [jira|azure|github|local|test]` · `pipelines` · `models [profile]` · `wizard` · `index` · empty = show current config.
 
 One place to tune the team. Reads `project.config.md` as the source of truth.
 
@@ -52,9 +52,35 @@ bash scripts/tracker.sh setup azure  azdo_org_url=https://dev.azure.com/<org> az
 bash scripts/tracker.sh setup github github_token=<token>     # or just: gh auth login
 bash scripts/tracker.sh use local && bash scripts/tracker.sh skip   # no external tracker
 ```
+**Always finish with the live self-test** — it runs exactly the calls `/dp-deliver` makes against the
+real tracker (create Epic → Story under it → child visible → search → sprint → In Progress → comment
+→ description → Done → Epic closes → sprint closes) and deletes what it created:
+```bash
+bash scripts/tracker.sh selftest          # --keep leaves the test items for inspection
+```
+`/dp-setup tracker test` runs only this. Each ❌ names the step; the usual causes are permissions
+(create / transition / delete / manage sprints) or a custom workflow with no path to Done. Search
+⚠️ on Jira/GitHub is index delay — not a failure.
+
 Optional Azure values: `azdo_team` (default "<project> Team") and `azdo_story_type` (auto-detected:
 User Story · Product Backlog Item · Requirement · Issue). Then refresh the backlog map:
 `bash scripts/generate-backlog-index.sh`. Existing local items stay in `docs/tasks/` for reference.
+
+## pipelines — CI + CD + protection + environments (once per repo)
+Everything between "PR merged" and "live in production", for the git host (`scripts/git-host.sh`):
+```bash
+bash scripts/generate-ci.sh           # CI (gate ladder on PRs) + CD (build once → DEV → SIT → UAT → PRD)
+git add .github azure-pipelines*.yml && git commit -m "ci: devpilot CI/CD pipelines" && git push
+bash scripts/protect-branches.sh      # CI required on develop + main (GitHub protection / Azure policies)
+bash scripts/setup-environments.sh    # dev · sit · uat · prd — approvals on uat + prd
+```
+Then ask how each environment is deployed: a **deploy script** (`deploy/deploy.sh <env> <artifact-dir>
+<version>` — App Service, IIS, Kubernetes …; offer to write it with the user) or a **deploy webhook**
+(`DEPLOY_HOOK` secret per environment). Also collect `API_URL` / `FRONTEND_URL` per environment for
+the smoke test. Azure needs a PAT with Code (Read, write & manage) + Build (Read & execute) and project
+admin rights; without them each script prints the exact manual steps.
+**Why protection matters on Azure:** without a build-validation policy, `azdo.sh pr-complete` refuses to
+merge (CI would be skipped) unless `AZDO_ALLOW_UNPROTECTED=1`.
 
 ## models [profile] — switch the model assignment
 DevPilot runs on Claude only. Three **model modes** (recorded as `model_policy.model_mode`):

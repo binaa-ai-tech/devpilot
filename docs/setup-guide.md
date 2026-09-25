@@ -122,7 +122,9 @@ write), Code (Read & write), Build (Read)**. The Story type is detected from you
 bash scripts/tracker.sh setup azure azdo_org_url=https://dev.azure.com/<org> azdo_project=<project> azdo_pat=<token>
 ```
 `setup` stores the values in `.devpilot/config.sh` (gitignored), switches `tracker.type`, and tests
-the connection live. **CI or shared machines:** export the same names as environment variables
+the connection live. Then run the **self-test** — it performs every call a delivery makes on your real
+project (Epic → Story → sprint → Done → Epic + sprint closed) and deletes what it created:
+`bash scripts/tracker.sh selftest` (or `/dp-setup tracker test`). **CI or shared machines:** export the same names as environment variables
 (`JIRA_API_TOKEN`, `AZDO_PAT`, `GITHUB_TOKEN`, …) — they override the file.
 
 **Not configured?** The first `/dp-deliver` or `/dp-plan` asks once: *connect now* (paste the
@@ -138,6 +140,13 @@ same `AZDO_PAT` and use **auto-complete** (squash, delete branch, merge when pol
 brief → added to a sprint → `In Progress` with a start comment → after the PR merges, `Done` with
 the version + PR link, the Epic closed once all its Stories are Done, and the sprint closed once
 nothing in it is open. A QA **BLOCKED** comment is the only other one.
+
+**Pipelines (`/dp-setup pipelines`):** CI on every PR plus CD that **builds once** and promotes the same
+artifact `develop → DEV`, `release/* → SIT → UAT → PRD`, `hotfix/* → SIT → PRD`, with human approvals on
+UAT and PRD (`scripts/setup-environments.sh`). Deploys run `deploy/deploy.sh <env> <dir> <version>` from
+your repo, or call a `DEPLOY_HOOK` secret, then a smoke test against `API_URL` / `FRONTEND_URL`. On Azure
+Repos, `protect-branches.sh` applies the branch policies over the API (CI required, squash only, comments
+resolved; + 1 reviewer under `pr-only`), and PRs are never auto-completed into a branch without CI.
 
 **Versions:** every `/dp-deliver` PR bumps the version from `develop`'s current one — a feature
 bumps MINOR, a bug PATCH — in `VERSION`, `Directory.Build.props`, `package.json` and `*.csproj`

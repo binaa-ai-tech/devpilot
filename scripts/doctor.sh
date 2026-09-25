@@ -62,6 +62,15 @@ elif [ "$HOST" = "github" ] && [ "$(cfg merge_policy)" = "auto" ]; then
 else warn "${HOST_MSG#⚠️  }"
 fi
 
+# Delivery pipeline (CD) + deploy target
+if [ -f .github/workflows/devpilot-cd.yml ] || [ -f azure-pipelines-cd.yml ]; then
+  ok "CD pipeline present (build once → DEV → SIT → UAT → PRD)"
+  [ -f deploy/deploy.sh ] && ok "deploy target: deploy/deploy.sh" \
+    || ok "deploy target: DEPLOY_HOOK secrets in the pipeline (or add deploy/deploy.sh) — deploy.sh fails loudly if neither exists"
+else
+  warn "no CD pipeline — releases can't deploy: /dp-setup pipelines"
+fi
+
 # Versioning
 command -v bash >/dev/null && ok "version $(bash scripts/version.sh current 2>/dev/null) (bumped by every /dp-deliver PR: feature→minor, bug→patch)"
 

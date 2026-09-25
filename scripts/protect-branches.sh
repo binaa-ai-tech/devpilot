@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # =============================================================================
-# protect-branches.sh — enforce the gate ladder server-side via GitHub branch
-# protection: require the devpilot-ci check, block force-pushes and deletions.
+# protect-branches.sh — enforce the gate ladder server-side:
+#   GitHub      → branch protection: require the devpilot-ci check, block force-pushes/deletions
+#   Azure Repos → branch policies: devpilot-ci build validation, squash only, comments resolved
+#                 (+ 1 reviewer under pr-only); pushes must go through a PR
 #
 #   bash scripts/protect-branches.sh                  # protects base_branch + main
 #   bash scripts/protect-branches.sh develop release  # explicit branches
@@ -16,16 +18,34 @@ set -uo pipefail
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 cd "$ROOT" || exit 1
 
-# Azure Repos: branch policies (set once per repo, by a project admin).
+# Azure Repos: branch policies via REST (azdo.sh protect). Any required policy
+# also forces every change through a PR — direct and force pushes are rejected.
 if [ "$(bash "$ROOT/scripts/git-host.sh" 2>/dev/null)" = "azure" ]; then
   MP=$(grep '^merge_policy:' project.config.md 2>/dev/null | head -1 | awk '{print $2}')
-  echo "ℹ️  Azure Repos — set these branch policies on develop and main"
-  echo "    (Repos → Branches → … → Branch policies):"
-  echo "    • Build validation → pipeline from azure-pipelines.yml (devpilot-ci), Required, expire on push"
-  echo "    • Limit merge types → Squash merge only · Check for linked work items → Optional"
-  [ "${MP:-auto}" = "pr-only" ] && echo "    • Require a minimum number of reviewers → 1"
-  echo "    • Security → deny 'Force push' for Contributors"
-  echo "    DevPilot's PRs use auto-complete, so they merge the moment these policies pass."
+  BASE=$(grep '^base_branch:' project.config.md 2>/dev/null | head -1 | awk '{print $2}' | tr -d '"'); BASE="${BASE:-develop}"
+  REVIEWERS=0; [ "${MP:-auto}" = "pr-only" ] && REVIEWERS=1
+  BRANCHES=("$@"); [ ${#BRANCHES[@]} -eq 0 ] && { BRANCHES=("$BASE"); [ "$BASE" != "main" ] && BRANCHES+=("main"); }
+  manual() {
+    echo "ℹ️  Set these branch policies on ${BRANCHES[*]} by hand (Repos → Branches → … → Branch policies):"
+    echo "    • Build validation → the devpilot-ci pipeline (azure-pipelines.yml), Required"
+    echo "    • Limit merge types → Squash merge only · Comment resolution → Required"
+    [ "$REVIEWERS" -gt 0 ] && echo "    • Minimum number of reviewers → 1"
+    echo "    Automate it: a PAT with Code (Read, write & manage) + Build (Read & execute), project admin rights,"
+    echo "    then: bash scripts/protect-branches.sh"
+  }
+  if ! bash "$ROOT/scripts/azdo.sh" repo-id >/dev/null 2>&1; then manual; exit 0; fi
+  BUILD_ID=""
+  if [ -f azure-pipelines.yml ]; then
+    BUILD_ID=$(bash "$ROOT/scripts/azdo.sh" pipeline-ensure devpilot-ci azure-pipelines.yml 2>/dev/null) \
+      || echo "  ⚠️  devpilot-ci pipeline not created — commit azure-pipelines.yml to the default branch, then re-run"
+  fi
+  FAILED=0
+  for BR in "${BRANCHES[@]}"; do
+    git ls-remote --exit-code --heads origin "$BR" >/dev/null 2>&1 || { echo "  ⏭  $BR — not on origin, skipped"; continue; }
+    bash "$ROOT/scripts/azdo.sh" protect "$BR" --reviewers "$REVIEWERS" ${BUILD_ID:+--build "$BUILD_ID"} || FAILED=1
+  done
+  if [ "$FAILED" = 1 ]; then echo "  ⚠️  some policies could not be applied (needs project admin rights)"; manual; fi
+  echo "  DevPilot PRs use auto-complete: they merge the moment these policies pass."
   exit 0
 fi
 
