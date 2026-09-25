@@ -905,10 +905,12 @@ assert_eq "${UNUSED:-none}" "none" "every script, skill, prompt and template is 
 
 echo "== installer prints no shell errors (macOS bash 3.2 regressions) =="
 D=$(mktemp -d)
-( cd "$D" && git init -q -b develop && git remote add origin https://dev.azure.com/acme/Shop/_git/web \
+( cd "$D" && git init -q -b develop && git config user.email t@t.t && git config user.name t \
+  && git remote add origin https://dev.azure.com/acme/Shop/_git/web \
   && git commit -q --allow-empty -m init && echo '{"dependencies":{"@angular/core":"^21.0.0"}}' > package.json \
   && DEVPILOT_LOCAL="$REPO" bash "$REPO/install.sh" --defaults >"$D/out.log" 2>"$D/err.log" < /dev/null )
-ERRS=$(grep -E 'syntax error|No such file or directory|command not found|unexpected token' "$D/out.log" "$D/err.log" | head -3)
+[ -s "$D/out.log" ] && ok "installer ran" || no "installer ran (no output — setup failed)"
+ERRS=$(grep -E 'syntax error|No such file or directory|command not found|unexpected token' "$D/out.log" "$D/err.log" 2>/dev/null | head -3)
 assert_eq "${ERRS:-none}" "none" "installer runs without shell errors"
 assert_contains "$(cat "$D/project.config.md")" '`/dp-deliver resume`' "config comment keeps its backticked command"
 assert_contains "$(cat "$D/out.log")" "Azure Repos" "summary shows the git host"
