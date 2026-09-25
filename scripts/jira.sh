@@ -4,7 +4,7 @@
 # Call it through tracker.sh; the interface is shared by every backend.
 #
 #   ping                                   verify credentials + project
-#   new <Epic|Story|Bug|Task> <summary> <body-file|text> [parent] [labels,csv]  → KEY
+#   new <Epic|Story|Bug|Task|Subtask> <summary> <body-file|text> [parent] [labels,csv]  → KEY
 #   show <KEY>                             details + child items
 #   search <text>                          TSV candidates (dedup)
 #   list                                   TSV of the whole project (backlog index)
@@ -96,12 +96,13 @@ case "$cmd" in
       Story) TRY="Story Task" ;;
       Bug)   TRY="Bug Task" ;;
       Epic)  TRY="Epic" ;;
+      Subtask) TRY="Subtask Sub-task" ;;
       *)     TRY="Task" ;;
     esac
     KEY=""
     for T in $TRY; do
       L="$LABELS"
-      [ "$T" != "$TYPE" ] && L=$(printf '%s' "$(echo "$TYPE" | tr '[:upper:]' '[:lower:]')${LABELS:+,$LABELS}")
+      [ "$T" != "$TYPE" ] && [ "$TYPE" != "Subtask" ] && L=$(printf '%s' "$(echo "$TYPE" | tr '[:upper:]' '[:lower:]')${LABELS:+,$LABELS}")
       if RESP=$(_req POST "$API/issue" "$(mk "$T" "$L")" 2>/dev/null); then
         KEY=$(echo "$RESP" | jq -r '.key // empty'); [ -n "$KEY" ] && break
       fi

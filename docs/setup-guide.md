@@ -148,6 +148,10 @@ your repo, or call a `DEPLOY_HOOK` secret, then a smoke test against `API_URL` /
 Repos, `protect-branches.sh` applies the branch policies over the API (CI required, squash only, comments
 resolved; + 1 reviewer under `pr-only`), and PRs are never auto-completed into a branch without CI.
 
+**Secrets:** `secrets.provider: keychain` or `azure-keyvault` keeps tokens out of files entirely (§6).
+**Cost per delivery:** the installer registers a Claude Code hook (`scripts/usage-hook.sh`) that records
+token usage per work item; `/dp-status metrics` shows it, with cost once `pricing` is filled in.
+
 **Versions:** every `/dp-deliver` PR bumps the version from `develop`'s current one — a feature
 bumps MINOR, a bug PATCH — in `VERSION`, `Directory.Build.props`, `package.json` and `*.csproj`
 `<Version>`. The PR title carries it (`[v1.4.0] …`); `/dp-release sit` releases exactly that
@@ -199,7 +203,9 @@ The standard process the team follows lives in `.devpilot/process.md`.
 | Model profile (recommended mode) | `/dp-setup models save` — or `bash scripts/model-profiles.sh apply save` |
 | One model for everything | `bash scripts/model-profiles.sh single claude-sonnet-5` |
 | Per-team models | edit `models.*` in `project.config.md` → `bash scripts/model-profiles.sh sync-agents` |
-| Tracker (Jira / Azure DevOps / GitHub / local) | `/dp-setup tracker` |
+| Tracker (Jira / Azure DevOps / GitHub / local) | `/dp-setup tracker` · test it: `/dp-setup tracker test` |
+| Where tokens are kept | `secrets.provider: file \| keychain \| azure-keyvault` in `project.config.md` |
+| CI/CD, approvals, deploy target | `/dp-setup pipelines` |
 | Agents, merge policy, versioning | edit `project.config.md` (one line each) or `/dp-setup wizard` |
 | Update DevPilot itself | `bash install.sh --update` — never touches `project.config.md` or credentials |
 | Update every repo in your org | `bash scripts/update-org.sh <org> --merge` (from the devpilot clone) — clones each repo, runs `--update` on the base branch, opens/merges one PR per repo; `--install-missing` fresh-installs with defaults where devpilot isn't present. **Never delete + re-install** — that loses per-project config; `--update` exists precisely so you don't have to. |

@@ -23,6 +23,14 @@ tracker:
   type: local                    # local | jira | azure | github
   when_unconfigured: ask         # ask | skip
 
+## Secrets — where API tokens / PATs are kept (URLs and project names stay in .devpilot/config.sh)
+# file (default, gitignored .devpilot/config.sh) | keychain (macOS Keychain / Linux Secret Service)
+# | azure-keyvault (az CLI; set vault). Environment variables always win (CI).
+
+secrets:
+  provider: file                 # file | keychain | azure-keyvault
+  vault: ""                      # Key Vault name when provider = azure-keyvault
+
 ## Git host — where PRs are opened and merged
 # auto (from the origin remote) | github | azure (Azure Repos)
 git_host: auto
@@ -111,3 +119,12 @@ models:
 ## Usage limits
 # When a run hits a Claude usage limit it checkpoints to docs/tasks/<KEY>-checkpoint.json
 # and stops cleanly; `/dp-deliver resume` continues from the exact phase once the limit resets.
+
+## Pricing — optional: cost per delivery in /dp-status metrics
+# USD per million tokens as "input/output", from your Anthropic price sheet. Empty → tokens only.
+# Usage is recorded by the Claude Code hook scripts/usage-hook.sh (.claude/settings.json).
+
+pricing:
+  claude-opus-5-5: ""
+  claude-sonnet-5: ""
+  claude-haiku-4-5-20251001: ""

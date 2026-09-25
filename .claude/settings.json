@@ -3,7 +3,10 @@
     "SessionStart": [
       {
         "hooks": [
-          { "type": "command", "command": "bash scripts/session-start.sh" }
+          {
+            "type": "command",
+            "command": "bash scripts/session-start.sh"
+          }
         ]
       }
     ],
@@ -11,7 +14,30 @@
       {
         "matcher": "Edit|Write|MultiEdit",
         "hooks": [
-          { "type": "command", "command": "bash scripts/scope-hook.sh" }
+          {
+            "type": "command",
+            "command": "bash scripts/scope-hook.sh"
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/usage-hook.sh"
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/usage-hook.sh"
+          }
         ]
       }
     ]

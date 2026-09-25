@@ -117,6 +117,19 @@ fetch_summary() {
 # NEVER touches your settings: project.config.md, .devpilot/config.sh,
 # and CLAUDE.md are left exactly as they are.
 # (Keep these lists in sync with STEP 9.)
+# Add the token-usage hook to an existing .claude/settings.json (never overwrites anything).
+ensure_usage_hook() {
+  [ -f .claude/settings.json ] && command -v jq >/dev/null 2>&1 || return 0
+  grep -q 'usage-hook.sh' .claude/settings.json && return 0
+  local tmp; tmp=$(mktemp)
+  if jq '.hooks = (.hooks // {})
+         | .hooks.Stop = ((.hooks.Stop // []) + [{hooks:[{type:"command",command:"bash scripts/usage-hook.sh"}]}])
+         | .hooks.SessionEnd = ((.hooks.SessionEnd // []) + [{hooks:[{type:"command",command:"bash scripts/usage-hook.sh"}]}])' \
+       .claude/settings.json > "$tmp" 2>/dev/null; then
+    mv "$tmp" .claude/settings.json; info "Token-usage hook added to .claude/settings.json (cost per delivery: /dp-status metrics)"
+  else rm -f "$tmp"; fi
+}
+
 run_update() {
   echo ""
   echo -e "${BOLD}  devpilot — update (config preserved)${RESET}"
@@ -129,7 +142,7 @@ run_update() {
   CHECKLISTS="feature.md bugfix.md hotfix.md"
   CMDS="dp-deliver.md dp-plan.md dp-sprint.md dp-build.md dp-test.md dp-pr.md dp-release.md dp-hotfix.md dp-status.md dp-setup.md"
   AGENTS_LIST="team-lead.md team-ba.md team-frontend.md team-dotnet.md team-qa.md"
-  SCRIPTS="git-flow.sh new-feature.sh resolve-model.sh model-profiles.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh devpilot-lib.sh tracker.sh jira.sh azdo.sh github.sh git-host.sh version.sh close-delivery.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy.sh smoke.sh setup-environments.sh generate-project-index.sh generate-backlog-index.sh md-to-adf.sh"
+  SCRIPTS="git-flow.sh new-feature.sh resolve-model.sh model-profiles.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh devpilot-lib.sh tracker.sh jira.sh azdo.sh github.sh git-host.sh version.sh close-delivery.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy.sh smoke.sh setup-environments.sh db-package.sh usage-hook.sh generate-project-index.sh generate-backlog-index.sh md-to-adf.sh"
 
   info "Refreshing .devpilot/rules..."
   fetch ".devpilot/rules.md" ".devpilot/rules.md"
@@ -179,6 +192,8 @@ run_update() {
   # defaults — re-sync it from the user's project.config.md so their chosen
   # profile / wizard model assignments survive the update.
   [ -f project.config.md ] && bash scripts/model-profiles.sh sync-agents 2>/dev/null || true
+
+  ensure_usage_hook
 
   # Secrets + per-developer state stay out of git (config.sh may now hold Azure/Jira keys).
   touch .gitignore
@@ -236,13 +251,13 @@ echo ""
 section "STEP 1/6 · System scan — AI tools"
 
 HAS_CLAUDE=false
-HAS_GH=false
 HAS_GIT=false
 
 command -v claude       &>/dev/null && HAS_CLAUDE=true       && echo "  ✅ claude       — Claude Code CLI"           || echo "  ❌ claude       — not found (DevPilot runs on Claude Code: https://claude.ai/code)"
-command -v gh           &>/dev/null && HAS_GH=true           && echo "  ✅ gh           — GitHub CLI (PR automation)" || echo "  ❌ gh           — not found (install for PR automation)"
+command -v gh           &>/dev/null                          && echo "  ✅ gh           — GitHub CLI (PR automation)" || echo "  ⚠️  gh           — not found (only for GitHub PRs from a terminal; Azure Repos and Claude Code on the web don't need it)"
 command -v git          &>/dev/null && HAS_GIT=true          && echo "  ✅ git"                                        || echo "  ❌ git          — REQUIRED"
-command -v jq           &>/dev/null                          && echo "  ✅ jq"                                        || echo "  ⚠️  jq           — not found (some scripts limited)"
+command -v jq           &>/dev/null                          && echo "  ✅ jq"                                        || echo "  ❌ jq           — not found (needed for Jira / Azure DevOps / GitHub and PR automation)"
+command -v curl         &>/dev/null                          && echo "  ✅ curl"                                      || echo "  ❌ curl         — not found (needed for Jira / Azure DevOps / GitHub)"
 
 if [ "$HAS_GIT" = false ]; then
   echo ""
@@ -728,6 +743,7 @@ if [ ! -f ".claude/settings.json" ]; then
   info ".claude/settings.json created (SessionStart hook → scripts/session-start.sh)"
 else
   info ".claude/settings.json exists — to enable the warm-up hook, add a SessionStart entry running: bash scripts/session-start.sh"
+  ensure_usage_hook
 fi
 
 # CLAUDE.md — project context for Claude Code
@@ -742,7 +758,7 @@ for f in git-flow.sh new-feature.sh resolve-model.sh model-profiles.sh preflight
           devpilot-config.sh devpilot-lib.sh tracker.sh jira.sh azdo.sh github.sh git-host.sh version.sh close-delivery.sh \
           open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh \
           doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh \
-          deploy.sh smoke.sh setup-environments.sh \
+          deploy.sh smoke.sh setup-environments.sh db-package.sh usage-hook.sh \
           generate-project-index.sh generate-backlog-index.sh md-to-adf.sh; do
   fetch "scripts/$f" "scripts/$f"
   chmod +x "scripts/$f" 2>/dev/null || true
@@ -799,6 +815,11 @@ tracker:
 ## Git host — auto (from origin) | github | azure
 git_host: auto
 
+## Secrets — where tokens live: file (.devpilot/config.sh) | keychain | azure-keyvault
+secrets:
+  provider: file
+  vault: ""
+
 ## Merge Policy
 # auto    — devpilot squash-merges the PR into base_branch automatically
 # pr-only — devpilot opens the PR and stops; a human merges it
@@ -809,6 +830,12 @@ merge_policy: $MERGE_POLICY
 
 versioning:
   bump: auto                     # auto | off
+
+## Pricing — optional: USD per million tokens "input/output" → cost per delivery in /dp-status metrics
+pricing:
+  claude-opus-5-5: ""
+  claude-sonnet-5: ""
+  claude-haiku-4-5-20251001: ""
 
 ## Docs Language
 # Human language for BA/QA/review docs. Code & commits stay English.

@@ -60,13 +60,16 @@ Wait for the SIT job/stage and report its result.
    PRD failed → stop, do not tag; offer `/dp-release rollback`.
 3. PRD green → finish the release so `main` and the tag match exactly what is live:
    ```bash
-   bash scripts/changelog.sh <VERSION>
-   git add CHANGELOG.md && git commit -m "docs(changelog): v<VERSION>" || true
+   bash scripts/changelog.sh <VERSION>          # docs/changes/* entries → "## v<VERSION>" section
+   git add -A CHANGELOG.md docs/changes && git commit -m "docs(changelog): v<VERSION>" || true
    bash scripts/git-flow.sh release-finish <VERSION>      # → main + tag v<VERSION> + back into develop
    ```
-4. Release notes on the shipped items (they were closed at merge time):
-   `bash scripts/tracker.sh comment <KEY> "🚀 Released to production in v<VERSION>"` for each item in
-   the CHANGELOG's v<VERSION> section.
+4. Release notes on the shipped items (they were closed at merge time) — the changelog knows them:
+   ```bash
+   for KEY in $(bash scripts/changelog.sh keys <VERSION>); do
+     bash scripts/tracker.sh comment "$KEY" "🚀 Released to production in v<VERSION>"
+   done
+   ```
 
 **Report:** production URL, tag `v<VERSION>`, run link, items noted.
 

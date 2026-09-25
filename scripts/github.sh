@@ -61,7 +61,7 @@ case "$cmd" in
 
   new)
     TYPE="${1:?type}"; SUMMARY="${2:?summary}"; BODY="${3:-}"; PARENT="${4:-}"; LABELS="${5:-}"
-    LBL=$(echo "$TYPE" | tr '[:upper:]' '[:lower:]')
+    LBL=$(echo "$TYPE" | tr '[:upper:]' '[:lower:]'); [ "$LBL" = "subtask" ] && LBL="task"
     TITLE="$SUMMARY"; [ "$TYPE" = "Epic" ] && TITLE="[Epic] $SUMMARY"
     TEXT=$(_text_or_file "${BODY:-_(created by DevPilot)_}")
     [ -n "$PARENT" ] && TEXT="Parent: #$(_n "$PARENT")

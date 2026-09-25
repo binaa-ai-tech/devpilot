@@ -6,7 +6,7 @@
 
 You write what you need in one sentence. DevPilot plans it, writes the code, tests it, reviews it, and merges it.
 
-[![Version](https://img.shields.io/badge/version-5.2.0-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-5.3.0-blue.svg)](VERSION)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#license)
 [![Runs on](https://img.shields.io/badge/runs%20on-Claude%20Code-7c3aed.svg)](#what-you-need)
 [![Stack](https://img.shields.io/badge/stack-Angular%20%7C%20.NET%20%7C%20SQL%20Server-orange.svg)](#what-you-need)
@@ -136,7 +136,8 @@ You never call the AI agents directly. The commands start them for you.
    ├─ 0. TRACKER  Checks Jira / Azure DevOps / GitHub is connected. If not, asks once:
    │              connect it now (paste the API key) or continue without a tracker.
    ├─ 1. PLAN     Writes the story + acceptance criteria. Searches the tracker for duplicates and
-   │              opens the closest matches' child tasks. Creates Epic → Story BEFORE any code.
+   │              opens the closest matches' child tasks. Creates Epic → Story BEFORE any code,
+   │              plus one task per layer: [BE] · [FE] · [DB] · [QA].
    ├─ 2. SPRINT   New feature → its own sprint.  Bug → the current sprint.
    │              Critical production bug (P0/P1) → stops and tells you to use /dp-hotfix.
    ├─ 3. DESIGN   Tech Lead lists the files to change, the API shape, and which tests are needed.
@@ -144,6 +145,7 @@ You never call the AI agents directly. The commands start them for you.
    ├─ 5. TEST     Unit tests · API tests on real SQL Server · browser tests (Playwright)
    ├─ 6. REVIEW   Code quality · security · performance · every changed file has a test
    ├─ 7. VERSION  Bumps develop's version: feature 1.4.0 → 1.5.0 · bug 1.4.0 → 1.4.1
+   │              + a changelog entry for each story
    ├─ 8. MERGE    PR "[v1.5.0] Add CSV export (PROJ-12)" into develop, merged when all checks pass
    ├─ 9. CLOSE    Stories → Done · Epic → Done (when all its stories are) · sprint → closed
    │              · you're back on develop with the latest code
@@ -202,6 +204,15 @@ Set it up once per repository with `/dp-setup pipelines`.
 | `/dp-release uat` | Deploys the tested SIT build to UAT |
 | `/dp-release prd` | Merges to `main`, tags `v<version>`, and deploys to production **after you approve** |
 | `/dp-release rollback` | Redeploys the previous version to production (shows the plan first, still needs approval) |
+
+**Two deliveries at the same time?** CI checks that each pull request's version is newer than `develop`'s. If another delivery merged first,
+`/dp-pr` bumps the version again, so two releases never share a number.
+
+**Release notes are automatic.** Each delivery adds its own entry file under `docs/changes/`, so pull requests never conflict on `CHANGELOG.md`.
+At `/dp-release prd` the entries become the version's section, and every shipped ticket gets a "Released in vX" comment.
+
+**Database changes** ship as a package in every build: `migrations.sql` (safe to run more than once), `rollback.sql` (back to the
+previous release's schema) and `migrations.txt` (what this release changes), ready for DBAs and change boards.
 
 **Version numbers are automatic.** Every `/dp-deliver` bumps develop's version (new feature → `1.4.0` → `1.5.0`,
 bug fix → `1.4.0` → `1.4.1`) in `package.json`, `.csproj` / `Directory.Build.props` and `VERSION`. `/dp-release sit`
@@ -265,6 +276,23 @@ language: en                  # language for requirement and test documents (cod
 
 model_policy:
   coding_profile: auto        # auto | balanced | save  (see below)
+```
+
+**Keeping API keys safe.** Tokens are stored in `.devpilot/config.sh`, which is never committed. You can keep them somewhere safer instead:
+
+```yaml
+secrets:
+  provider: keychain          # file (default) | keychain (macOS Keychain / Linux keyring) | azure-keyvault
+  vault: ""                   # your Key Vault name, when provider is azure-keyvault
+```
+Environment variables always win, which is what CI uses.
+
+**Cost per delivery.** A Claude Code hook records the tokens used by every session, attributed to the ticket from the branch name.
+`/dp-status metrics` shows tokens per ticket and model. Add your prices to see the cost too:
+
+```yaml
+pricing:
+  claude-sonnet-5: "<input>/<output>"   # USD per million tokens, from your Anthropic price sheet
 ```
 
 **Claude models.** DevPilot picks the model for each task:

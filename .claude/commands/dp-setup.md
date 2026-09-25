@@ -82,6 +82,12 @@ admin rights; without them each script prints the exact manual steps.
 **Why protection matters on Azure:** without a build-validation policy, `azdo.sh pr-complete` refuses to
 merge (CI would be skipped) unless `AZDO_ALLOW_UNPROTECTED=1`.
 
+## secrets — where tokens / PATs live
+`project.config.md → secrets.provider`: `file` (default, gitignored `.devpilot/config.sh`), `keychain`
+(macOS Keychain / Linux Secret Service via `secret-tool`), or `azure-keyvault` (`az login` +
+`secrets.vault`). Set it **before** `/dp-setup tracker` — `tracker.sh setup` then stores the token in the
+provider and only the URLs / project names in config.sh. Environment variables always win (CI).
+
 ## models [profile] — switch the model assignment
 DevPilot runs on Claude only. Three **model modes** (recorded as `model_policy.model_mode`):
 | Mode | What it means | How to set |

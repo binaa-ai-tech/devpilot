@@ -227,7 +227,7 @@ D=$(sandbox); mkdir -p "$D/out"; echo 3.1.0 > "$D/out/VERSION"
 OUT=$(cd "$D" && bash scripts/deploy.sh sit out 2>&1); RC=$?
 assert_code "$RC" "1" "deploy with no target fails loudly (never a fake success)"
 assert_contains "$OUT" "DEPLOY_HOOK" "deploy explains how to add a target"
-assert_code "$(cd "$D" && CI= TF_BUILD= bash scripts/deploy.sh prd out >/dev/null 2>&1; echo $?)" "1" "production from a terminal needs CONFIRM=1"
+assert_code "$(cd "$D" && CI='' TF_BUILD='' bash scripts/deploy.sh prd out >/dev/null 2>&1; echo $?)" "1" "production from a terminal needs CONFIRM=1"
 OUT=$(cd "$D" && DEPLOY_HOOK_SIT=https://hooks.example/sit PATH="$MOCKBIN:$PATH" bash scripts/deploy.sh sit out 2>&1); RC=$?
 assert_code "$RC" "0" "deploy via webhook"
 assert_contains "$OUT" "v3.1.0 live on SIT" "deploys the version stamped in the artifact"
@@ -247,7 +247,7 @@ assert_contains "$CD" "upload-artifact" "GitHub CD builds once and uploads the a
 assert_contains "$CD" "bash scripts/deploy.sh prd out" "GitHub CD promotes the same artifact to prd"
 assert_contains "$CD" "name: prd" "prd runs in the approval-gated environment"
 assert_contains "$CD" "needs.uat.result == 'success'" "prd only after UAT on release branches"
-assert_contains "$CD" "migrations script --idempotent" "CD ships an idempotent EF migration script"
+assert_contains "$CD" "bash scripts/db-package.sh out/db" "CD ships the database package (migrations + rollback)"
 assert_contains "$CD" "workflow_dispatch" "manual run on a tag = redeploy / rollback"
 ( cd "$D" && git remote add origin https://dev.azure.com/a/P/_git/r && bash scripts/generate-ci.sh >/dev/null 2>&1 )
 AZCD="$(cat "$D/azure-pipelines-cd.yml" 2>/dev/null)"
@@ -266,6 +266,62 @@ for F in deploy-dev deploy-sit deploy-uat deploy-prd; do
 done
 rm -rf "$D" "$MOCKBIN"
 
+echo "== db-package.sh (fake dotnet) =="
+D=$(sandbox); FK=$(mktemp -d)
+cat > "$FK/dotnet" <<'EOF'
+#!/usr/bin/env bash
+echo "dotnet $*" >> "$FAKE_LOG"; o=""; while [ $# -gt 0 ]; do [ "$1" = "--output" ] && o="$2"; shift; done
+[ -n "$o" ] && echo "-- sql" > "$o"; exit 0
+EOF
+chmod +x "$FK/dotnet"; export FAKE_LOG="$D/dotnet.log"
+( cd "$D" && mkdir -p src/Infra/Migrations && touch src/Infra/Infra.csproj src/Infra/Migrations/20260101000000_Init.cs \
+    src/Infra/Migrations/20260101000000_Init.Designer.cs src/Infra/Migrations/AppDbContextModelSnapshot.cs \
+  && git add -A && git commit -qm "feat: init" && git tag v1.0.0 \
+  && touch src/Infra/Migrations/20260301000000_AddCsv.cs && git add -A && git commit -qm "feat: csv" )
+OUT=$(cd "$D" && PATH="$FK:$PATH" bash scripts/db-package.sh out/db --project src/Infra/Infra.csproj 2>&1)
+assert_contains "$OUT" "1 new migration(s) since v1.0.0" "db package diffs migrations against the previous release"
+assert_contains "$(cat "$D/out/db/migrations.txt")" "20260301000000_AddCsv" "migrations.txt lists this release's migrations"
+assert_contains "$(cat "$FAKE_LOG")" "migrations script --idempotent" "idempotent migrations.sql"
+assert_contains "$(cat "$FAKE_LOG")" "migrations script 20260301000000_AddCsv 20260101000000_Init" "rollback.sql goes back to the previous release (Designer/snapshot ignored)"
+( cd "$D" && git tag v1.1.0 && rm -rf out ); OUT=$(cd "$D" && git commit -q --allow-empty -m "fix: x" && PATH="$FK:$PATH" bash scripts/db-package.sh out/db 2>&1)
+assert_contains "$OUT" "rollback: none" "no schema change → no rollback script"
+unset FAKE_LOG; rm -rf "$D" "$FK"
+
+echo "== usage-hook.sh + metrics (cost per delivery) =="
+D=$(sandbox); TR="$D/t.jsonl"; mkdir -p "$D/t/subagents"
+for _ in 1 2 3; do echo '{"type":"assistant","message":{"id":"m1","model":"claude-sonnet-5","usage":{"input_tokens":100,"output_tokens":1000000,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}' >> "$TR"; done
+echo '{"type":"user","message":{"content":"hi"}}' >> "$TR"
+echo '{"type":"assistant","message":{"id":"s1","model":"claude-haiku-4-5-20251001","usage":{"input_tokens":5,"output_tokens":7}}}' > "$D/t/subagents/agent-1.jsonl"
+( cd "$D" && git commit -q --allow-empty -m base && git checkout -q -b feature/ado-345-csv \
+  && printf '{"session_id":"s-1","transcript_path":"%s","hook_event_name":"SessionEnd","cwd":"%s"}' "$TR" "$D" | bash scripts/usage-hook.sh )
+U="$D/.devpilot/logs/usage/s-1.json"
+assert_eq "$(jq -r .key "$U" 2>/dev/null)" "ADO-345" "usage attributed to the branch's work item"
+assert_eq "$(jq -r '.models[] | select(.model=="claude-sonnet-5") | .output' "$U" 2>/dev/null)" "1000000" "a message repeated in the transcript is counted once"
+assert_eq "$(jq -r '.models[] | select(.model|startswith("claude-haiku")) | .output' "$U" 2>/dev/null)" "7" "subagent usage included"
+printf 'pricing:\n  claude-sonnet-5: "3/15"\n' >> "$D/project.config.md"
+assert_contains "$(cd "$D" && bash scripts/metrics.sh usage)" '$15.00' "metrics prices output tokens per model"
+assert_contains "$(cat "$REPO/.claude/settings.json")" "usage-hook.sh" "usage hook registered (Stop + SessionEnd)"
+rm -rf "$D"
+
+echo "== secrets provider (keychain via secret-tool) =="
+D=$(sandbox); FK=$(mktemp -d); cp "$REPO/tests/fake-secret-tool.sh" "$FK/secret-tool"; chmod +x "$FK/secret-tool"; export FAKE_STORE="$D/store"
+printf 'tracker:\n  type: local\nsecrets:\n  provider: keychain\n' > "$D/project.config.md"
+( cd "$D" && PATH="$FK:/usr/bin:/bin" bash scripts/tracker.sh setup azure azdo_org_url=https://dev.azure.com/a azdo_project=P azdo_pat=s3cret >/dev/null 2>&1 )
+assert_eq "$(grep -c s3cret "$D/.devpilot/config.sh" 2>/dev/null)" "0" "PAT is not written to config.sh"
+assert_contains "$(cat "$D/.devpilot/config.sh")" "AZDO_ORG_URL" "non-secret values still go to config.sh"
+assert_eq "$(cd "$D" && PATH="$FK:/usr/bin:/bin" bash -c '. scripts/devpilot-lib.sh; dp_load_secrets; echo "$AZDO_PAT"')" "s3cret" "PAT read back from the keychain"
+assert_eq "$(cd "$D" && AZDO_PAT=env PATH="$FK:/usr/bin:/bin" bash -c '. scripts/devpilot-lib.sh; dp_load_secrets; echo "$AZDO_PAT"')" "env" "environment still wins over the keychain"
+unset FAKE_STORE; rm -rf "$D" "$FK"
+
+echo "== layer tasks: Jira sub-tasks under a Story (mocked) =="
+MOCKBIN=$(mktemp -d); cp "$REPO/tests/mock-curl.sh" "$MOCKBIN/curl"; chmod +x "$MOCKBIN/curl"
+D=$(sandbox); export MOCK_LOG="$D/mock.log"; mkdir -p "$D/.devpilot"
+printf 'JIRA_BASE_URL="https://acme.atlassian.net"\nJIRA_EMAIL="d@a.io"\nJIRA_API_TOKEN=t\nJIRA_PROJECT_KEY="MSK"\n' > "$D/.devpilot/config.sh"
+( cd "$D" && bash scripts/tracker.sh use jira 2>/dev/null && PATH="$MOCKBIN:$PATH" bash scripts/tracker.sh breakdown MSK-7 backend,frontend "CSV" >/dev/null 2>&1 )
+assert_contains "$(cat "$MOCK_LOG")" '"issuetype":{"name":"Subtask"}' "Jira layer tasks are sub-tasks of the Story"
+assert_contains "$(cat "$MOCK_LOG")" '"summary":"[FE]CSV"' "one [FE] task (summary spaces stripped by the mock log)"
+unset MOCK_LOG; rm -rf "$D" "$MOCKBIN"
+
 echo "== close-delivery.sh (after merge) =="
 D=$(sandbox)
 ( cd "$D" && git commit -q --allow-empty -m base && git branch -M develop && git checkout -q -b feature/local-2-csv \
@@ -273,12 +329,17 @@ D=$(sandbox)
 E=$(cd "$D" && bash scripts/tracker.sh new Epic "Reports" "g" 2>/dev/null)
 K=$(cd "$D" && bash scripts/tracker.sh new Story "CSV" "a" "$E" 2>/dev/null)
 SP=$(cd "$D" && bash scripts/tracker.sh sprint create "S1" 2>/dev/null); ( cd "$D" && bash scripts/tracker.sh sprint assign "$SP" "$K" 2>/dev/null )
+OUT=$(cd "$D" && bash scripts/close-delivery.sh --prepare --version 1.3.0 --sprint "$SP" "$K" 2>/dev/null); RC=$?
+assert_code "$RC" "0" "local tracker: close-delivery --prepare closes items inside the PR"
+assert_contains "$(cd "$D" && git diff --cached --name-only)" "docs/tasks/$K.md" "closed items are staged for the PR"
+( cd "$D" && git commit -qm "chore: deliver" && git checkout -q develop && git merge -q feature/local-2-csv && git checkout -q feature/local-2-csv )
 OUT=$(cd "$D" && bash scripts/close-delivery.sh --pr https://x/pr/1 --version 1.3.0 --sprint "$SP" "$K" 2>/dev/null); RC=$?
-assert_code "$RC" "0" "close-delivery succeeds"
+assert_code "$RC" "0" "close-delivery after merge succeeds"
+assert_contains "$OUT" "closed inside the merged PR" "local tracker: nothing changes on develop after merge"
 assert_contains "$(cat "$D/docs/tasks/$K.md")" "Status: Done" "Story closed"
 assert_contains "$(cat "$D/docs/tasks/$K.md")" "v1.3.0" "merged comment carries the version"
 assert_contains "$(cat "$D/docs/tasks/$E.md")" "Status: Done" "Epic closed with its last Story"
-assert_contains "$OUT" "sprint: closed" "sprint closed when empty"
+assert_contains "$(cat "$D/docs/sprints/$SP.md")" "State: closed" "sprint closed when empty"
 assert_eq "$(cd "$D" && git branch --show-current)" "develop" "back on develop after the merge"
 rm -rf "$D"
 
@@ -396,7 +457,7 @@ OUT=$( cd "$D" && bash scripts/protect-branches.sh 2>/dev/null ); RC=$?
 assert_code "$RC" "0" "protect-branches on Azure exits 0"
 assert_contains "$OUT" "Build validation" "protect-branches explains Azure branch policies"
 # notify: unconfigured → silent success + durable log
-( cd "$D" && bash scripts/notify.sh done "sprint built" >/dev/null 2>&1 ); RC=$?
+( cd "$D" && bash scripts/notify.sh "done" "sprint built" >/dev/null 2>&1 ); RC=$?
 assert_code "$RC" "0" "notify exits 0 when unconfigured"
 assert_contains "$(cat "$D/docs/tasks/notifications.log" 2>/dev/null)" "sprint built" "notify always logs the event"
 # protect-branches: degrades gracefully without gh auth

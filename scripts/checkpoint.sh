@@ -43,7 +43,6 @@ CHECKPOINT_DIR="docs/tasks"
 
 RED="\033[0;31m"
 GREEN="\033[0;32m"
-YELLOW="\033[1;33m"
 RESET="\033[0m"
 
 error() { echo -e "${RED}[checkpoint] ERROR:${RESET} $*" >&2; exit 1; }

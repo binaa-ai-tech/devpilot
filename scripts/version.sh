@@ -12,6 +12,9 @@
 #                                      bug|issue|fix|chore|docs → patch, breaking → major
 #                                      (several intents → the highest)
 #   files                              the files that carry the version
+#   verify --ref <target>              exit 1 unless this branch's version is AHEAD of the
+#                                      target's — CI runs it on every PR so two PRs cut from
+#                                      the same develop can never ship the same version
 #
 # Source of truth, first found: VERSION · Directory.Build.props · package.json
 # (root, then ≤3 levels deep) · *.csproj <Version>. No version anywhere → 0.0.0,
@@ -110,6 +113,17 @@ case "$cmd" in
     NEW=$(next "${1:?Usage: version.sh bump <major|minor|patch|X.Y.Z> [--ref <git-ref>]}" "$(current "$REF")") || exit 1
     write_version "$NEW"
     echo "$NEW"
+    ;;
+  verify)
+    [ -n "$REF" ] || { echo "Usage: version.sh verify --ref <target-ref>" >&2; exit 2; }
+    MINE=$(current); THEIRS=$(current "$REF")
+    NEWER=$(printf '%s\n%s\n' "$MINE" "$THEIRS" | sort -t. -k1,1n -k2,2n -k3,3n | tail -1)
+    if [ "$MINE" != "$THEIRS" ] && [ "$NEWER" = "$MINE" ]; then
+      echo "✅ version $MINE is ahead of $REF ($THEIRS)"; exit 0
+    fi
+    echo "❌ version $MINE is not ahead of $REF ($THEIRS) — another delivery merged first." >&2
+    echo "   Re-bump from the target: bash scripts/version.sh bump <minor|patch> --ref $REF  (/dp-pr does this)" >&2
+    exit 1
     ;;
   level)
     L="patch"

@@ -27,8 +27,8 @@ jobs:
       - name: shellcheck (scripts)
         run: |
           sudo apt-get update -qq && sudo apt-get install -y shellcheck
-          # error-level gate: catch real bugs, not style nits. Sourced config excluded.
-          shellcheck -S error -e SC1090,SC1091 scripts/*.sh tests/*.sh
+          # warning-level gate: the scripts are warning-clean; keep them that way.
+          shellcheck -S warning -e SC1090,SC1091 scripts/*.sh tests/*.sh install.sh
 
       - name: bash syntax check
         run: |
@@ -39,21 +39,19 @@ jobs:
       - name: run test suite
         run: bash tests/run.sh
 
-  # ── Expensive pipeline — ONLY after merge to develop ─────────────────────────
-  # Gated so it never runs on the PR. Add real build/deploy/publish steps here;
-  # they execute once the merge into develop is complete.
-  deploy:
+  # ── End to end on a sample Angular + .NET repo (no AI needed) ─────────────────
+  # Installs DevPilot, runs the scripted /dp-deliver + /dp-release path (tracker,
+  # versioning, changelog, PR on mocked Azure Repos, close, release), generates the
+  # CI/CD pipelines and lints them with actionlint.
+  e2e:
     runs-on: ubuntu-latest
     needs: test
-    if: github.event_name == 'push' && github.ref == 'refs/heads/develop'
-    concurrency:
-      group: deploy-develop
-      cancel-in-progress: false
     steps:
       - uses: actions/checkout@v4
-
-      - name: deploy / publish (develop only)
+      - name: actionlint
         run: |
-          echo "Merged into develop — running the expensive pipeline."
-          echo "Add build, deploy, and publish steps here."
-          # e.g. ./scripts/deploy-dev.sh
+          curl -sSL https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz \
+            | tar -xz -C /usr/local/bin actionlint
+          actionlint -version
+      - name: e2e
+        run: bash tests/e2e.sh

@@ -57,7 +57,8 @@ For each unresolved thread:
 
 1. **Base moved?** Update the branch: `git pull --rebase origin $BASE_BRANCH` on a branch DevPilot
    created (merge instead on someone else's). **Keep the version exactly one step above base** —
-   if develop's version changed since the bump, redo it from the new base:
+   if develop's version changed since the bump (CI's `version.sh verify` step fails when another
+   delivery merged first), redo it from the new base:
    ```bash
    LEVEL=<minor|patch from the PR's items>
    WANT=$(bash scripts/version.sh next "$LEVEL" --ref "origin/$BASE_BRANCH")

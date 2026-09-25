@@ -47,8 +47,12 @@ bash scripts/tracker.sh sprint start "$SPRINT" 2>/dev/null || true
 for KEY in <STORY_KEYS>; do
   bash scripts/tracker.sh status "$KEY" "In Progress"
   bash scripts/tracker.sh comment "$KEY" "▶ Build started [$START_TIME] · Branch: $BRANCH · Sprint: $SPRINT"
+  bash scripts/tracker.sh breakdown "$KEY" "<layers of this Story>,qa" "<summary>" >/dev/null   # no-op if planned
 done
 ```
+Layer tasks follow the work: `[BE]`/`[DB]` → In Progress when `team-dotnet` starts, `[FE]` when
+`team-frontend` starts, `[QA]` when `team-qa` starts; each → **Done** when that agent reports green
+(`bash scripts/tracker.sh status <TASK> "In Progress" | "Done"`). Keys: `bash scripts/tracker.sh show <KEY>`.
 
 ---
 
@@ -108,6 +112,11 @@ git fetch origin "$BASE_BRANCH" -q
 LEVEL=$(bash scripts/version.sh level $INTENTS)           # any feature → minor, bugs only → patch
 VERSION=$(bash scripts/version.sh bump "$LEVEL" --ref "origin/$BASE_BRANCH")
 bash scripts/version.sh files | xargs git add
+# One changelog entry per Story — its own file, so parallel PRs never conflict on CHANGELOG.md
+for KEY in <STORY_KEYS>; do
+  bash scripts/changelog.sh add "$KEY" "<feat|fix per the Story's intent>" "<user-facing one-liner>" "$(bash scripts/tracker.sh url "$KEY")"
+done
+git add docs/changes
 git commit -m "chore(release): bump version to $VERSION"
 ```
 
@@ -124,6 +133,9 @@ git commit -m "chore(release): bump version to $VERSION"
 The last line lets `/dp-pr` finish the job (close items + sprint) on a later run.
 
 ```bash
+# Local tracker only: close the items INSIDE the PR (they are files in git; develop only
+# changes via PRs) — they become Done exactly when it merges. No-op for Jira/Azure/GitHub.
+bash scripts/close-delivery.sh --prepare --version "$VERSION" --sprint "$SPRINT" <STORY_KEYS>
 git add docs/ && git commit -m "docs($SPRINT_SLUG): plans, qa, review" || true
 TITLE="[v$VERSION] <summary> ($(for K in <STORY_KEYS>; do bash scripts/tracker.sh ref "$K"; done | paste -sd' ' -))"
 PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$TITLE" "docs/tasks/${SPRINT_SLUG}-pr.md" --items "<STORY_KEYS>"); PR_RC=$?
@@ -153,7 +165,7 @@ bash scripts/close-delivery.sh --pr "$PR_URL" --version "$VERSION" --sprint "$SP
 bash scripts/generate-backlog-index.sh
 bash scripts/notify.sh done "v$VERSION merged into $BASE_BRANCH — <N> item(s) · $PR_URL"
 ```
-`close-delivery.sh`: comment + **Done** on every Story → parent **Epic Done** when all its
+`close-delivery.sh`: any open layer task + comment + **Done** on every Story → parent **Epic Done** when all its
 children are → **sprint closed** when nothing in it is open (otherwise reported, left open) →
 checkout `develop`, pull, delete the merged branch locally. Unmerged (pr-only / red gate)? Keep
 the items In Progress: `bash scripts/notify.sh blocked "PR open, not merged — $PR_URL"`.

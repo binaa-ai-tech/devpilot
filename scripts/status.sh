@@ -25,8 +25,8 @@ files=("$DIR"/*.md)
 rows=0
 printf '%-22s %-12s %-12s %s\n' "KEY" "STATUS" "COMMAND" "BRANCH"
 printf '%-22s %-12s %-12s %s\n' "----------------------" "------------" "------------" "----------------------"
-# newest first by mtime (args are guaranteed non-empty, so ls -t is safe here)
-for f in $(ls -t "${files[@]}"); do
+# newest first by mtime; read line by line so paths with spaces survive
+while IFS= read -r f; do
   base=$(basename "$f" .md)
   case "$base" in *-checkpoint) continue;; esac
   key=$(field "$f" key);     key="${key:-$base}"
@@ -36,7 +36,7 @@ for f in $(ls -t "${files[@]}"); do
   if [ "$FILTER" = open ] && [ "$status" != "in-progress" ]; then continue; fi
   printf '%-22s %-12s %-12s %s\n' "$key" "$status" "$cmd" "$branch"
   rows=$((rows + 1))
-done
+done < <(ls -t -- "${files[@]}")
 
 echo ""
 INPROG=$(grep -ls '^status: in-progress' "$DIR"/*.md 2>/dev/null | grep -v checkpoint | wc -l | tr -d ' ')

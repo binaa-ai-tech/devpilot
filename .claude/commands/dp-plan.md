@@ -142,6 +142,14 @@ bash scripts/tracker.sh describe "$KEY" "$BRIEF"
 bash scripts/tracker.sh comment "$KEY" "📋 Planned [$START_TIME] · Verdict: <VERDICT> · Intent: $INTENT
 ACs: $AC_COUNT · Scope: <layers> · DoR: <ready|needs grooming> · Spec: <docs/requirements|docs/bugs>/$SLUG.md"
 ```
+**Break the Story into layer tasks** (not for Bugs) — one child per layer in scope, so the board
+shows who is doing what and later dedup can match at task level. Idempotent: an existing `[BE]` /
+`[FE]` / `[DB]` / `[QA]` child is reused (FOLD-IN / RELATED never duplicates a task):
+```bash
+TASK_KEYS=$(bash scripts/tracker.sh breakdown "$KEY" "<backend,frontend,db,qa — layers in scope + qa>" "$SUMMARY")
+```
+Jira → sub-tasks · Azure DevOps → Tasks under the Story · GitHub → sub-issues · local → child files.
+
 Items stay in **To Do** — planning does not start work.
 
 **Gate — planning is not done until a key exists:**

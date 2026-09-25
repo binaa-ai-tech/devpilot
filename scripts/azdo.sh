@@ -150,7 +150,7 @@ case "$cmd" in
     case "$TYPE" in
       Epic) WIT="Epic" ;;
       Bug)  ALL=$(_types); if printf '%s\n' "$ALL" | grep -qx "Bug"; then WIT="Bug"; else WIT=$(_story_type); TAGS="bug${TAGS:+,$TAGS}"; fi ;;
-      Task) WIT="Task" ;;
+      Task|Subtask) WIT="Task" ;;
       *)    WIT=$(_story_type) ;;
     esac
     HTML=$(_md_html "${BODY:- }")
@@ -415,7 +415,7 @@ case "$cmd" in
     }
     RC=0
     [ -n "$BUILD" ] && { upsert 0609b952-1397-4640-95ec-e00a01b2c241 "build validation: devpilot-ci required" true \
-      "$(jq -n --argjson d "$BUILD" '{buildDefinitionId:$d, displayName:"devpilot-ci", queueOnSourceUpdateOnly:false, manualQueueOnly:false, validDuration:720}')" || RC=1; }
+      "$(jq -n --argjson d "$BUILD" '{buildDefinitionId:$d, displayName:"devpilot-ci", queueOnSourceUpdateOnly:false, manualQueueOnly:false, validDuration:0}')" || RC=1; }
     upsert fa4e907d-c16b-4a4c-9dfa-4916e5d171ab "squash merge only" true \
       '{"allowSquash":true,"allowNoFastForward":false,"allowRebase":false,"allowRebaseMerge":false}' || RC=1
     upsert c6a1889d-b943-4856-b76f-9e46bb6b0df2 "review comments must be resolved" true '{}' || RC=1

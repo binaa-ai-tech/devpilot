@@ -35,6 +35,7 @@ The end-to-end SDLC contract (phases, gates, roles) lives in `.devpilot/process.
   VERSION → version.sh bump from develop (feature → minor · bug → patch)
   MERGE   → one PR "[vX.Y.Z] …" → develop (auto-merge ladder; GitHub or Azure Repos)
   CLOSE   → close-delivery.sh: items Done · Epic Done · sprint closed · back on develop
+            (local tracker: items close inside the PR — close-delivery.sh --prepare)
             --to sit → release/<version> → SIT
 ```
 
@@ -50,7 +51,10 @@ Merges are reversible tracker links + one Story with combined ACs.
 | Work tracker | Jira · Azure DevOps Boards · GitHub Issues · local (`docs/tasks/`) | `scripts/tracker.sh` (backends `jira.sh` · `azdo.sh` · `github.sh`) |
 | Git host | GitHub (`gh` / GitHub MCP) · Azure Repos (`azdo.sh`, auto-complete) | `scripts/git-host.sh` → `open-pr.sh` |
 | Version | `VERSION` · `Directory.Build.props` · `package.json` · `*.csproj` | `scripts/version.sh` |
-| Delivery pipeline | `devpilot-cd`: build once → DEV → SIT → UAT → PRD (approvals on UAT/PRD) | `generate-ci.sh` · `deploy.sh` · `smoke.sh` · `setup-environments.sh` |
+| Delivery pipeline | `devpilot-cd`: build once → DEV → SIT → UAT → PRD (approvals on UAT/PRD) | `generate-ci.sh` · `deploy.sh` · `smoke.sh` · `setup-environments.sh` · `db-package.sh` |
+| Release notes | one entry per item in `docs/changes/` → CHANGELOG section at release | `changelog.sh add` / `changelog.sh <version>` |
+| Secrets | `.devpilot/config.sh` · keychain · Azure Key Vault (env vars win) | `devpilot-lib.sh` (`secrets.provider`) |
+| Cost | tokens per session → per work item (Stop/SessionEnd hook) | `usage-hook.sh` → `metrics.sh` |
 
 Never call a backend directly from a command — always `tracker.sh`. Secrets live in the gitignored
 `.devpilot/config.sh`; same-named environment variables override it.

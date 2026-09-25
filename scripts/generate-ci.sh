@@ -135,6 +135,10 @@ cat <<'YML'
       - name: dependency audit — no new high/critical CVEs
         run: STRICT=1 bash scripts/audit.sh
 
+      - name: version is ahead of the target (parallel deliveries never reuse a version)
+        if: github.event_name == 'pull_request' && github.base_ref != 'main'
+        run: bash scripts/version.sh verify --ref "origin/${{ github.base_ref }}"
+
       - name: keep logs on failure
         if: failure()
         uses: actions/upload-artifact@v4
@@ -217,6 +221,9 @@ cat <<'YML'
         displayName: test-guard — every changed source file has a covering test
       - script: STRICT=1 bash scripts/audit.sh
         displayName: dependency audit — no new high/critical CVEs
+      - script: bash scripts/version.sh verify --ref "origin/${SYSTEM_PULLREQUEST_TARGETBRANCH#refs/heads/}"
+        condition: and(eq(variables['Build.Reason'], 'PullRequest'), ne(variables['System.PullRequest.TargetBranch'], 'refs/heads/main'))
+        displayName: version is ahead of the target (parallel deliveries never reuse a version)
       - task: PublishPipelineArtifact@1
         condition: failed()
         inputs:
@@ -226,7 +233,7 @@ YML
 }
 
 # Build steps shared by both CD flavours: out/web (Angular dist) · out/api (dotnet
-# publish) · out/db/migrations.sql (idempotent EF script) — the one artifact promoted.
+# publish) · out/db (db-package.sh: migrations.sql, rollback.sql, migrations.txt) — the one artifact promoted.
 cd_build_script() {
   echo 'set -euo pipefail; mkdir -p out'
   [ -n "$NG_DIR" ] && echo "(cd '$NG_DIR' && npm ci && npx ng build --configuration production) && mkdir -p out/web && cp -r '$NG_DIR/dist/.' out/web/"
@@ -234,7 +241,7 @@ cd_build_script() {
     echo "dotnet publish ${API_PROJ:+'$API_PROJ' }--configuration Release --output out/api -p:Version=\"\$(bash scripts/version.sh current)\""
     if [ "$HAS_MIGRATIONS" = 1 ]; then
       echo 'dotnet tool update --global dotnet-ef >/dev/null && export PATH="$PATH:$HOME/.dotnet/tools"'
-      echo "mkdir -p out/db && dotnet ef migrations script --idempotent ${MIG_PROJ:+--project '$MIG_PROJ' }${API_PROJ:+--startup-project '$API_PROJ' }--output out/db/migrations.sql"
+      echo "bash scripts/db-package.sh out/db ${MIG_PROJ:+--project '$MIG_PROJ' }${API_PROJ:+--startup '$API_PROJ'}"
     fi
   fi
   echo 'bash scripts/version.sh current > out/VERSION'
@@ -271,6 +278,8 @@ jobs:
       version: \${{ steps.version.outputs.version }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # tags: db-package.sh diffs migrations against the previous release
       - id: version
         run: echo "version=\$(bash scripts/version.sh current)" >> "\$GITHUB_OUTPUT"
 YML
@@ -360,6 +369,8 @@ stages:
       - job: build
         steps:
           - checkout: self
+            fetchDepth: 0
+            fetchTags: true
 YML
 [ -n "$NG_DIR" ] && cat <<'YML'
           - task: NodeTool@0

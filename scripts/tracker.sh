@@ -26,6 +26,8 @@
 #   link <KEY> <duplicate|relates> <KEY2> · url <KEY> · ref <KEY>
 #   close <KEY...>        → Done
 #   close-parent <KEY>    → Done when every child is done
+#   breakdown <STORY> <layers> <summary>   one child task per layer ([BE] [FE] [DB] [QA]), idempotent
+#   close-children <KEY>  → every open child Done
 #   sprint <create|assign|start|active|close|list> …   (close exits 4 while items are open)
 #
 # Gates:
@@ -310,7 +312,13 @@ case "$cmd" in
       mkdir -p "$(dirname "$DP_SECRETS")"
       printf '#!/bin/bash\n# DevPilot secrets — gitignored. Manage with scripts/devpilot-config.sh\n' > "$DP_SECRETS"
     fi
-    for KV in "$@"; do ( cd "$DP_ROOT" && bash "$DIR/devpilot-config.sh" set "$KV" >/dev/null ) || exit 1; done
+    for KV in "$@"; do
+      K=$(printf '%s' "${KV%%=*}" | tr '[:lower:]' '[:upper:]'); VAL="${KV#*=}"
+      case " $DP_SECRET_ONLY " in
+        *" $K "*) if dp_secret_store "$K" "$VAL"; then log "🔐 $K stored in $(dp_secret_provider)"; continue; fi ;;
+      esac
+      ( cd "$DP_ROOT" && bash "$DIR/devpilot-config.sh" set "$KV" >/dev/null ) || exit 1
+    done
     bash "$0" use "$T" || exit 1
     bash "$0" ping
     ;;
@@ -390,7 +398,33 @@ case "$cmd" in
 
   close)
     RC=0
-    for K in "$@"; do backend status "$K" "Done" || RC=1; done
+    for K in "$@"; do bash "$0" close-children "$K" 2>/dev/null; backend status "$K" "Done" || RC=1; done
+    exit $RC
+    ;;
+
+  breakdown)   # breakdown <STORY> <layers,csv> <summary> → one child task per layer (keys on stdout)
+    STORY="${1:?Usage: tracker.sh breakdown <STORY> <backend,frontend,db,qa> <summary>}"; LAYERS="${2:-}"; SUM="${3:-$1}"
+    EXISTING=$(backend show "$STORY" 2>/dev/null | sed -n '/^Children:/,$p')
+    for L in $(printf '%s' "$LAYERS" | tr ',' ' '); do
+      case "$L" in
+        backend|be|api) TAG="BE"; WHAT="API + business logic (.NET)" ;;
+        frontend|fe|ui) TAG="FE"; WHAT="UI (Angular)" ;;
+        db|database)    TAG="DB"; WHAT="schema + EF Core migration" ;;
+        qa|test)        TAG="QA"; WHAT="test cases + Playwright journeys" ;;
+        *) continue ;;
+      esac
+      # Idempotent: a child already tagged for this layer is reused, never duplicated.
+      HIT=$(printf '%s\n' "$EXISTING" | awk -F'\t' -v t="[$TAG]" 'index($6, t) == 1 { sub(/^ +/, "", $1); print $1; exit }')
+      if [ -n "$HIT" ]; then echo "$HIT"; continue; fi
+      backend new Subtask "[$TAG] $SUM" "$WHAT for $STORY — see the Story's brief." "$STORY" "$(echo "$TAG" | tr '[:upper:]' '[:lower:]')"
+    done
+    ;;
+
+  close-children)   # close-children <KEY> → every open child item Done
+    RC=0
+    for C in $(backend show "${1:?KEY}" 2>/dev/null | sed -n '/^Children:/,$p' | tail -n +2 | awk -F'\t' '$4 != "done" { sub(/^ +/, "", $1); print $1 }'); do
+      backend status "$C" "Done" || RC=1
+    done
     exit $RC
     ;;
 

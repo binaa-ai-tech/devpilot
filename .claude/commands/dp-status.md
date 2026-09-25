@@ -23,6 +23,8 @@ Reports: in-flight tasks, open sprints, and the current backlog index (live from
 ```bash
 bash scripts/metrics.sh
 ```
-Reports: task durations, throughput, model usage.
+Reports: work items, throughput, and **tokens per work item and model** (recorded by the
+`scripts/usage-hook.sh` Claude Code hook). With `pricing` set in `project.config.md`, the cost of
+each delivery too. `bash scripts/metrics.sh usage` shows only the usage table.
 
 Print a compact summary of whichever section(s) were requested.
