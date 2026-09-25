@@ -126,7 +126,12 @@ Stories, the Epic (once all its children are Done) and the sprint (once nothing 
 then checks out `develop` and pulls.
 
 If CI goes red after the PR opens, run the `/dp-pr` loop on it — never stop at "PR opened".
-Checkpoint after every phase (`bash scripts/checkpoint.sh save <KEY> <phase> <next_phase>`).
+Checkpoint after every phase so `/dp-deliver resume` can continue exactly there:
+```bash
+bash scripts/checkpoint.sh write --key <KEY> --slug "$SLUG" --branch "$(git branch --show-current)" \
+  --base-branch "$BASE_BRANCH" --command "/dp-deliver" --task "$TASK" \
+  --phase-completed <plan|sprint|build|qa|review|pr|merge> --next-phase <next>
+```
 
 ## Step 4 — Promote (only with `--to sit`)
 

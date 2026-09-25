@@ -2,8 +2,8 @@
 # =============================================================================
 # scope-hook.sh — PreToolUse hook that enforces an active layer lock in real time.
 #
-# When a layer-locked build is running, it writes the active layer to
-# .devpilot/.scope-lock. This hook reads the Edit/Write target
+# Opt-in: write a layer (frontend | backend | db) to .devpilot/.scope-lock to confine
+# edits to that layer (e.g. while one agent works alone). This hook reads the Edit/Write target
 # from the tool input on stdin and BLOCKS the write if it falls outside the
 # locked layer. With no lock file present, everything is allowed.
 #
@@ -35,7 +35,7 @@ case "$FP" in docs/*|*.md) exit 0 ;; esac     # docs always allowed
 violation=0
 case "$LAYER" in
   frontend) echo "$FP" | grep -Eq '\.(cs|sql)$|/[Mm]igrations/' && violation=1 ;;
-  backend)  echo "$FP" | grep -Eq '\.(html|scss|css|vue)$|\.component\.ts$|/[Mm]igrations/' && violation=1 ;;
+  backend)  echo "$FP" | grep -Eq '\.(html|scss|css)$|\.component\.ts$' && violation=1 ;;   # team-dotnet owns EF migrations
   db)       echo "$FP" | grep -Eqv '/[Mm]igrations/|\.sql$' && violation=1 ;;
   security) violation=0 ;;
 esac
