@@ -16,7 +16,7 @@ The end-to-end SDLC contract (phases, gates, roles) lives in `.devpilot/process.
 | `/dp-sprint` | Organize the backlog into sprints, recommend which to run first. |
 | `/dp-build [sprint]` | Build a whole sprint on one branch → one PR → `develop`. |
 
-**Quality** · `/dp-test [perf] [story\|PR\|diff]` — derive test cases from ACs → write tests → run · `/dp-autofix [PR]` — drive a PR's CI to green and merge (bounded fix loop, `auto-merge` gates) · `/dp-review-fix <PR>`
+**Quality** · `/dp-test [ui\|perf] [story\|PR\|diff]` — derive test cases from ACs → write unit/integration/Playwright UI tests → run · `/dp-autofix [PR]` — drive a PR's CI to green and merge (bounded fix loop, `auto-merge` gates) · `/dp-review-fix <PR>`
 **Deploy** · `/dp-release <sit\|uat\|prd> [version]` · `/dp-rollback [version]` · `/dp-hotfix <ticket> <slug> <version>`
 **Utility** · `/dp-status [health\|board\|metrics]` · `/dp-config [models\|wizard\|index]`
 
@@ -77,10 +77,11 @@ Set in `project.config.md` (`coding_models.*` tiers); change anytime via `/dp-co
 
 ## Tech stack & rules
 
-- **Frontend:** Angular 21+ / React · **Backend:** .NET (C#), SQL Server (stack-aware: node/python/go/java).
+- **Frontend:** Angular 21+ · **Backend:** ASP.NET Core (C#) + EF Core + SQL Server · **Contract:** OpenAPI → generated Angular client.
+- **Tests:** Vitest (Angular) · xUnit + `WebApplicationFactory` + Testcontainers (.NET) · Playwright (UI/E2E). Run via `bash scripts/run-tests.sh` — full log to disk, only failures in context.
 - **Rules:** `.devpilot/rules.md` (router) + `.devpilot/rules/<stack>.md`.
 - **Skills:** `.devpilot/skills/` — operating manual. Index: `.devpilot/skills/README.md`.
-- **Agents:** `.claude/agents/` — team-ba, team-lead, team-frontend, team-backend, team-dotnet, team-qa
+- **Agents:** `.claude/agents/` — team-ba, team-lead, team-frontend, team-dotnet, team-qa
   (spawned by the workflow commands; no manual slash wrappers).
 
 ---

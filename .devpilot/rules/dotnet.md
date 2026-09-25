@@ -8,5 +8,10 @@
 - Dependency injection via the built-in container; constructor injection only.
 - Nullable reference types enabled; no `!` null-forgiving without justification.
 - Validate input with FluentValidation or data annotations at the API edge.
-- Tests: xUnit/NUnit next to or mirroring the code; cover handler logic + one failure branch.
-- Build + test before commit: `dotnet build` && `dotnet test`.
+- Errors as RFC 7807 ProblemDetails; `CancellationToken` passed through every async call.
+- EF Core reads: `AsNoTracking()` + projection to DTOs; no N+1; lists paginated (`skills/efcore-sqlserver.md`).
+- Migrations additive + reversible; ship as `dotnet ef migrations script --idempotent`, never `Migrate()` on prod startup.
+- OpenAPI spec regenerated and committed with every contract change (`skills/api-contract.md`).
+- Tests: xUnit mirroring the code; unit tests for handlers + one failure branch; integration tests per endpoint
+  with `WebApplicationFactory` on real SQL Server via Testcontainers — never the EF InMemory provider (`skills/dotnet-testing.md`).
+- Build + test before commit via `bash scripts/run-tests.sh dotnet`.

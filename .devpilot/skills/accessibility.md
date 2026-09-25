@@ -1,6 +1,6 @@
 # Accessibility — every UI ships usable by everyone (WCAG 2.1 AA)
 
-Load this **before committing frontend UI** (Angular / React). Accessibility is not a polish pass;
+Load this **before committing frontend UI** (Angular). Accessibility is not a polish pass;
 it's part of done. Target **WCAG 2.1 AA**.
 
 ## The checklist (run before commit)

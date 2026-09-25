@@ -17,10 +17,10 @@ INTAKE → READY → SPRINT → BUILD → VERIFY → MERGE → RELEASE → OPERA
 | 2 | **Ready** | BA | `definition-of-ready.md` — clear, testable ACs; sized & sliced (`estimation-and-slicing.md`); no open questions. |
 | 3 | **Sprint** | `/dp-sprint` | Only READY Stories enter; sprint has a goal and a recommended run order. |
 | 4 | **Build** | `/dp-build` | One branch per sprint; layer agents stay in scope (`scope-guard`); every commit conventional, build never left red (`core-rules.md`). |
-| 5 | **Verify** | QA agent, `/dp-test` | Test cases derived per AC (`test-case-design.md`); pyramid respected (`test-strategy.md`, `e2e-testing.md`); perf budgets proven when in scope (`performance-testing.md`); QA verdict **PASS** per Story. |
+| 5 | **Verify** | QA agent, `/dp-test` | Test cases derived per AC (`test-case-design.md`); pyramid respected (`test-strategy.md`: Vitest · xUnit + real SQL Server · Playwright UI journeys per `ui-e2e-playwright.md`); suites run token-lean via `scripts/run-tests.sh`; perf budgets proven when in scope (`performance.md`); QA verdict **PASS** per Story. |
 | 6 | **Merge** | `/dp-build` · `/dp-autofix` | The `auto-merge.md` gate ladder: build/lint/tests/audit/review/QA all green **on the PR head**. Auto-fix loop is bounded; humans merge when `merge_policy: pr-only`. |
-| 7 | **Release** | `/dp-release` | Build once, promote the same artifact DEV→SIT→UAT→PRD (`ci-cd.md`, `release-discipline.md`); PRD always has a human approval; rollback path tested (`/dp-rollback`). |
-| 8 | **Operate** | `/dp-hotfix` · `/dp-status` | Incidents get a blameless postmortem (`incident-postmortem.md`); action items return to Intake; SLOs watched (`reliability-slo.md`). |
+| 7 | **Release** | `/dp-release` | Build once, promote the same artifact DEV→SIT→UAT→PRD (`release-ops.md`); PRD always has a human approval; rollback path tested (`/dp-rollback`). |
+| 8 | **Operate** | `/dp-hotfix` · `/dp-status` | Incidents get a blameless postmortem; action items return to Intake; SLOs watched (`release-ops.md`). |
 
 A failed gate sends work **back one phase**, never forward with a TODO.
 
@@ -30,22 +30,24 @@ A failed gate sends work **back one phase**, never forward with a TODO.
 |------|-------|------|
 | Business Analyst | `team-ba` | Intake, dedup, requirements, Definition of Ready |
 | Team Lead | `team-lead` | Implementation plans, ADRs, review gate, merge decision |
-| Developers | `team-frontend` / `team-backend` | Layer implementation, tests next to code |
+| Developers | `team-frontend` (Angular) / `team-dotnet` (.NET + SQL Server) | Layer implementation, tests next to code, OpenAPI contract kept in sync |
 | QA Engineer | `team-qa` | Test-case design, coverage, mutation mindset, the verdict |
 
 ## Cross-cutting standards (always on)
 
-- **Spec-first** — every change traces to a verifiable AC (`spec-first.md`).
+- **Spec-first** — every change traces to a verifiable AC (`core-rules.md`, `definition-of-ready.md`).
 - **Defect standard** — a bug is a single typed `Bug` issue (no Epic→Story), routed by
   severity: **P0/P1 → `/dp-hotfix`** (branch from `main`, postmortem); **P2 → active sprint**;
   **P3 → next sprint, batched**. The P0/P1 redirect is **hard-enforced** by
   `scripts/jira-guard.sh hotfix-gate` — `/ceo` and `/dp-plan` refuse to plan/build one. Bug
   DoD is *reproduce-before-fix*: a regression test must fail on the unfixed code, then pass
   and stay (`definition-of-done.md` Bug DoD).
-- **Security & data** — `threat-modeling` at design time, `security-scan` +
-  `scripts/audit.sh` at diff time, `secrets-management`/`data-privacy` always.
-- **Performance** — `performance-review` on code, `database-performance` on
-  schema, `performance-testing` budgets on the running system.
+- **Security & data** — `security-scan` (threat model at design time; secrets, PII,
+  dependencies at diff time) + `scripts/audit.sh`.
+- **Contract** — the .NET API's OpenAPI spec is committed and the Angular client is generated
+  from it; breaking changes are versioned (`api-contract`).
+- **Performance** — `performance` on code and running-system budgets, `efcore-sqlserver`
+  on schema and queries.
 - **Audit trail** — `docs/tasks/<KEY>.md` carries the blow-by-blow; the ticket
   gets exactly start + DONE (`core-rules.md` #11).
 - **Token discipline** — read indexes first; load heavy skills only at the

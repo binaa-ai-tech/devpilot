@@ -73,7 +73,7 @@ Apply a profile or mode (updates `project.config.md` + syncs Claude agent frontm
 bash scripts/model-profiles.sh apply claude auto             # or balanced | save
 bash scripts/model-profiles.sh apply opencode recommended    # or balanced | save
 bash scripts/model-profiles.sh apply antigravity recommended # or balanced | save
-bash scripts/model-profiles.sh single claude claude-sonnet-4-6   # one model for the whole team
+bash scripts/model-profiles.sh single claude claude-sonnet-5   # one model for the whole team
 bash scripts/model-profiles.sh sync-agents                   # after editing models.* by hand (per-team)
 bash scripts/model-profiles.sh opencode-list                 # see your live opencode models
 bash scripts/model-profiles.sh antigravity-list              # see your live antigravity models

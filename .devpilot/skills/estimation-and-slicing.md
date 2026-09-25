@@ -29,4 +29,4 @@ path, single-layer → layer-locked, multi-slice → full team flow.
 ## Rules
 - No slice without a verifiable acceptance criterion.
 - Prefer shipping a thin complete slice over a thick half-built one.
-- Record assumptions; don't pause to ask (see `get-shit-done.md`).
+- Record assumptions; don't pause to ask (see `core-rules.md` #1).

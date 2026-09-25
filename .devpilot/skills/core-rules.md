@@ -17,11 +17,13 @@
 6. **No magic numbers or strings.** Extract named constants.
 7. **Strong typing.** No `any`/untyped escapes; declare return types.
 8. **Stay in scope.** Touch only files the plan names for your layer.
-9. **Always end with verification** — run the stack's build + tests; never
-   leave the build red.
+9. **Always end with verification** — run the stack's build + tests through
+   `bash scripts/run-tests.sh` (full log to disk, only failures in context —
+   `token-lean-testing`); never leave the build red.
 10. **Reach for heavier skills on demand only** — `self-heal` on a failure,
     `security-scan` on auth/input handling, `architecture-guard` on structural
-    change. Don't pre-load them.
+    change, `angular-*` / `dotnet-*` / `efcore-sqlserver` / `api-contract` when
+    writing that layer. Don't pre-load them.
 11. **Process logging — two altitudes, no echo.** The blow-by-blow lives in the
     repo, not the ticket:
     - **`docs/tasks/<KEY>.md`** is the live per-step log — append who/what/when,

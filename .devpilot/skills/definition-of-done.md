@@ -34,12 +34,15 @@ Applies on top of the layer DoD. A bug is not "done" because the symptom disappe
 ## Frontend DoD (Frontend Developer)
 
 All universal items, plus:
-- [ ] `ng lint` passes / `npm run lint` passes
-- [ ] `ng build --configuration=production` passes / `npm run build` passes
-- [ ] `ng test --watch=false` passes / `npm test -- --watchAll=false` passes
-- [ ] All new components use `ChangeDetectionStrategy.OnPush`
+- [ ] `ng lint` passes
+- [ ] `ng build --configuration=production` passes
+- [ ] `bash scripts/run-tests.sh angular` passes (Vitest)
+- [ ] All new components use `ChangeDetectionStrategy.OnPush` + signal inputs/outputs
+- [ ] Specs per `angular-testing.md`: render, interaction, loading/empty/error states
+- [ ] `data-testid` / accessible names on elements a UI journey will touch
 - [ ] WCAG 2.1 AA checklist reviewed (see `accessibility.md`)
-- [ ] Performance checklist completed (from `performance-review.md`)
+- [ ] API calls go through the generated client when an OpenAPI contract exists (`api-contract.md`)
+- [ ] Performance checklist completed (from `performance.md`)
 - [ ] Self-heal protocol applied on any failures (from `self-heal.md`)
 
 ---
@@ -48,11 +51,13 @@ All universal items, plus:
 
 All universal items, plus:
 - [ ] `dotnet build` passes with zero warnings on new code
-- [ ] `dotnet test` passes with zero failures
+- [ ] `bash scripts/run-tests.sh dotnet` passes with zero failures
 - [ ] All new service methods have unit tests
-- [ ] All new API endpoints have integration tests
-- [ ] DB migrations are idempotent (tested with `IF NOT EXISTS` patterns)
-- [ ] Performance checklist completed (from `performance-review.md`)
+- [ ] All new API endpoints have integration tests on real SQL Server (`dotnet-testing.md`)
+- [ ] Endpoints follow `dotnet-api.md`: DTOs, validation, auth + ownership, ProblemDetails
+- [ ] OpenAPI spec regenerated + committed; no unversioned breaking change (`api-contract.md`)
+- [ ] Migrations additive, reversible, idempotent script reviewed (`efcore-sqlserver.md`)
+- [ ] Performance checklist completed (from `performance.md`)
 - [ ] Architecture guardrails checked (from `architecture-guard.md`)
 - [ ] Self-heal protocol applied on any failures (from `self-heal.md`)
 
@@ -65,6 +70,8 @@ All universal items, plus:
 - [ ] For a **bug** ticket: a regression test exists that fails on the pre-fix code (apply the Bug DoD)
 - [ ] Happy path, at least two edge cases, and at least one error/empty state are covered
 - [ ] Mutation-mindset applied: boundary values, null/empty inputs, inverted boolean conditions all tested
+- [ ] Every UI-facing AC has a Playwright journey or a written reason it is covered lower (`ui-e2e-playwright.md`)
+- [ ] `bash scripts/run-tests.sh all` green; `bash scripts/test-guard.sh` clean
 - [ ] QA report written with explicit ✅ PASS or ❌ BLOCKED verdict
 - [ ] No blockers left unresolved
 

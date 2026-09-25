@@ -277,8 +277,8 @@ done
 echo "== model-profiles.sh =="
 MP="$REPO/scripts/model-profiles.sh"
 # claude profile → tier mapping
-assert_contains "$(bash "$MP" claude-map auto)"     "POWER=claude-opus-4-8"   "claude auto uses Opus for power"
-assert_contains "$(bash "$MP" claude-map balanced)" "POWER=claude-sonnet-4-6" "claude balanced caps power at Sonnet"
+assert_contains "$(bash "$MP" claude-map auto)"     "POWER=claude-opus-5-5"   "claude auto uses Opus for power"
+assert_contains "$(bash "$MP" claude-map balanced)" "POWER=claude-sonnet-5" "claude balanced caps power at Sonnet"
 assert_contains "$(bash "$MP" claude-map save)"     "STANDARD=claude-haiku-4-5-20251001" "claude save defaults standard to Haiku"
 assert_code "$(bash "$MP" claude-map bogus >/dev/null 2>&1; echo $?)" "1" "claude-map rejects an unknown profile"
 # opencode map falls back to curated defaults when opencode is absent
@@ -289,7 +289,7 @@ assert_code "$(bash "$MP" antigravity-map bogus >/dev/null 2>&1; echo $?)" "1" "
 # apply writes coding_profile + tiers + syncs agent frontmatter, idempotently
 D=$(sandbox); cp "$REPO"/project.config.md "$D/"; mkdir -p "$D/.claude/agents"
 cp "$REPO"/.claude/agents/team-ba.md "$REPO"/.claude/agents/team-lead.md "$REPO"/.claude/agents/team-qa.md \
-   "$REPO"/.claude/agents/team-frontend.md "$REPO"/.claude/agents/team-backend.md "$D/.claude/agents/" 2>/dev/null
+   "$REPO"/.claude/agents/team-frontend.md "$REPO"/.claude/agents/team-dotnet.md "$D/.claude/agents/" 2>/dev/null
 ( cd "$D" && bash scripts/model-profiles.sh apply claude save >/dev/null 2>&1 )
 ( cd "$D" && bash scripts/model-profiles.sh apply claude save >/dev/null 2>&1 )   # twice → must stay single line
 assert_eq "$(grep -c 'coding_profile:' "$D/project.config.md")" "1" "apply is idempotent (one coding_profile line)"
@@ -302,12 +302,12 @@ assert_contains "$(grep '^model:' "$D/.claude/agents/team-frontend.md")" "claude
 ( cd "$D" && bash scripts/model-profiles.sh single claude test-model-x >/dev/null 2>&1 )
 assert_contains "$(cat "$D/project.config.md")" "model_mode: single" "single records model_mode"
 assert_eq "$(grep -cE '^[[:space:]]+model_mode:' "$D/project.config.md")" "1" "single keeps one model_mode line"
-assert_contains "$(grep '^model:' "$D/.claude/agents/team-backend.md")" "test-model-x" "single syncs dev agent frontmatter"
+assert_contains "$(grep '^model:' "$D/.claude/agents/team-dotnet.md")" "test-model-x" "single syncs dev agent frontmatter"
 assert_contains "$(grep '^model:' "$D/.claude/agents/team-ba.md")" "test-model-x" "single syncs orchestrator frontmatter"
 assert_eq "$(grep -c '"test-model-x"' "$D/project.config.md")" "3" "single sets all three claude tiers"
 ( cd "$D" && bash scripts/model-profiles.sh apply claude save >/dev/null 2>&1 )   # back to a profile
 # sync-agents re-applies frontmatter from project.config.md (the --update repair path)
-( cd "$D" && sed -i 's/^model: .*/model: claude-sonnet-4-6/' .claude/agents/team-lead.md && bash scripts/model-profiles.sh sync-agents >/dev/null 2>&1 )
+( cd "$D" && sed -i 's/^model: .*/model: claude-sonnet-5/' .claude/agents/team-lead.md && bash scripts/model-profiles.sh sync-agents >/dev/null 2>&1 )
 assert_contains "$(grep '^model:' "$D/.claude/agents/team-lead.md")" "claude-haiku-4-5-20251001" "sync-agents restores frontmatter from config"
 # apply antigravity switches the recorded profile and leaves a single coding_profile line
 ( cd "$D" && bash scripts/model-profiles.sh apply antigravity recommended >/dev/null 2>&1 )
@@ -317,7 +317,8 @@ rm -rf "$D"
 
 echo "== testing & auto-merge wiring (round 4) =="
 # New skills exist, are indexed, and the installer ships them (update + fresh lists).
-for SK in test-case-design e2e-testing performance-testing auto-merge; do
+for SK in test-case-design ui-e2e-playwright performance auto-merge token-lean-testing \
+          angular-dev angular-testing dotnet-api dotnet-testing efcore-sqlserver api-contract release-ops; do
   [ -f "$REPO/.devpilot/skills/$SK.md" ] && ok "skill $SK.md exists" || no "skill $SK.md exists"
   assert_contains "$(cat "$REPO/.devpilot/skills/README.md")" "$SK.md" "skills index lists $SK"
   n=$(grep -c "$SK.md" "$REPO/install.sh"); n=${n:-0}
@@ -403,6 +404,40 @@ assert_contains "$(cat "$REPO/scripts/install-git-hooks.sh")" "post-merge" "git 
 assert_contains "$INSTALL" "docs/index/.state" "installer gitignores the index state file"
 n=$(grep -c -- '-mmin' "$REPO/.claude/commands/dp-plan.md" || true); n=${n:-0}
 assert_eq "$n" "0" "time-based freshness check removed from dp-plan"
+
+echo "== run-tests.sh (token-lean runner) =="
+D=$(sandbox)
+OUT=$(cd "$D" && bash scripts/run-tests.sh cmd "echo 'Tests  3 passed'"); RC=$?
+assert_code "$RC" "0" "passing command exits 0"
+assert_contains "$OUT" "✅ PASS" "passing command reports PASS"
+assert_eq "$([ -f "$D/.devpilot/logs/cmd.log" ] && echo yes)" "yes" "full log written to .devpilot/logs"
+OUT=$(cd "$D" && TEST_MAX_LINES=5 bash scripts/run-tests.sh cmd 'for i in $(seq 1 200); do echo "Error: boom $i"; done; exit 3'); RC=$?
+assert_code "$RC" "1" "failing command exits 1"
+assert_contains "$OUT" "❌ FAIL" "failing command reports FAIL"
+assert_eq "$([ "$(printf '%s\n' "$OUT" | wc -l)" -le 8 ] && echo capped)" "capped" "failure output capped by TEST_MAX_LINES"
+OUT=$(cd "$D" && bash scripts/run-tests.sh all); RC=$?
+assert_code "$RC" "0" "no suites detected exits 0"
+assert_contains "$OUT" "no test suites detected" "reports when nothing to run"
+assert_code "$(cd "$D" && bash scripts/run-tests.sh bogus >/dev/null 2>&1; echo $?)" "2" "unknown mode exits 2"
+rm -rf "$D"
+
+echo "== Angular + .NET skill set =="
+SK="$REPO/.devpilot/skills"
+# Every skill a command/agent/persona/doc names must exist (no dangling references).
+# install.sh is checked separately: its retired-files cleanup list names removed skills on purpose.
+MISSING=""
+for ref in $(grep -rhoE 'skills/[a-z0-9-]+\.md' "$REPO/.claude" "$REPO/.devpilot" "$REPO/CLAUDE.md" "$REPO/AGENTS.md" "$REPO/README.md" | sort -u); do
+  [ -f "$REPO/.devpilot/$ref" ] || MISSING="$MISSING $ref"
+done
+assert_eq "${MISSING:-none}" "none" "no dangling skill references"
+MISSING=""
+for s in $(grep -oE '[a-z0-9-]+\.md' <<<"$(sed -n '/^  SKILLS="/p' "$REPO/install.sh")"); do
+  [ -f "$SK/$s" ] || MISSING="$MISSING $s"
+done
+assert_eq "${MISSING:-none}" "none" "installer update list matches skills on disk"
+assert_eq "$([ -f "$REPO/.claude/agents/team-backend.md" ] && echo present || echo gone)" "gone" "generic backend agent retired"
+assert_contains "$(cat "$REPO/.claude/commands/dp-build.md")" '"team-dotnet"' "dp-build routes backend work to team-dotnet"
+assert_contains "$(cat "$REPO/.claude/commands/dp-test.md")" "ui-e2e-playwright" "dp-test drives Playwright UI testing"
 
 echo ""
 echo "── Results: $PASS passed, $FAIL failed ──"

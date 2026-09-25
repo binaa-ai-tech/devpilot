@@ -44,8 +44,8 @@ ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
 CONFIG="$ROOT/project.config.md"
 
 # ── Claude model ids (single source of truth) ──────────────────────────────────
-CL_OPUS="claude-opus-4-8"
-CL_SONNET="claude-sonnet-4-6"
+CL_OPUS="claude-opus-5-5"
+CL_SONNET="claude-sonnet-5"
 CL_HAIKU="claude-haiku-4-5-20251001"
 
 # ── Claude profile → tier + orchestrator models ────────────────────────────────
@@ -238,7 +238,7 @@ sync_agents() {
   [ -n "$lead" ] && _sync_agent team-lead.md "$lead"
   [ -n "$qa" ]   && _sync_agent team-qa.md   "$qa"
   [ -n "$fe" ]   && _sync_agent team-frontend.md "$fe"
-  if [ -n "$be" ]; then _sync_agent team-backend.md "$be"; _sync_agent team-dotnet.md "$be"; fi
+  [ -n "$be" ] && _sync_agent team-dotnet.md "$be"
   echo "✅ agent frontmatter synced from project.config.md (ba=${ba:-?} lead=${lead:-?} qa=${qa:-?} fe=${fe:-config-default} be=${be:-config-default})"
 }
 
@@ -261,7 +261,6 @@ apply() {
       _sync_agent team-lead.md "$LEAD"
       _sync_agent team-qa.md   "$QA"
       _sync_agent team-frontend.md "$STANDARD"
-      _sync_agent team-backend.md  "$STANDARD"
       _sync_agent team-dotnet.md   "$STANDARD"
       _set_coding_profile "$profile"
       _set_model_mode "recommended"
@@ -300,7 +299,7 @@ single() {
       for agent in ba team_lead qa frontend_dev backend_dev; do
         _set_orchestrator_tier1 "$agent" "$model"
       done
-      for f in team-ba.md team-lead.md team-qa.md team-frontend.md team-backend.md team-dotnet.md; do
+      for f in team-ba.md team-lead.md team-qa.md team-frontend.md team-dotnet.md; do
         _sync_agent "$f" "$model"
       done
       ;;

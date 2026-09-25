@@ -13,7 +13,7 @@ manual approval gate. Skips the backlog/sprint machinery — this is an emergenc
    bash scripts/git-flow.sh hotfix-start <ticket> <slug>
    ```
 3. **Implement** the minimal fix per the resolved engine (`engines.coding`). Minimum diff —
-   no refactoring under pressure. Read `.devpilot/skills/debug-method.md` first.
+   no refactoring under pressure. Follow the debugging method in `.devpilot/skills/self-heal.md` (Part 0) first.
 4. **Self-review:** `git diff main...HEAD` — confirm scope is tight.
 5. **Finish:**
    ```bash
@@ -22,7 +22,7 @@ manual approval gate. Skips the backlog/sprint machinery — this is an emergenc
    Merges → `main`, tags `v<version>`, merges back → `develop`.
 6. **CI on `main`** → lint → test → build → **manual PRD gate** (approve `Deploy → PRD`).
 7. **Close ticket** + verify on production.
-8. **Postmortem** — apply `.devpilot/skills/incident-postmortem.md`. Write a blameless
+8. **Postmortem** — apply the incidents section of `.devpilot/skills/release-ops.md`. Write a blameless
    postmortem to `docs/postmortems/<ticket>-<slug>.md` (timeline, root cause, action items),
    and turn each action item into a backlog Story via `/dp-plan`. Skip only for trivial
    internal-only blips.

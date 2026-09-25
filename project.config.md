@@ -32,9 +32,9 @@ language: en                     # en | ar | fr | es | de | …
 ## Tech Stack
 
 stack:
-  frontend: angular              # angular | react | vue | nextjs | none
-  backend: dotnet                # dotnet | node | python | none
-  database: sqlserver            # sqlserver | postgres | mysql | none
+  frontend: angular              # angular | none
+  backend: dotnet                # dotnet | none
+  database: sqlserver            # sqlserver | none
   integration: none              # rabbitmq | kafka | azure-servicebus | none
 
 ## Active Agents
@@ -128,8 +128,8 @@ coding_models:
   # role default in .claude/agents/*; these tiers are the orchestrator's balance
   # and the escalation target for complex work.)
   claude:
-    power:    "claude-opus-4-8"
-    standard: "claude-sonnet-4-6"
+    power:    "claude-opus-5-5"
+    standard: "claude-sonnet-5"
     lite:     "claude-haiku-4-5-20251001"
 
   # GitHub Copilot via opencode — used when the run family is opencode.
@@ -168,7 +168,7 @@ models:
     tier3: "free: DeepSeek V4 Flash Free"
 
   team_lead:
-    tier1: claude-sonnet-4-6
+    tier1: claude-sonnet-5
     tier2: "copilot: Gemini 2.5 Pro"
     tier3: "free: DeepSeek V4 Flash Free"
 
@@ -180,10 +180,10 @@ models:
   # Dev agent role models — synced into .claude/agents/*.md frontmatter by
   # model-profiles.sh (apply | single | sync-agents).
   frontend_dev:
-    tier1: claude-sonnet-4-6
+    tier1: claude-sonnet-5
 
   backend_dev:
-    tier1: claude-sonnet-4-6
+    tier1: claude-sonnet-5
 
 ## Fallback Behavior
 

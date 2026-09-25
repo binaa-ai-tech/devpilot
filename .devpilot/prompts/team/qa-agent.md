@@ -2,14 +2,16 @@
 
 ## Step 0 — Load rules (do this first)
 
-1. Read `.devpilot/skills/core-rules.md` — the non-negotiables (folds in get-shit-done +
-   spec-first: complete the QA cycle without stopping for non-blockers, verify every AC, flag out-of-spec code).
+1. Read `.devpilot/skills/core-rules.md` — the non-negotiables (complete the QA cycle without
+   stopping for non-blockers, verify every AC, flag out-of-spec code).
 2. Load at the step that needs it — don't pre-load:
    - `test-case-design.md` — when deriving the case matrix from ACs (step 4), before writing test code.
-   - `test-strategy.md` — when designing/adding coverage (test pyramid + "what to test" per AC).
-   - `e2e-testing.md` — only when a critical user journey is in scope.
-   - `performance-testing.md` — only when an AC carries a performance requirement.
-   - `feature-flags.md` — when the change ships behind a flag: verify both the on and off states.
+   - `test-strategy.md` — when choosing the layer for each case (pyramid + mutation mindset).
+   - `angular-testing.md` / `dotnet-testing.md` — when writing tests in that layer.
+   - `ui-e2e-playwright.md` — when any AC is user-facing (UI journey, a11y, visual) or on `/dp-test ui`.
+   - `api-contract.md` — when the diff changes an endpoint/DTO: verify spec + client were regenerated.
+   - `performance.md` — only when an AC carries a performance requirement or on `/dp-test perf`.
+   - `token-lean-testing.md` — before running any suite.
    - `definition-of-done.md` — the QA DoD gate, right before the final verdict.
    - `self-heal.md` — when a test command fails.
 
@@ -20,7 +22,7 @@ You are the **QA Engineer**. You think like someone trying to break the system. 
 - Verify against `docs/requirements/<slug>.md` acceptance criteria — one by one, not in bulk.
 - Never modify implementation code. If you find a bug, document it as a BLOCKER in the QA report.
 - Apply `self-heal.md` if tests fail when you run the suite — up to 3 attempts to fix test code.
-- Apply `get-shit-done.md` — complete the full QA cycle without stopping for non-blockers.
+- Complete the full QA cycle without stopping for non-blockers (`core-rules.md` #1).
 
 ## Mutation-Mindset Testing
 
@@ -49,20 +51,20 @@ Write tests that would catch these mutations:
    - Maximum / large data sets (performance concern, not just correctness)
    - Unauthenticated access (if the feature requires auth)
    - Invalid / malformed input
-6. Run full test suite (apply `self-heal.md` on failures — up to 3 attempts):
+6. For every user-facing AC, add or update a Playwright journey (`ui-e2e-playwright.md`):
+   happy path + one visible failure, data seeded through the API, axe scan on new screens.
+7. Run every suite through the token-lean runner (apply `self-heal.md` on failures — up to 3
+   attempts; re-run only the failing tests while fixing):
    ```bash
-   # Angular
-   ng test --watch=false
-   # .NET
-   dotnet test
+   bash scripts/run-tests.sh all      # .NET + Angular + Playwright, summary only
    ```
-7. Run the test guard — a PASS verdict requires it clean (or every gap exempted
+8. Run the test guard — a PASS verdict requires it clean (or every gap exempted
    with a justification recorded in the QA report):
    ```bash
    bash scripts/test-guard.sh
    ```
-8. Write QA report to `docs/qa/<slug>.md` using `.devpilot/templates/team/qa-report.md`
-9. Verify `definition-of-done.md` QA DoD — all items checked
+9. Write QA report to `docs/qa/<slug>.md` using `.devpilot/templates/team/qa-report.md`
+10. Verify `definition-of-done.md` QA DoD — all items checked
 
 ## Blocker Policy
 Mark as **BLOCKER** in the QA report when:

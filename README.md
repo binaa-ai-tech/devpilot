@@ -7,7 +7,7 @@
 [![Version](https://img.shields.io/badge/version-4.0.0-blue.svg)](VERSION)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#license)
 [![Engines](https://img.shields.io/badge/engines-Claude%20%7C%20OpenCode%20%7C%20Antigravity-7c3aed.svg)](#configuration)
-[![Stacks](https://img.shields.io/badge/stacks-.NET%20%7C%20Node%20%7C%20Python%20%7C%20Go%20%7C%20Java%20%7C%20Angular%20%7C%20React-orange.svg)](#stack-support)
+[![Stacks](https://img.shields.io/badge/stacks-Angular%20%7C%20.NET%20%7C%20SQL%20Server-orange.svg)](#stack-support)
 
 A portable, zero-config multi-agent orchestration layer that installs into any project in minutes.
 
@@ -63,8 +63,8 @@ It is built so a **one-person team can operate like a small company**:
 | 🧠 **Task-balanced models** | `/ceo --claude` or `--opencode`; within each family the model is picked per task — power (Opus/GPT-5) vs token-saving (Haiku/4o-mini). |
 | 🪙 **Token-lean** | Agents read `core-rules` once + load heavier skills only on demand — a **75–89% cut** in per-spawn skill load, in any repo. |
 | 🛡 **Professional gates** | Definition of Ready → sized/sliced → built → tested (DoD) → security/code review → released → postmortem. |
-| 🧩 **Any stack** | One stack-aware backend agent + per-stack rule snippets for .NET, Node, Python, Go, Java, Angular, React/Vue, SQL Server, Postgres/MySQL. |
-| 📚 **A real operating manual** | 41 process skills: spec-first, definition-of-ready/done, api-design, data-migration-safety, accessibility, i18n, code-review, security-scan, threat-modeling, secrets-management, data-privacy, clean-code, version-control, refactoring, ci-cd, feature-flags, reliability-slo, dependency-management, documentation, test-strategy, test-case-design, test-guard, e2e-testing, performance-testing, auto-merge, database-performance, cost-awareness, debug-method, incident-postmortem, release-discipline, and more. The SDLC contract that ties them together: `.devpilot/process.md`. |
+| 🧩 **Angular + .NET, end to end** | Angular frontend agent + .NET/SQL Server backend agent, a committed OpenAPI contract that generates the Angular client, and tests at every layer: Vitest, xUnit + real SQL Server (Testcontainers), and Playwright UI journeys. |
+| 📚 **A focused operating manual** | 23 skills, no overlap: `angular-dev`, `angular-testing`, `dotnet-api`, `efcore-sqlserver`, `dotnet-testing`, `api-contract`, `ui-e2e-playwright`, `token-lean-testing`, plus definition-of-ready/done, architecture-guard, test-case-design, test-strategy, test-guard, performance, code-review, security-scan, auto-merge, release-ops, and self-heal. The SDLC contract that ties them together: `.devpilot/process.md`. |
 | 🔔 **Operations built in** | Generated per-project CI (`devpilot-ci`) enforcing the gate ladder, one-command branch protection, and webhook/email notifications on sprint DONE / QA BLOCKED (`scripts/notify.sh`). |
 
 **Engines run the same workflow.** Claude uses subagents; opencode (GitHub Copilot) runs the
@@ -235,6 +235,7 @@ process under the hood — you never manage the steps yourself.
 | **Many ideas at once** | several `/dp-plan "…"` calls (dedup merges overlaps) → `/dp-sprint` → `/dp-build sprint-1` |
 | **"Is this already in the backlog?"** | just `/dp-plan` it — the dedup ladder answers DUPLICATE / FOLD-IN / RELATED / UNRELATED |
 | **Tests are thin / write test cases** | `/dp-test <story \| PR \| diff>` — derives a case matrix from the ACs, writes the missing tests, runs the suite |
+| **Full UI testing** | `/dp-test ui <scope>` — Playwright journeys for every user-facing AC, axe accessibility scan, visual/mobile checks |
 | **Performance worry** | `/dp-test perf <scope>` — budgeted load/stress pass; violations are blockers with numbers |
 | **PR is red in CI** | `/dp-autofix <PR>` — diagnoses logs, fixes within 3 bounded cycles, merges when green or escalates with the diagnosis |
 | **Reviewer left comments** | `/dp-review-fix <PR>` — applies each comment, replies on the threads, re-requests review |
@@ -258,12 +259,11 @@ process under the hood — you never manage the steps yourself.
 | `/dp-plan <feature \| issue \| task \| requirement>` | PM brain: dedup against the backlog, write Epic→Story (no code). Accepts raw text or a Jira key |
 | `/dp-sprint` | Group the backlog into sprints, recommend which to run first |
 | `/dp-build [sprint]` | Build a whole sprint → one PR → develop |
-| `/dp-test [perf] [story \| PR \| diff]` | Derive test cases from ACs → write the missing tests → run the suite |
+| `/dp-test [ui \| perf] [story \| PR \| diff]` | Derive test cases from ACs → write the missing tests (unit, integration, Playwright UI) → run the suite |
 | `/dp-autofix [PR]` | Drive a PR's CI to green (bounded fix loop) and merge per the `auto-merge` gate ladder |
 | `/dp-review-fix <PR>` | Read PR review comments → apply fixes → push |
 
-The six team agents (`team-ba`, `team-lead`, `team-frontend`, `team-backend`, `team-dotnet`,
-`team-qa`) are spawned automatically by the workflow commands — no manual slash wrappers.
+The five team agents (`team-ba`, `team-lead`, `team-frontend`, `team-dotnet`, `team-qa`) are spawned automatically by the workflow commands — no manual slash wrappers.
 
 **Config & deploy**
 
@@ -317,9 +317,9 @@ merge_policy: auto     # auto = devpilot squash-merges the PR | pr-only = a huma
 language: en           # human language for BA/QA/review docs (code stays English)
 
 stack:
-  frontend: angular    # angular | react | vue | nextjs | none
-  backend:  dotnet     # dotnet | node | python | go | java | none
-  database: sqlserver  # sqlserver | postgres | mysql | none
+  frontend: angular    # angular | none
+  backend:  dotnet     # dotnet | none
+  database: sqlserver  # sqlserver | none
   mobile:   none
 
 engines:
@@ -344,8 +344,8 @@ coding_profile: auto
 # balancing capability vs token cost.
 coding_models:
   claude:
-    power:    "claude-opus-4-8"            # architectural / cross-cutting / high-risk
-    standard: "claude-sonnet-4-6"          # normal feature & bug work
+    power:    "claude-opus-5-5"            # architectural / cross-cutting / high-risk
+    standard: "claude-sonnet-5"          # normal feature & bug work
     lite:     "claude-haiku-4-5-20251001"  # simple / mechanical / BA / QA
   opencode:                                 # GitHub Copilot via opencode
     power:    "github-copilot/gpt-5"
@@ -378,7 +378,7 @@ agents:                                     # enable only the layers your stack 
 | `model_mode` | Meaning | Switch with |
 |--------------|---------|-------------|
 | `recommended` *(default)* | task-balanced tiers via a one-word profile | `/dp-config models save` (claude: `auto \| balanced \| save` · opencode/antigravity: `recommended \| balanced \| save`) |
-| `single` | one model for the whole team | `bash scripts/model-profiles.sh single claude claude-sonnet-4-6` |
+| `single` | one model for the whole team | `bash scripts/model-profiles.sh single claude claude-sonnet-5` |
 | `per-team` | a model per role (BA, Team Lead, QA, Frontend, Backend) — or per layer on a non-claude engine | edit `models.*` / `layer_models.*` → `bash scripts/model-profiles.sh sync-agents` |
 
 Profiles are presets over `power / standard / lite`; edit those tiers directly for fine control.
@@ -389,14 +389,19 @@ Full guidance per scenario: [docs/setup-guide.md](docs/setup-guide.md).
 
 ## Stack Support
 
-A single **stack-aware backend agent** adapts to your language; rules are split into per-stack
-snippets so agents read only what applies (`.devpilot/rules/<stack>.md`, routed by `.devpilot/rules.md`).
+DevPilot is built for **Angular + ASP.NET Core + SQL Server**. Each layer has its own agent,
+rule snippet (`.devpilot/rules/<stack>.md`, routed by `.devpilot/rules.md`), and skills.
 
-| Layer | Supported |
-|-------|-----------|
-| Frontend | Angular · React · Vue · Next.js |
-| Backend | .NET · Node/TypeScript · Python · Go · Java |
-| Database | SQL Server · PostgreSQL · MySQL |
+| Layer | Stack | Tests |
+|-------|-------|-------|
+| Frontend | Angular 21+ (standalone, signals) | Vitest + TestBed |
+| Backend | .NET 8+ ASP.NET Core APIs | xUnit + `WebApplicationFactory` |
+| Database | SQL Server via EF Core | Testcontainers (real SQL Server) + Respawn |
+| Contract | OpenAPI → generated Angular client | snapshot + breaking-change check |
+| UI / E2E | the running app + API | Playwright (journeys, axe a11y, visual, mobile) |
+
+Every suite runs through `scripts/run-tests.sh`: the full log goes to `.devpilot/logs/` and
+agents read only the PASS/FAIL line and the failures, which keeps test runs cheap in tokens.
 
 ---
 
@@ -409,12 +414,13 @@ The lifecycle is gated end to end — **Ready → built → tested → reviewed 
 - **Definition of Done** — exit gate, per-role checklist (`definition-of-done.md`).
 - **Code-review gate** — Team Lead reviews with severity tags (🔴/🟡/🟢); an open 🔴 blocks the PR.
 - **Security scan + dependency audit** — `security-scan.md` checklist + `scripts/audit.sh`
-  (npm/pip/dotnet/go); new high/critical CVEs block the PR.
-- **Layer disciplines** — `api-design` (contracts), `data-migration-safety` (zero-downtime DB),
-  `accessibility` (WCAG AA) load on demand for the layers they apply to.
+  (npm/dotnet); new high/critical CVEs block the PR.
+- **Layer disciplines** — `dotnet-api` + `api-contract` (versioned OpenAPI contracts),
+  `efcore-sqlserver` (zero-downtime migrations, fast queries), `angular-dev` + `accessibility`
+  (WCAG AA) load on demand for the layers they apply to.
 - **QA verdict** — test cases derived per AC (`test-case-design.md`, traceability matrix in the QA
-  report); every acceptance criterion has a test; perf budgets proven when in scope
-  (`performance-testing.md`); PASS or BLOCKED.
+  report); every acceptance criterion has a test, every user-facing AC a Playwright journey
+  (`ui-e2e-playwright.md`); perf budgets proven when in scope (`performance.md`); PASS or BLOCKED.
 - **Test guard** — `scripts/test-guard.sh` (skill: `test-guard.md`): every changed source file has
   a covering test or a justified exemption; merge gates run it strict (`STRICT=1`) — a gap blocks the PR.
 - **Auto-merge ladder** — `auto-merge.md`: build/tests/audit/review/QA/CI all green **on the PR head**
@@ -539,15 +545,15 @@ bash scripts/checkpoint.sh latest          # find the most recent in-progress ta
 ```
 .claude/
   commands/          # /ceo + /dp-* workflow, deploy & config commands
-  agents/            # team-ba, team-lead, team-frontend, team-backend, team-dotnet, team-qa
+  agents/            # team-ba, team-lead, team-frontend, team-dotnet, team-qa
   settings.json      # SessionStart hook → scripts/session-start.sh
 .opencode/
   config.json        # OpenCode project config — points to AGENTS.md and .devpilot/rules.md
 .devpilot/
   process.md         # The standard dev process — phases, gates, roles (the SDLC contract)
   rules.md           # Router → core-rules + the snippet for your stack
-  rules/             # angular, react-vue, dotnet, node, python, go, java, sqlserver, postgres-mysql
-  skills/            # Operating manual (README.md index + 41 process skills)
+  rules/             # angular, dotnet, sqlserver
+  skills/            # Operating manual (README.md index + 23 skills)
   config/            # models.md — model tier reference
   templates/         # requirements, plan, qa-report, review-report, adr, jira-brief, ticket
 scripts/             # Orchestration: engine/model routing, backlog+sprint, Jira (md→ADF), deploy …

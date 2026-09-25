@@ -29,7 +29,7 @@
 
 ## Scope
 
-**Frontend:** <Angular / React / None — list components/pages affected>
+**Frontend:** <Angular / None — list components/pages affected>
 **Backend:** <.NET APIs / SQL Server / None — list endpoints/tables affected>
 **Out of scope:** <What is explicitly NOT included in this task>
 

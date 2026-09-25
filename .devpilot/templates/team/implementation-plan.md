@@ -16,7 +16,7 @@
 
 ## Layers Affected
 
-- [ ] Frontend (Angular / React)
+- [ ] Frontend (Angular)
 - [ ] Backend (.NET)
 - [ ] Database (SQL Server)
 - [ ] Tests

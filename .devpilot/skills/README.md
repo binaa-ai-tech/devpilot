@@ -1,71 +1,56 @@
-# devpilot Skills — the team's operating manual
+# devpilot Skills — the team's operating manual (Angular + .NET)
 
 Each skill is a short, principle-driven playbook. **Token discipline: agents read
-`core-rules.md` ONCE at spawn — nothing else up front.** Every heavier skill is loaded
+`core-rules.md` ONCE at spawn — nothing else up front.** Every other skill is loaded
 **only at the step that needs it** (per `core-rules.md` rule #10). Never pre-load skill lists.
 
 ## Always (every agent) — read once
 | Skill | Purpose |
 |-------|---------|
-| `core-rules.md` | The non-negotiables. Folds in `get-shit-done` + `spec-first` essentials, so those are **not** read separately. |
-
-## On demand only (load at point of use)
-`compact-context` (before a phase handoff) · `get-shit-done`/`spec-first` (full detail, rarely needed beyond core-rules) · everything below.
+| `core-rules.md` | The non-negotiables: autonomy, spec-first, scope, typing, verification, logging. |
 
 ## Planning / PM (BA / Team Lead — `/dp-plan`, `/dp-sprint`)
 | Skill | Purpose |
 |-------|---------|
-| `spec-first.md` | Every change traces to a verifiable acceptance criterion. |
-| `definition-of-ready.md` | Entry gate — a Story may enter a sprint only when ready (clear, testable, sized, deduped). |
+| `definition-of-ready.md` | Entry gate — a Story enters a sprint only when clear, testable, sized, deduped. |
 | `estimation-and-slicing.md` | Cut work into thin, shippable vertical slices; size & sequence. |
+| `architecture-guard.md` | Keep changes in the right layer (Controller→Service→Repository; smart/dumb components). |
 
-## Implementation (Frontend / Backend / DB / Integration)
+## Angular (Frontend Developer)
 | Skill | Purpose |
 |-------|---------|
-| `architecture-guard.md` | Keep changes in the right layer / structure. |
-| `api-design.md` | Contract-first endpoints; versioning; no silent breaking changes. |
-| `data-migration-safety.md` | Expand/contract, reversible, online DB migrations (zero downtime). |
+| `angular-dev.md` | Standalone + signals + zoneless-safe components, HTTP services/interceptors, lazy routes, typed forms, i18n. |
+| `angular-testing.md` | Vitest + TestBed specs, `HttpTestingController`, harnesses, stubbed signal services. |
 | `accessibility.md` | WCAG 2.1 AA gate for UI (keyboard, labels, contrast, live regions). |
-| `i18n.md` | Externalize strings; locale-aware dates/numbers/currency; Unicode + RTL. |
-| `clean-code.md` | Naming, small functions, readability — write for the next reader. |
-| `refactoring.md` | Change structure without changing behavior; tests-first, small steps. |
-| `test-strategy.md` | What to test and how (the test pyramid). |
-| `performance-testing.md` | Load/stress/soak budgets — prove the running system, not just the code. |
-| `observability.md` | Logging, metrics, and error handling ship with the feature. |
-| `performance-review.md` | Performance checklist for new code. |
-| `database-performance.md` | Indexes, query plans, N+1, pagination — make the schema fast. |
-| `cost-awareness.md` | Treat cloud/API cost as a design constraint; cache, right-size, expire. |
-| `feature-flags.md` | Decouple deploy from release; default-off, kill switch, clean up stale flags. |
-| `self-heal.md` | 3-attempt recovery + limit fallback. |
 
-## Security & data (design-time + diff-time)
+## .NET (Backend Developer)
 | Skill | Purpose |
 |-------|---------|
-| `threat-modeling.md` | Security by design (STRIDE, trust boundaries) before building auth/data/input features. |
-| `security-scan.md` | Security checklist over the diff. |
-| `secrets-management.md` | Credentials never in code; env/secret manager, rotation, no secrets in logs. |
-| `data-privacy.md` | Classify/minimize personal data; PII controls, retention, erasure (GDPR shape). |
-| `dependency-management.md` | Own the supply chain: vet, pin/lock, scan, license, update cadence. |
+| `dotnet-api.md` | ASP.NET Core endpoints: DTOs, ProblemDetails, validation, auth + ownership, versioning, logging/resilience. |
+| `efcore-sqlserver.md` | Expand/contract migrations, idempotent scripts, no-N+1 queries, indexes, pagination. |
+| `dotnet-testing.md` | xUnit units + `WebApplicationFactory` integration tests on real SQL Server (Testcontainers + Respawn). |
+| `api-contract.md` | Committed OpenAPI → generated Angular client; snapshot + breaking-change checks. |
 
-## Quality & shipping (QA / Team Lead)
+## Testing & QA (QA Engineer, `/dp-test`)
 | Skill | Purpose |
 |-------|---------|
 | `test-case-design.md` | Derive test cases from ACs (boundaries, negatives, traceability) before code. |
-| `test-guard.md` | **Highly recommended** enforcement gate — no changed source file ships without a test (`scripts/test-guard.sh`). |
-| `e2e-testing.md` | A few critical journeys, made stable enough to gate a merge. |
-| `code-review.md` | Structured review gate with severity tags. |
-| `version-control.md` | Atomic commits + small, single-purpose, CI-green PRs. |
-| `definition-of-done.md` | Per-role DoD gate before handoff. |
-| `ci-cd.md` | Pipeline-as-code, quality gates, build-once/promote, reversible deploys. |
-| `auto-merge.md` | The gate ladder + bounded fix loop a robot must pass to merge a PR. |
-| `release-discipline.md` | SemVer, changelog, DEV→SIT→UAT→PRD gates, rollback. |
+| `test-strategy.md` | Which pyramid layer proves what; mutation mindset. |
+| `ui-e2e-playwright.md` | Full UI testing: journeys, auth once, API seeding, axe a11y, visual + mobile, traces. |
+| `token-lean-testing.md` | Run suites via `scripts/run-tests.sh` — full log on disk, only failures in context. |
+| `test-guard.md` | Enforcement gate — no changed source file ships without a test (`scripts/test-guard.sh`). |
+| `performance.md` | Code performance checklist + k6 / web-vitals budgets. |
 
-## Across the whole process
+## Review, merge & ship (Team Lead)
 | Skill | Purpose |
 |-------|---------|
-| `debug-method.md` | Hypothesis-driven debugging (bug/issue tracks). |
-| `reliability-slo.md` | SLIs/SLOs/error budgets; design for failure (timeouts, retries, degrade). |
-| `incident-postmortem.md` | Blameless postmortem after a production incident (`/dp-hotfix`); action items → backlog. |
-| `tech-debt.md` | Take on and pay down debt deliberately; no silent debt. |
-| `documentation.md` | README/ADR/runbook authoring; docs as a deliverable, kept next to code. |
-| `status-reporting.md` | Crisp, honest status at every phase boundary. |
+| `code-review.md` | Review order + severity tags; clean-code, refactoring, and PR-hygiene standards. |
+| `security-scan.md` | Threat model at design time; diff checklist incl. secrets, PII, dependencies. |
+| `definition-of-done.md` | Per-role DoD gate before handoff. |
+| `auto-merge.md` | The gate ladder + bounded fix loop a robot must pass to merge a PR. |
+| `release-ops.md` | CI/CD, SemVer, DEV→SIT→UAT→PRD gates, feature flags, SLOs, postmortems. |
+
+## Whenever something fails
+| Skill | Purpose |
+|-------|---------|
+| `self-heal.md` | Root-cause debugging, 3-attempt build/test recovery, limit fallback. |

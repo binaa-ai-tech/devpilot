@@ -64,8 +64,8 @@ coding_models.<family>`:
 
 | Tier | When | Claude (`auto`) | opencode (`recommended`) |
 |------|------|--------|----------------------------|
-| `power` | architectural / cross-cutting / high-risk | `claude-opus-4-8` | `github-copilot/gpt-5` |
-| `standard` | normal feature & bug work (default) | `claude-sonnet-4-6` | `github-copilot/gpt-4o` |
+| `power` | architectural / cross-cutting / high-risk | `claude-opus-5-5` | `github-copilot/gpt-5` |
+| `standard` | normal feature & bug work (default) | `claude-sonnet-5` | `github-copilot/gpt-4o` |
 | `lite` | simple / mechanical / BA / QA | `claude-haiku-4-5` | `github-copilot/gpt-4o-mini` |
 
 **opencode + no Copilot:** if GitHub Copilot isn't available in opencode, devpilot
@@ -78,11 +78,11 @@ uses `coding_models.opencode.fallback`, or opencode's own default model when tha
 | Agent | Tier 1 (Claude Pro) | Tier 2 (Copilot/opencode) | Tier 3 (Free) |
 |-------|--------------------|-----------------------------|----------------|
 | BA | claude-haiku-4-5 | Gemini 3.5 Flash | DeepSeek V4 Flash Free |
-| Team Lead | claude-sonnet-4-6 | Gemini 2.5 Pro | DeepSeek V4 Flash Free |
-| Frontend Dev | claude-sonnet-4-6 | GPT-5.4 | DeepSeek V4 Flash Free |
-| Backend Dev | claude-sonnet-4-6 | GPT-5.4 | DeepSeek V4 Flash Free |
-| DB Agent | claude-sonnet-4-6 | GPT-5.2 | DeepSeek V4 Flash Free |
-| Integration | claude-sonnet-4-6 | GPT-5.4 | DeepSeek V4 Flash Free |
+| Team Lead | claude-sonnet-5 | Gemini 2.5 Pro | DeepSeek V4 Flash Free |
+| Frontend Dev | claude-sonnet-5 | GPT-5.4 | DeepSeek V4 Flash Free |
+| Backend Dev | claude-sonnet-5 | GPT-5.4 | DeepSeek V4 Flash Free |
+| DB Agent | claude-sonnet-5 | GPT-5.2 | DeepSeek V4 Flash Free |
+| Integration | claude-sonnet-5 | GPT-5.4 | DeepSeek V4 Flash Free |
 | QA | claude-haiku-4-5 | GPT-5-mini | Nemotron 3 Super Free |
 
 **Why no Opus:** Normal projects don't need it. Sonnet 4.6 handles architecture,

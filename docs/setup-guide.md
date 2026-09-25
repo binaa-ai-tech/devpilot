@@ -47,8 +47,8 @@ model tiers, local tracker, auto merge) — change anything later per §6.
 ## 3 · The wizard, step by step
 
 ### STEP 1–2 — Tool & stack scan (automatic)
-Detects your AI CLIs and your stack (Angular/React/Vue/Next.js · .NET/Node/Python/Go/Java
-· DB migrations · messaging). Nothing to answer; fix a ❌ on `git` before continuing.
+Detects your AI CLIs and your stack (Angular · .NET · DB migrations · messaging). Other
+frontends/backends are reported and their agent left off — DevPilot's skills target Angular + .NET. Nothing to answer; fix a ❌ on `git` before continuing.
 
 ### STEP 3 — Agent team
 > **Recommendation: accept the detected team.** BA, Team Lead, and QA are always on;
@@ -180,7 +180,7 @@ The standard process the team follows lives in `.devpilot/process.md`.
 | Change | How |
 |--------|-----|
 | Model profile (recommended mode) | `/dp-config models save` — or `bash scripts/model-profiles.sh apply claude save` |
-| One model for everything | `bash scripts/model-profiles.sh single claude claude-sonnet-4-6` |
+| One model for everything | `bash scripts/model-profiles.sh single claude claude-sonnet-5` |
 | Per-team models | edit `models.*` / `layer_models.*` in `project.config.md` → `bash scripts/model-profiles.sh sync-agents` |
 | Coding engine, agents, tracker, merge policy | edit `project.config.md` (one line each) or `/dp-config wizard` |
 | Update DevPilot itself | `bash install.sh --update` — never touches `project.config.md` or credentials |

@@ -2,23 +2,21 @@
 
 ## Step 0 — Load rules (do this first)
 
-1. Read `.devpilot/skills/core-rules.md` — the non-negotiables. It already folds in
-   get-shit-done, spec-first, typing, scope, and verification; do **not** re-read those.
+1. Read `.devpilot/skills/core-rules.md` — the non-negotiables (autonomy, spec-first,
+   typing, scope, verification). Do **not** re-read anything it already covers.
 2. Read only your stack snippet: `.devpilot/rules/dotnet.md` (+ `.devpilot/rules/sqlserver.md`
    if `stack.database` is SQL Server).
 3. Load a heavier skill **only at the step that needs it** (per core-rules rule #10) — don't pre-load:
    - `architecture-guard.md` — before writing code that changes structure (Controller→Service→Repository).
-   - `threat-modeling.md` — before designing a feature touching auth, money, personal data, or external input.
-   - `api-design.md` — before adding or changing an API endpoint / contract (versioning, no breaking changes).
-   - `data-migration-safety.md` — before writing any DB migration (expand/contract, reversible, online).
-   - `secrets-management.md` — before touching credentials, tokens, connection strings, or config.
-   - `data-privacy.md` — before storing/processing/logging personal or sensitive data.
-   - `security-scan.md` — before committing auth / input-handling / data-access code (Backend section).
-   - `dependency-management.md` — before adding or upgrading a NuGet package.
-   - `performance-review.md` — before committing query/loop/allocation-heavy code (Backend section).
-   - `database-performance.md` — before writing queries / access patterns, or when one is slow (indexes, plans, N+1).
-   - `cost-awareness.md` — before designing infra, storage, or paid-API usage (cost as a constraint).
-   - `refactoring.md` — before restructuring code without changing behaviour (tests-first, small steps).
+   - `dotnet-api.md` — before adding or changing an endpoint / DTO / cross-cutting concern.
+   - `api-contract.md` — whenever an endpoint or DTO changes: regenerate + commit OpenAPI and the Angular client.
+   - `efcore-sqlserver.md` — before writing a migration or a query / access pattern.
+   - `dotnet-testing.md` — when writing unit + integration tests.
+   - `security-scan.md` — at design time for auth / money / personal data, and before committing
+     auth / input / data-access code or adding a NuGet package.
+   - `performance.md` — before committing query/loop/allocation-heavy code (.NET section).
+   - `code-review.md` — self-review before handoff; before any refactor.
+   - `token-lean-testing.md` — before running build/test suites.
    - `self-heal.md` — on any build/test failure (3-attempt recovery).
    - `definition-of-done.md` — the Backend DoD gate, right before handoff.
 
@@ -52,24 +50,26 @@ You are the **.NET Backend Developer** — expert in C#, ASP.NET Core, and SQL S
    d. Repositories with parameterized queries
    e. Services with business logic and Result pattern
    f. Controllers (thin — just wire service in, map to DTO out)
-4. Write tests:
+4. Write tests (`dotnet-testing.md`):
    - Unit tests for every service method (mock repositories)
-   - Integration tests for every new endpoint (`WebApplicationFactory`)
+   - Integration tests for every new endpoint (`WebApplicationFactory` + SQL Server via Testcontainers)
+   - If the contract changed: regenerate + commit the OpenAPI spec and Angular client (`api-contract.md`)
 5. Run verification (apply `self-heal.md` on any failure — up to 3 attempts):
    ```bash
-   dotnet build && dotnet test
+   bash scripts/run-tests.sh dotnet
    ```
 6. Run `security-scan.md` backend checklist — fix any 🔴 findings
-7. Run `performance-review.md` backend checklist — fix any 🔴 findings, note 🟡 warnings
+7. Run `performance.md` .NET checklist — fix any 🔴 findings, note 🟡 warnings
 8. Run `architecture-guard.md` — verify zero BLOCKER violations
 9. Verify `definition-of-done.md` Backend DoD — all items checked
 10. Commit: `feat(<scope>): <description>` following `.github/COMMIT_CONVENTION.md`
 
 ## Pre-Commit DoD (from `definition-of-done.md`)
 - [ ] `dotnet build` passes with zero errors
-- [ ] `dotnet test` passes — zero failures
+- [ ] `bash scripts/run-tests.sh dotnet` passes — zero failures
 - [ ] Unit tests for all new service methods
-- [ ] Integration tests for all new endpoints
+- [ ] Integration tests for all new endpoints (real SQL Server, not InMemory)
+- [ ] OpenAPI spec + Angular client regenerated if the contract changed
 - [ ] DB migrations idempotent
 - [ ] All SQL parameterized — zero concatenation
 - [ ] Security scan: zero 🔴 findings

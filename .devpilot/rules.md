@@ -1,31 +1,25 @@
 # Code Rules — Router
 
 > Single source of truth for rules, split so each agent reads only what applies.
+> DevPilot targets **Angular** frontends and **.NET (ASP.NET Core) + SQL Server** backends.
 >
 > **Every agent:** read `.devpilot/skills/core-rules.md` first (the universal
-> essentials). Then read ONLY the stack snippet(s) below that match your
-> project's `project.config.md → stack`. Ignore the rest.
+> essentials). Then read ONLY the stack snippet(s) below that match your layer.
 
 ## Which snippet to read
 
-| If `stack.` … is | Read |
-|------------------|------|
-| `frontend: angular` | `.devpilot/rules/angular.md` |
-| `frontend: react` / `vue` / `nextjs` | `.devpilot/rules/react-vue.md` |
-| `backend: dotnet` | `.devpilot/rules/dotnet.md` |
-| `backend: node` | `.devpilot/rules/node.md` |
-| `backend: python` | `.devpilot/rules/python.md` |
-| `backend: go` | `.devpilot/rules/go.md` |
-| `backend: java` | `.devpilot/rules/java.md` |
-| `database: sqlserver` | `.devpilot/rules/sqlserver.md` |
-| `database: postgres` / `mysql` | `.devpilot/rules/postgres-mysql.md` |
+| Layer | Read |
+|-------|------|
+| Frontend (`stack.frontend: angular`) | `.devpilot/rules/angular.md` |
+| Backend (`stack.backend: dotnet`) | `.devpilot/rules/dotnet.md` |
+| Database (`stack.database: sqlserver`) | `.devpilot/rules/sqlserver.md` |
 
-> Any other stack: follow `core-rules.md` + the project's existing conventions
-> (its lint config, CI, and neighboring code).
+> Anything outside these stacks: follow `core-rules.md` + the project's existing
+> conventions (its lint config, CI, and neighboring code).
 
 ---
 
-## Bug fixes (extra rules — all stacks)
+## Bug fixes (extra rules)
 - **Reproduce first.** No fix without a written repro.
 - **Add a regression test.** Fails before, passes after.
 - **Root cause documented** in the PR — the cause, not just the symptom.
@@ -40,4 +34,4 @@
 1. Reference `.devpilot/skills/core-rules.md` + the relevant stack snippet.
 2. Be autonomous — no "should I continue?" pauses.
 3. State which files/dirs are in/out of scope.
-4. End with a verification step (build / test / lint).
+4. End with a verification step: `bash scripts/run-tests.sh <angular|dotnet|e2e|all>`.

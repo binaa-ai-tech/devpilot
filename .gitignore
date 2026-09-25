@@ -34,3 +34,6 @@ Desktop.ini
 docs/project-index.md
 docs/index/.state
 docs/index/*.md
+
+# Token-lean test runner logs (scripts/run-tests.sh)
+.devpilot/logs/

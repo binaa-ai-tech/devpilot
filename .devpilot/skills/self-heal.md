@@ -1,13 +1,33 @@
 # Self-Healing — 3-attempt recovery + model fallback
 
-Apply this skill in every agent. It covers two scenarios:
-build/lint/test failures and Claude limit fallback to the configured fallback engine.
+Apply this skill in every agent. It covers three scenarios: debugging a bug to its
+root cause, build/lint/test failures, and Claude limit fallback to the configured
+fallback engine.
+
+---
+
+## Part 0 — Debugging method (bug / issue tracks)
+
+Debugging is a search, not a guess. Find the root cause before touching code.
+1. **Reproduce** — a reliable, minimal repro (exact inputs, env, steps). No repro, no fix claim.
+2. **Observe** — read the full error, stack trace, and logs; state actual vs. expected precisely.
+3. **Hypothesize** — 1–3 concrete, falsifiable causes.
+4. **Localize** — bisect (`git bisect`, binary-search the data flow, temporary instrumentation);
+   confirm or kill each hypothesis with evidence.
+5. **Fix the root cause**, not the symptom — a try/catch that hides the error is not a fix.
+6. **Lock it in** — a regression test that fails before the fix and passes after; root cause in
+   one line on the PR/ticket. Remove temporary debug logging before committing.
+
+Heuristics: "worked before" → diff against the last good state · "works locally, fails in env X"
+→ config/data/schema, not logic (`prompts/6-env-diff.md`) · intermittent → ordering,
+concurrency, time, or shared state. Three dead hypotheses → escalate with what you ruled out.
 
 ---
 
 ## Part 1 — Build / Lint / Test Recovery (3-attempt protocol)
 
-When a build, lint, or test command fails:
+When a build, lint, or test command fails (run suites via `bash scripts/run-tests.sh` —
+`token-lean-testing` — and read only the failure lines):
 
 ### Attempt 1 — Diagnose
 1. Read the COMPLETE error output. Do not skim.

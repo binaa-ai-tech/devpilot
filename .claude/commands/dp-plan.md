@@ -89,7 +89,7 @@ is in the **gray band** (ambiguous), STOP and ask the user, showing the 1–2 ca
 ## Step 4 — BA: write the durable spec to git
 
 **Adopt the BA persona.** Read `.devpilot/prompts/team/ba-agent.md`. Apply
-`.devpilot/skills/spec-first.md` — every Story must trace to verifiable acceptance criteria.
+`.devpilot/skills/definition-of-ready.md` — every Story must trace to verifiable acceptance criteria.
 
 1. Read the relevant source files identified from the project index (3–8 max).
 2. Write `docs/requirements/<SLUG>.md` from `.devpilot/templates/team/requirements.md`

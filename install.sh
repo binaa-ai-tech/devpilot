@@ -124,14 +124,14 @@ run_update() {
   echo -e "${BOLD}  devpilot — update (config preserved)${RESET}"
   echo ""
 
-  RULE_SNIPPETS="angular.md react-vue.md dotnet.md node.md python.md go.md java.md sqlserver.md postgres-mysql.md"
-  PROMPT_TEAM="ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md backend-agent.md qa-agent.md"
+  RULE_SNIPPETS="angular.md dotnet.md sqlserver.md"
+  PROMPT_TEAM="ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md qa-agent.md"
   TEMPLATE_TEAM="requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md jira-brief.md"
-  SKILLS="get-shit-done.md spec-first.md security-scan.md performance-review.md architecture-guard.md self-heal.md definition-of-done.md compact-context.md core-rules.md code-review.md test-strategy.md debug-method.md estimation-and-slicing.md tech-debt.md observability.md release-discipline.md status-reporting.md definition-of-ready.md incident-postmortem.md data-migration-safety.md api-design.md accessibility.md threat-modeling.md secrets-management.md data-privacy.md clean-code.md version-control.md refactoring.md ci-cd.md feature-flags.md reliability-slo.md dependency-management.md documentation.md i18n.md cost-awareness.md database-performance.md test-case-design.md e2e-testing.md performance-testing.md auto-merge.md test-guard.md README.md"
+  SKILLS="core-rules.md definition-of-ready.md estimation-and-slicing.md architecture-guard.md angular-dev.md angular-testing.md accessibility.md dotnet-api.md efcore-sqlserver.md dotnet-testing.md api-contract.md test-case-design.md test-strategy.md ui-e2e-playwright.md token-lean-testing.md test-guard.md performance.md code-review.md security-scan.md definition-of-done.md auto-merge.md release-ops.md self-heal.md README.md"
   CHECKLISTS="feature.md bugfix.md hotfix.md"
   CMDS="ceo.md dp-plan.md dp-sprint.md dp-build.md dp-release.md dp-rollback.md dp-hotfix.md dp-status.md dp-config.md dp-review-fix.md dp-test.md dp-autofix.md"
-  AGENTS_LIST="team-lead.md team-ba.md team-frontend.md team-dotnet.md team-backend.md team-qa.md"
-  SCRIPTS="git-flow.sh new-feature.sh run-command.sh resolve-engine.sh model-profiles.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh create-jira-ticket.sh create-jira-epic.sh update-jira-status.sh update-jira-description.sh add-jira-comment.sh generate-project-index.sh generate-backlog-index.sh jira-sprint.sh link-jira-issues.sh md-to-adf.sh jira-describe.sh ceo.sh dp-plan.sh dp-sprint.sh dp-build.sh dp-release.sh dp-status.sh dp-config.sh"
+  AGENTS_LIST="team-lead.md team-ba.md team-frontend.md team-dotnet.md team-qa.md"
+  SCRIPTS="git-flow.sh new-feature.sh run-command.sh resolve-engine.sh model-profiles.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh create-jira-ticket.sh create-jira-epic.sh update-jira-status.sh update-jira-description.sh add-jira-comment.sh generate-project-index.sh generate-backlog-index.sh jira-sprint.sh link-jira-issues.sh md-to-adf.sh jira-describe.sh ceo.sh dp-plan.sh dp-sprint.sh dp-build.sh dp-release.sh dp-status.sh dp-config.sh"
 
   info "Refreshing .devpilot/rules..."
   fetch ".devpilot/rules.md" ".devpilot/rules.md"
@@ -152,6 +152,20 @@ run_update() {
 
   info "Refreshing scripts/..."
   for f in $SCRIPTS; do fetch "scripts/$f" "scripts/$f"; chmod +x "scripts/$f" 2>/dev/null || true; done
+
+  # Retired in the Angular + .NET consolidation — merged into the skills above.
+  info "Removing retired skills, rules, and agents..."
+  RETIRED="skills/get-shit-done.md skills/spec-first.md skills/compact-context.md skills/status-reporting.md
+    skills/tech-debt.md skills/observability.md skills/clean-code.md skills/refactoring.md skills/version-control.md
+    skills/ci-cd.md skills/release-discipline.md skills/reliability-slo.md skills/incident-postmortem.md
+    skills/feature-flags.md skills/threat-modeling.md skills/secrets-management.md skills/data-privacy.md
+    skills/dependency-management.md skills/cost-awareness.md skills/i18n.md skills/database-performance.md
+    skills/data-migration-safety.md skills/api-design.md skills/e2e-testing.md skills/performance-review.md
+    skills/performance-testing.md skills/debug-method.md skills/documentation.md
+    rules/react-vue.md rules/node.md rules/python.md rules/go.md rules/java.md rules/postgres-mysql.md
+    prompts/team/backend-agent.md"
+  for f in $RETIRED; do rm -f ".devpilot/$f"; done
+  rm -f .claude/agents/team-backend.md
 
   # Refetching the agent files above reset their model: frontmatter to repo
   # defaults — re-sync it from the user's project.config.md so their chosen
@@ -250,18 +264,14 @@ if [ -f "angular.json" ] || \
    grep -q '"@nx/angular"' package.json 2>/dev/null || \
    find . -maxdepth 4 -name "angular.json" 2>/dev/null | grep -q .; then
                                                              DETECT_FRONTEND="angular";  echo "  ✅ Angular"
-elif grep -q '"next"' package.json 2>/dev/null;         then DETECT_FRONTEND="nextjs";   echo "  ✅ Next.js"
-elif grep -q '"react"' package.json 2>/dev/null;        then DETECT_FRONTEND="react";    echo "  ✅ React"
-elif grep -q '"vue"' package.json 2>/dev/null;          then DETECT_FRONTEND="vue";      echo "  ✅ Vue"
-elif [ -f "package.json" ];                             then DETECT_FRONTEND="node";     echo "  ✅ Node/JS"
+elif [ -f "package.json" ]; then
+  warn "package.json found but no Angular — DevPilot's frontend skills target Angular; frontend agent left off"
 fi
 
 if find . -maxdepth 3 \( -name "*.sln" -o -name "*.csproj" \) 2>/dev/null | grep -q .; then
   DETECT_BACKEND="dotnet"; echo "  ✅ .NET"
-elif [ -f "requirements.txt" ] || [ -f "pyproject.toml" ]; then
-  DETECT_BACKEND="python"; echo "  ✅ Python"
-elif [ -f "go.mod" ];   then DETECT_BACKEND="go";   echo "  ✅ Go"
-elif [ -f "pom.xml" ];  then DETECT_BACKEND="java"; echo "  ✅ Java"
+elif [ -f "requirements.txt" ] || [ -f "pyproject.toml" ] || [ -f "go.mod" ] || [ -f "pom.xml" ]; then
+  warn "non-.NET backend found — DevPilot's backend skills target .NET; backend agent left off"
 fi
 
 # Scan deeper than the backend probe: EF Core / monorepo migrations often nest
@@ -372,7 +382,7 @@ info "Coding engine: $CODING_ENGINE  (fallback: $FALLBACK_ENGINE)"
 section "STEP 5/8 · Model assignment"
 
 # NOTE: profile mappings mirror scripts/model-profiles.sh — keep them in sync.
-CL_OPUS="claude-opus-4-8"; CL_SONNET="claude-sonnet-4-6"; CL_HAIKU="claude-haiku-4-5-20251001"
+CL_OPUS="claude-opus-5-5"; CL_SONNET="claude-sonnet-5"; CL_HAIKU="claude-haiku-4-5-20251001"
 
 CL_POWER="$CL_OPUS"; CL_STANDARD="$CL_SONNET"; CL_LITE="$CL_HAIKU"
 OC_POWER="github-copilot/gpt-5"; OC_STANDARD="github-copilot/gpt-4o"; OC_LITE="github-copilot/gpt-4o-mini"; OC_FALLBACK=""
@@ -856,7 +866,7 @@ fi
 
 # Per-stack rule snippets (router in rules.md tells agents which to read)
 mkdir -p .devpilot/rules
-for f in angular.md react-vue.md dotnet.md node.md python.md go.md java.md sqlserver.md postgres-mysql.md; do
+for f in angular.md dotnet.md sqlserver.md; do
   fetch ".devpilot/rules/$f" ".devpilot/rules/$f"
 done
 
@@ -864,7 +874,7 @@ for f in 6-env-diff.md 6-generate-tests.md; do
   fetch ".devpilot/prompts/$f" ".devpilot/prompts/$f"
 done
 
-for f in ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md backend-agent.md qa-agent.md; do
+for f in ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md qa-agent.md; do
   fetch ".devpilot/prompts/team/$f" ".devpilot/prompts/team/$f"
 done
 
@@ -880,12 +890,11 @@ for f in feature.md bugfix.md hotfix.md; do
   fetch ".devpilot/checklists/$f" ".devpilot/checklists/$f"
 done
 
-for f in get-shit-done.md spec-first.md security-scan.md performance-review.md architecture-guard.md self-heal.md definition-of-done.md compact-context.md core-rules.md \
-         code-review.md test-strategy.md debug-method.md estimation-and-slicing.md tech-debt.md observability.md release-discipline.md status-reporting.md \
-         definition-of-ready.md incident-postmortem.md data-migration-safety.md api-design.md accessibility.md \
-         threat-modeling.md secrets-management.md data-privacy.md clean-code.md version-control.md refactoring.md ci-cd.md feature-flags.md reliability-slo.md dependency-management.md documentation.md \
-         i18n.md cost-awareness.md database-performance.md \
-         test-case-design.md e2e-testing.md performance-testing.md auto-merge.md test-guard.md \
+for f in core-rules.md definition-of-ready.md estimation-and-slicing.md architecture-guard.md \
+         angular-dev.md angular-testing.md accessibility.md \
+         dotnet-api.md efcore-sqlserver.md dotnet-testing.md api-contract.md \
+         test-case-design.md test-strategy.md ui-e2e-playwright.md token-lean-testing.md test-guard.md performance.md \
+         code-review.md security-scan.md definition-of-done.md auto-merge.md release-ops.md self-heal.md \
          README.md; do
   fetch ".devpilot/skills/$f" ".devpilot/skills/$f"
 done
@@ -900,7 +909,7 @@ for f in ceo.md dp-plan.md dp-sprint.md dp-build.md \
   fetch ".claude/commands/$f" ".claude/commands/$f"
 done
 
-for f in team-lead.md team-ba.md team-frontend.md team-dotnet.md team-backend.md team-qa.md; do
+for f in team-lead.md team-ba.md team-frontend.md team-dotnet.md team-qa.md; do
   fetch ".claude/agents/$f" ".claude/agents/$f"
 done
 
@@ -934,7 +943,7 @@ fi
 # scripts/
 info "Installing scripts/..."
 for f in git-flow.sh new-feature.sh run-command.sh resolve-engine.sh model-profiles.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh \
-          run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh \
+          run-mode.sh track.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh \
           doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh \
           deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh \
           create-jira-ticket.sh create-jira-epic.sh \
@@ -966,7 +975,7 @@ done
 
 # .gitignore additions
 if [ -f ".gitignore" ]; then
-  for entry in ".devpilot/config.sh" ".devpilot/.scope-lock" ".env" ".env.local" "docs/fallback/" "docs/index/.state" "docs/project-index.md" "docs/index/*.md"; do
+  for entry in ".devpilot/config.sh" ".devpilot/.scope-lock" ".env" ".env.local" "docs/fallback/" ".devpilot/logs/" "docs/index/.state" "docs/project-index.md" "docs/index/*.md"; do
     grep -qF "$entry" .gitignore || echo "$entry" >> .gitignore
   done
 fi
@@ -1136,7 +1145,6 @@ sync_model ".claude/agents/team-lead.md"     "$T1_LEAD"
 sync_model ".claude/agents/team-ba.md"       "$T1_BA"
 sync_model ".claude/agents/team-qa.md"       "$T1_QA"
 sync_model ".claude/agents/team-frontend.md" "$T1_FE_DEV"
-sync_model ".claude/agents/team-backend.md"  "$T1_BE_DEV"
 sync_model ".claude/agents/team-dotnet.md"   "$T1_BE_DEV"
 
 # ═════════════════════════════════════════════════════════════════════════════

@@ -8,6 +8,15 @@ without breaking things. Untested behavior is unfinished behavior.
 2. **Integration** — a slice through real boundaries (DB, API, queue).
 3. **End-to-end** — a few critical user journeys only. Slow and brittle; keep rare.
 
+| Layer | Angular | .NET |
+|-------|---------|------|
+| Unit | Vitest specs — services, pipes, components (`angular-testing`) | xUnit — services/handlers/validators (`dotnet-testing`) |
+| Integration | Component + `HttpTestingController` | `WebApplicationFactory` + SQL Server via Testcontainers |
+| Contract | Generated client compiles against committed OpenAPI | OpenAPI snapshot test (`api-contract`) |
+| E2E / UI | Playwright journeys across the real app + API (`ui-e2e-playwright`) | |
+
+Run every layer through `bash scripts/run-tests.sh` (`token-lean-testing`).
+
 ## What to test (every change)
 - The **happy path** for each acceptance criterion.
 - At least one **edge** case (boundary, empty, max).

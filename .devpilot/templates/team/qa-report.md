@@ -17,23 +17,14 @@
 
 ## Test Results
 
-### Frontend
+Run via `bash scripts/run-tests.sh all` — paste the summary lines only; full logs stay in `.devpilot/logs/`.
 
-```
-ng test --watch=false
-[paste summary output]
-```
-
-**Status:** ✅ All pass / ❌ X failures
-
-### Backend
-
-```
-dotnet test
-[paste summary output]
-```
-
-**Status:** ✅ All pass / ❌ X failures
+| Suite | Result | Notes |
+|-------|--------|-------|
+| .NET (`dotnet`) | ✅ <passed>/<total> / ❌ <n> failing | <failing tests, if any> |
+| Angular (`angular`) | ✅ <passed>/<total> / ❌ <n> failing | |
+| UI / E2E (`e2e`) | ✅ <passed>/<total> / ❌ <n> failing / n/a | <trace path for failures> |
+| Accessibility (axe) | ✅ clean / ❌ <violations> / n/a | |
 
 ---
 

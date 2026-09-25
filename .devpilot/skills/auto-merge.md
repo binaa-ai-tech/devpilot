@@ -33,8 +33,8 @@ forever; never burn a fourth cycle "just in case".
 
 ## Never auto-merge when
 - `merge_policy: pr-only`, or the target is `main`/a release branch — the PRD
-  path always gets a human (`release-discipline.md`).
-- The diff contains DB migrations not vetted against `data-migration-safety.md`,
+  path always gets a human (`release-ops.md`).
+- The diff contains DB migrations not vetted against `efcore-sqlserver.md`,
   or touches secrets/auth configuration.
 - A gate went green because a test was skipped, weakened, or an error was
   suppressed — that's a hard stop, not a pass (`self-heal.md` hard rules).

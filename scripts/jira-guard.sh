@@ -112,7 +112,7 @@ case "$cmd" in
       echo -e "${RED}${BOLD}❌ STOP — $severity bug must not go through /ceo or /dp-plan.${RESET}" >&2
       echo -e "${YELLOW}   A production-critical defect takes the expedited /dp-hotfix lane:${RESET}" >&2
       echo -e "     • branches from \`main\` (not develop), ships to PRD behind a manual gate" >&2
-      echo -e "     • minimal diff, then a blameless postmortem (.devpilot/skills/incident-postmortem.md)" >&2
+      echo -e "     • minimal diff, then a blameless postmortem (.devpilot/skills/release-ops.md)" >&2
       echo -e "   Run:  /dp-hotfix <ticket> <slug> <version>   (see .devpilot/process.md)" >&2
       exit 1
     fi

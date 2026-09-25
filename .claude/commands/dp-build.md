@@ -85,12 +85,13 @@ Use `IMPL_ENGINE` from Step 0.
 ### Engine: `claude`
 Spawn agents in parallel for the union of scoped work across the sprint's Stories:
 - **Frontend** → `subagent_type: "team-frontend"`
-- **Backend / DB / Integration** → `subagent_type: "team-backend"`
+- **Backend / DB / Integration** → `subagent_type: "team-dotnet"`
 
 Each agent prompt:
 > Sprint: `<SPRINT>`. Stories + specs: `<list of docs/requirements/*.md + docs/plans/*.md>`.
 > Branch: `<BRANCH>`. Implement all <layer> work across these Stories per the plans.
-> Read `.devpilot/skills/self-heal.md`. Run build + tests. Commit per Story with a
+> Read `.devpilot/skills/self-heal.md`. Run build + tests via `bash scripts/run-tests.sh <angular|dotnet>`
+> (summary only — `token-lean-testing`). Commit per Story with a
 > conventional message referencing its key. Report what you built in 3 bullets.
 
 ### Engine: `opencode`
@@ -115,8 +116,9 @@ autonomous run (see `core-rules.md` #1 and `auto-merge.md`).
 Spawn `subagent_type: "team-qa"`:
 > Sprint: `<SPRINT>`. Verify every acceptance criterion across all Stories. Derive the
 > case matrix per AC with `.devpilot/skills/test-case-design.md`, apply
-> `.devpilot/skills/test-strategy.md` (what to test per AC; `e2e-testing.md` /
-> `performance-testing.md` only when a journey or perf AC is in scope) and gate on
+> `.devpilot/skills/test-strategy.md` (what to test per AC), add a Playwright journey for
+> every user-facing AC per `.devpilot/skills/ui-e2e-playwright.md` (`performance.md` only
+> when a perf AC is in scope), run everything via `bash scripts/run-tests.sh all`, and gate on
 > `.devpilot/skills/definition-of-done.md`. Write `docs/qa/<SPRINT_SLUG>.md`.
 > Verdict per Story: PASS / BLOCKED.
 

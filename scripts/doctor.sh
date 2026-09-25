@@ -86,7 +86,7 @@ for T in power standard lite; do
   if [ -z "$M" ]; then
     warn "coding_models.claude.$T is empty — set it: /dp-config models <profile>"; CL_BAD=1
   elif ! printf '%s' "$M" | grep -qE '^claude-(opus|sonnet|haiku|fable|mythos)-[0-9a-z.-]+$'; then
-    warn "coding_models.claude.$T='$M' doesn't look like a Claude model id — typo? (e.g. claude-sonnet-4-6)"; CL_BAD=1
+    warn "coding_models.claude.$T='$M' doesn't look like a Claude model id — typo? (e.g. claude-sonnet-5)"; CL_BAD=1
   fi
 done
 [ "$CL_BAD" = 0 ] && ok "claude model tiers look valid"
@@ -94,7 +94,7 @@ done
 # Agent frontmatter vs config (drift breaks per-team/single modes silently)
 agent_tier1() { grep -A30 '^models:' project.config.md 2>/dev/null | grep -A3 "^  $1:" | grep 'tier1:' | head -1 | sed 's/.*tier1:[[:space:]]*//; s/#.*//' | tr -d '"' | awk '{print $1}'; }
 DRIFT=0
-for PAIR in "ba:team-ba" "team_lead:team-lead" "qa:team-qa" "frontend_dev:team-frontend" "backend_dev:team-backend"; do
+for PAIR in "ba:team-ba" "team_lead:team-lead" "qa:team-qa" "frontend_dev:team-frontend" "backend_dev:team-dotnet"; do
   KEY="${PAIR%%:*}"; FILE=".claude/agents/${PAIR##*:}.md"
   WANT=$(agent_tier1 "$KEY"); [ -z "$WANT" ] && continue
   [ -f "$FILE" ] || continue

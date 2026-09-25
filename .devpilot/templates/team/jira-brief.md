@@ -7,9 +7,10 @@
 ## How to implement (any AI tool)
 - Repo: `<git-remote-url>` · Base branch: `<base_branch>` · Work branch: `feature/<KEY>-<slug>`
 - Engine: pick per `engines.coding` (Claude or opencode/Copilot). Model balances power vs token by complexity.
-- Apply skills: `spec-first` (trace every change to an AC) → layer skills as needed
-  (`api-design`, `data-migration-safety`, `accessibility`, `security-scan`, `performance-review`,
-  `architecture-guard`) → `definition-of-done` before handoff.
+- Apply skills: `core-rules` (trace every change to an AC) → layer skills as needed
+  (Angular: `angular-dev`, `angular-testing`, `accessibility`; .NET: `dotnet-api`, `efcore-sqlserver`,
+  `dotnet-testing`; both: `api-contract`, `security-scan`, `performance`, `architecture-guard`)
+  → `ui-e2e-playwright` for user-facing ACs → `definition-of-done` before handoff.
 - Full spec in repo (authoritative): `docs/requirements/<slug>.md`, domain model `docs/domain-models/<slug>.md`.
 
 ## User Story

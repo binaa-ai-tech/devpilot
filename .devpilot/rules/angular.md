@@ -24,5 +24,13 @@
 - Services `providedIn: 'root'` unless feature-scoped. No `BehaviorSubject` for new state — prefer signals.
 - SCSS only, design tokens (`$primary`, `$radius-md`). No hardcoded hex/px, no inline styles.
 
+### HTTP / API
+- HTTP only in services; cross-cutting concerns in functional interceptors. Use the client generated from the
+  committed OpenAPI spec when one exists — no hand-written duplicate DTOs (`skills/api-contract.md`).
+- Every data view renders loading, empty, and error states.
+
 ### Testing
-- One `*.spec.ts` per new component/service; cover rendering + one interaction/branch. `TestBed` with standalone imports.
+- One `*.spec.ts` per new component/service (Vitest via `ng test`); cover rendering + one interaction/branch.
+  `TestBed` with standalone imports; HTTP through `HttpTestingController` (`skills/angular-testing.md`).
+- Elements a Playwright journey will touch get a `data-testid` or an accessible name (`skills/ui-e2e-playwright.md`).
+- Run suites via `bash scripts/run-tests.sh angular` — never paste the raw log into context.
