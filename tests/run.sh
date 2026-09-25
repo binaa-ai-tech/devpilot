@@ -914,7 +914,10 @@ ERRS=$(grep -E 'syntax error|No such file or directory|command not found|unexpec
 assert_eq "${ERRS:-none}" "none" "installer runs without shell errors"
 assert_contains "$(cat "$D/project.config.md")" '`/dp-deliver resume`' "config comment keeps its backticked command"
 assert_contains "$(cat "$D/out.log")" "Azure Repos" "summary shows the git host"
-NOCASE=$(grep -nE '\$\(case ' "$REPO/install.sh" "$REPO"/scripts/*.sh | head -3)
+# Same line: a `$(` followed by `case` before any `)`; multi-line: `case` opening right after a bare `$(`.
+NOCASE=$( { grep -nE '\$\([^)]*\<case\>' "$REPO/install.sh" "$REPO"/scripts/*.sh "$REPO"/.devpilot/templates/deploy/*.sh
+  for f in "$REPO/install.sh" "$REPO"/scripts/*.sh; do
+    awk -v F="$f" '/\$\([[:space:]]*$/ {o=NR} o && NR<=o+3 && /^[[:space:]]*case / {print F":"NR}' "$f"; done; } | head -3)
 assert_eq "${NOCASE:-none}" "none" "no case inside \$(…) (bash 3.2 can't parse it)"
 rm -rf "$D"
 

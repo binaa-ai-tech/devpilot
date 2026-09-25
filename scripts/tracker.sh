@@ -169,8 +169,9 @@ local_cmd() {
       done
       return 0
       ;;
-    status)   local_set_status "$1" "$( case "$(echo "$2" | tr '[:upper:]' '[:lower:]')" in
-                done|closed|resolved) echo Done ;; "in progress"|doing|active) echo "In Progress" ;; *) echo "To Do" ;; esac )"
+    status)   case "$(echo "$2" | tr '[:upper:]' '[:lower:]')" in   # not inside $(…): macOS bash 3.2
+                done|closed|resolved) ST="Done" ;; "in progress"|doing|active) ST="In Progress" ;; *) ST="To Do" ;; esac
+              local_set_status "$1" "$ST"
               log "$1 → $2" ;;
     comment)  local_append "$1" "$(printf '%s' "$2" | head -1)"; log "💬 comment → $1" ;;
     describe) local_append "$1" "Description updated$( [ -f "$2" ] && echo " from $2")"; log "📝 description → $1" ;;

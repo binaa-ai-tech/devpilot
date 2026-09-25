@@ -292,7 +292,9 @@ case "$cmd" in
     while [ $# -gt 0 ]; do case "$1" in --items) ITEMS="${2:-}"; shift 2 ;; *) shift ;; esac; done
     SRC=$(git branch --show-current)
     DESC=$(_text_or_file "${BODY:-Opened by DevPilot}" | head -c 3900)
-    REFS=$(for k in $ITEMS; do case "$k" in ADO-*|AB#*) echo "$(_id "$k")";; esac; done | jq -R . | jq -s 'map({id:.})')
+    # (no `case` inside $(…): macOS bash 3.2 can't parse it)
+    IDS=""; for k in $ITEMS; do case "$k" in ADO-*|AB#*) IDS="$IDS $(_id "$k")" ;; esac; done
+    REFS=$(for i in $IDS; do echo "$i"; done | jq -R . | jq -s 'map({id:.})')
     R=$(_az POST "$REPO_API/pullrequests?$V" "$(jq -n --arg s "refs/heads/$SRC" --arg t "refs/heads/$BASE" \
          --arg ti "$TITLE" --arg d "$DESC" --argjson w "$REFS" \
          '{sourceRefName:$s, targetRefName:$t, title:$ti, description:$d, workItemRefs:$w}')" 2>/dev/null) \
