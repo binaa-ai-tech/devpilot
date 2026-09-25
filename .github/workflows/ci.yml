@@ -55,3 +55,23 @@ jobs:
           actionlint -version
       - name: e2e
         run: bash tests/e2e.sh
+
+  # ── macOS: the default /bin/bash there is 3.2 (2007) and the tools are BSD ────
+  # Every `bash` call in the tests resolves to /bin/bash, so anything DevPilot runs
+  # on a developer's Mac is exercised here.
+  macos:
+    runs-on: macos-latest
+    needs: test
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: use the system bash 3.2
+        run: |
+          mkdir -p "$RUNNER_TEMP/bash32" && ln -sf /bin/bash "$RUNNER_TEMP/bash32/bash"
+          echo "$RUNNER_TEMP/bash32" >> "$GITHUB_PATH"
+      - name: versions
+        run: bash --version | head -1; command -v jq curl git
+      - name: test suite (bash 3.2)
+        run: bash tests/run.sh
+      - name: e2e (bash 3.2)
+        run: bash tests/e2e.sh

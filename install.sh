@@ -613,7 +613,13 @@ printf "  %-18s %s\n" "Model mode"     "$MODEL_MODE  (profile: $ACTIVE_PROFILE)"
 printf "  %-18s %s\n" "BA / Lead / QA" "$T1_BA · $T1_LEAD · $T1_QA"
 printf "  %-18s %s\n" "Frontend / BE"  "$T1_FE_DEV · $T1_BE_DEV"
 printf "  %-18s %s\n" "Tracker"        "$TRACKER_TYPE$([ "$TRK_CREDS" = 1 ] && echo ' (credentials captured)')"
-printf "  %-18s %s\n" "Git host"       "$(case "$(git config --get remote.origin.url 2>/dev/null)" in *dev.azure.com*|*visualstudio.com*) echo 'Azure Repos';; *github.com*) echo GitHub;; *) echo 'unknown (set git_host later)';; esac)"
+# (no `case` inside $(…): macOS bash 3.2 can't parse it)
+GIT_HOST_LABEL="unknown (set git_host later)"
+case "$(git config --get remote.origin.url 2>/dev/null)" in
+  *dev.azure.com*|*visualstudio.com*) GIT_HOST_LABEL="Azure Repos" ;;
+  *github.com*)                       GIT_HOST_LABEL="GitHub" ;;
+esac
+printf "  %-18s %s\n" "Git host"       "$GIT_HOST_LABEL"
 printf "  %-18s %s\n" "Merge policy"   "$MERGE_POLICY"
 printf "  %-18s %s\n" "Docs language"  "$DOC_LANGUAGE"
 AGENT_LIST="BA · Lead · QA"
@@ -927,7 +933,7 @@ models:
 
 ## Usage limits
 # A run that hits a Claude usage limit checkpoints to docs/tasks/<KEY>-checkpoint.json;
-# `/dp-deliver resume` continues from the exact phase once the limit resets.
+# \`/dp-deliver resume\` continues from the exact phase once the limit resets.
 CONFIGEOF
 
 info "project.config.md written"

@@ -651,7 +651,7 @@ assert_contains "$(grep '^model:' "$D/.claude/agents/team-ba.md")" "test-model-x
 assert_eq "$(grep -c '"test-model-x"' "$D/project.config.md")" "3" "single sets all three claude tiers"
 ( cd "$D" && bash scripts/model-profiles.sh apply claude save >/dev/null 2>&1 )   # back to a profile
 # sync-agents re-applies frontmatter from project.config.md (the --update repair path)
-( cd "$D" && sed -i 's/^model: .*/model: claude-sonnet-5/' .claude/agents/team-lead.md && bash scripts/model-profiles.sh sync-agents >/dev/null 2>&1 )
+( cd "$D" && sed -i.bak 's/^model: .*/model: claude-sonnet-5/' .claude/agents/team-lead.md && rm -f .claude/agents/team-lead.md.bak && bash scripts/model-profiles.sh sync-agents >/dev/null 2>&1 )
 assert_contains "$(grep '^model:' "$D/.claude/agents/team-lead.md")" "claude-haiku-4-5-20251001" "sync-agents restores frontmatter from config"
 # switching profile keeps a single coding_profile line
 ( cd "$D" && bash scripts/model-profiles.sh apply balanced >/dev/null 2>&1 )
@@ -902,6 +902,24 @@ for f in "$REPO"/scripts/*.sh "$REPO"/.claude/skills/*/ "$REPO"/.devpilot/prompt
   [ -n "$c" ] || UNUSED="$UNUSED $n"
 done
 assert_eq "${UNUSED:-none}" "none" "every script, skill, prompt and template is used by a command, agent, skill or script"
+
+echo "== installer prints no shell errors (macOS bash 3.2 regressions) =="
+D=$(mktemp -d)
+( cd "$D" && git init -q -b develop && git config user.email t@t.t && git config user.name t \
+  && git remote add origin https://dev.azure.com/acme/Shop/_git/web \
+  && git commit -q --allow-empty -m init && echo '{"dependencies":{"@angular/core":"^21.0.0"}}' > package.json \
+  && DEVPILOT_LOCAL="$REPO" bash "$REPO/install.sh" --defaults >"$D/out.log" 2>"$D/err.log" < /dev/null )
+[ -s "$D/out.log" ] && ok "installer ran" || no "installer ran (no output — setup failed)"
+ERRS=$(grep -E 'syntax error|No such file or directory|command not found|unexpected token' "$D/out.log" "$D/err.log" 2>/dev/null | head -3)
+assert_eq "${ERRS:-none}" "none" "installer runs without shell errors"
+assert_contains "$(cat "$D/project.config.md")" '`/dp-deliver resume`' "config comment keeps its backticked command"
+assert_contains "$(cat "$D/out.log")" "Azure Repos" "summary shows the git host"
+# Same line: a `$(` followed by `case` before any `)`; multi-line: `case` opening right after a bare `$(`.
+NOCASE=$( { grep -nE '\$\([^)]*\<case\>' "$REPO/install.sh" "$REPO"/scripts/*.sh "$REPO"/.devpilot/templates/deploy/*.sh
+  for f in "$REPO/install.sh" "$REPO"/scripts/*.sh; do
+    awk -v F="$f" '/\$\([[:space:]]*$/ {o=NR} o && NR<=o+3 && /^[[:space:]]*case / {print F":"NR}' "$f"; done; } | head -3)
+assert_eq "${NOCASE:-none}" "none" "no case inside \$(…) (bash 3.2 can't parse it)"
+rm -rf "$D"
 
 echo "== DevPilot release metadata =="
 V=$(cat "$REPO/VERSION")
