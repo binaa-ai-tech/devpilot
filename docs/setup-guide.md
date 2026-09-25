@@ -173,7 +173,7 @@ QA BLOCKED, and `/dp-pr` escalation. That's what makes "walk away" after `/dp-de
 Two gates you should know from day one:
 - **Test guard** (highly recommended, on by default in the merge ladder) —
   `bash scripts/test-guard.sh` proves every changed source file has a covering test;
-  merge gates run it strict. See `.devpilot/skills/test-guard.md`.
+  merge gates run it strict. See `.claude/skills/test-guard/SKILL.md`.
 - **Doctor** — run it whenever something feels off; every warning comes with the exact
   fix command, and `/dp-setup fix` applies them interactively.
 

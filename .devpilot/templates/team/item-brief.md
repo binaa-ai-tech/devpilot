@@ -29,7 +29,7 @@ Key files / components: <from the plan, if known>
 ## Definition of Done
 - All acceptance criteria implemented and covered by tests (happy path + one edge/error each).
 - Build + tests green; no `any`/dead code/secrets; in-scope files only.
-- Review gate passed (`code-review`, `security-scan` on auth/input). See `.devpilot/skills/definition-of-done.md`.
+- Review gate passed (`review-checklist`, `security-scan` on auth/input). See `.claude/skills/definition-of-done/SKILL.md`.
 
 ## Tracking
 - Epic: `<EPIC_KEY>` · Sprint: `<sprint or "unscheduled">` · Status: `<To Do / ready / needs grooming>`

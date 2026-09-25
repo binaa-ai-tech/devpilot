@@ -5,7 +5,7 @@
 # Runs the Angular (Vitest), .NET and Playwright suites it detects, writes each
 # suite's complete output to .devpilot/logs/, and prints only a PASS/FAIL line
 # plus the failure lines. The skill that governs its use is
-# .devpilot/skills/token-lean-testing.md.
+# .claude/skills/token-lean-testing/SKILL.md.
 #
 #   bash scripts/run-tests.sh [angular|dotnet|e2e|all]   # default: all
 #   bash scripts/run-tests.sh cmd "<command>"            # wrap any command

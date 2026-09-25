@@ -9,7 +9,7 @@ Usage: **/dp-release <stage> [version]**
   then finish the release (merge → `main`, tag `v<version>`, merge back → develop).
 - `/dp-release rollback [version]` — redeploy a previous tag to production (approval-gated).
 
-Governing skill: `.devpilot/skills/release-ops.md` — build once, promote the same artifact,
+Governing skill: `.claude/skills/release-ops/SKILL.md` — build once, promote the same artifact,
 never skip an environment, production always approved by a human. DevPilot **never approves a
 deployment itself**; it tells the user exactly what to approve and verifies the result.
 
@@ -94,6 +94,6 @@ Conservative: show the plan first, act on confirmation, never force-push or rewr
 5. Code follow-up: `bash scripts/rollback.sh <target>` (dry run) → `CONFIRM=1 …` creates
    `rollback/<target>`; open a PR to `main` with
    `bash scripts/open-pr.sh main "Rollback to v<target>" "<why>" --no-merge`.
-   Every production rollback gets a postmortem (`release-ops.md` → Incidents & postmortems).
+   Every production rollback gets a postmortem (`release-ops` → Incidents & postmortems).
 
 **Report:** rolled back to v<target>, run link, smoke result, postmortem path.

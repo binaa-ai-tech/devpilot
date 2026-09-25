@@ -28,7 +28,7 @@ PR call through `scripts/open-pr.sh` / `scripts/azdo.sh` / `gh` / GitHub MCP.
 > 2. **Gray-zone dedup** (Step 1) — the request might be a duplicate; the user decides.
 >
 > Never pause to ask the user to test, review, or approve before merge. QA is `team-qa` + the
-> automated suites, review is the Team Lead gate, the merge gate is `auto-merge.md`.
+> automated suites, review is the Team Lead gate, the merge gate is `auto-merge`.
 > Legitimate stops short of merge: a red gate the bounded fix loop couldn't clear (escalate with
 > the self-heal template) or `merge_policy: pr-only`. Production is never touched.
 

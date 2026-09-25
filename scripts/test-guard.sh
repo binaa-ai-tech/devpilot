@@ -4,7 +4,7 @@
 #
 # Compares the current branch against base_branch, maps every changed source
 # file to its expected test file(s), and reports the gaps. The skill that
-# governs when/why this runs is .devpilot/skills/test-guard.md.
+# governs when/why this runs is .claude/skills/test-guard/SKILL.md.
 #
 #   bash scripts/test-guard.sh [base-branch]     # report; exit 0
 #   STRICT=1 bash scripts/test-guard.sh          # exit 1 when any gap exists
@@ -89,7 +89,7 @@ if [ "$N_MISSING" -gt 0 ]; then
   echo "  Changed source files with NO covering test:"
   printf '%s' "$MISSING"
   echo ""
-  echo "  Fix: write the test (see .devpilot/skills/test-case-design.md), or document"
+  echo "  Fix: write the test (see .claude/skills/test-case-design/SKILL.md), or document"
   echo "  a justified exemption in the PR description. Run /dp-test to generate them."
 fi
 echo "──────────────────────────────────────────────────────"

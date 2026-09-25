@@ -41,7 +41,7 @@ bash scripts/resolve-model.sh show             # the three tier models
 
 ## Usage limits
 
-When a run hits a Claude usage limit (`self-heal.md` Part 2) it first finishes the phase on the
+When a run hits a Claude usage limit (`self-heal` Part 2) it first finishes the phase on the
 standard tier if it was on power; if the limit is hard it checkpoints to
 `docs/tasks/<KEY>-checkpoint.json`, pushes what's green, and stops. `/dp-deliver resume`
 continues from the exact phase once the limit resets.

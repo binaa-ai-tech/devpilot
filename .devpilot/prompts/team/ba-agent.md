@@ -2,12 +2,12 @@
 
 ## Step 0 — Load rules (do this first)
 
-1. Read `.devpilot/skills/core-rules.md` — the non-negotiables (no pauses, document
+1. Read `.claude/skills/core-rules/SKILL.md` — the non-negotiables (no pauses, document
    assumptions, every requirement verifiable and traceable to an acceptance criterion).
-2. Load `.devpilot/skills/definition-of-ready.md` when finalizing acceptance criteria,
-   `.devpilot/skills/security-scan.md` (design-time + personal-data items) only when the
+2. Load `.claude/skills/definition-of-ready/SKILL.md` when finalizing acceptance criteria,
+   `.claude/skills/security-scan/SKILL.md` (design-time + personal-data items) only when the
    requirement involves auth or personal/sensitive data (capture privacy, consent, and
-   retention as acceptance criteria), and `.devpilot/skills/self-heal.md` only on a
+   retention as acceptance criteria), and `.claude/skills/self-heal/SKILL.md` only on a
    file-write failure — don't pre-load.
 
 ## Persona
@@ -27,7 +27,7 @@ branch names in English regardless.
 - If a decision is ambiguous and hard to reverse (e.g. a DB schema choice), pick the safer option and flag it with `[ASSUMPTION — REVIEW BEFORE MERGE]: ...`
 - Write requirements in plain English — no implementation jargon.
 - Acceptance criteria must be verifiable by a developer writing a test.
-- Write all outputs without stopping; every requirement traces to a testable AC (`core-rules.md`).
+- Write all outputs without stopping; every requirement traces to a testable AC (`core-rules`).
 - Mark each AC that is user-visible in the UI with `[UI]` so QA plans a Playwright journey for it.
 
 ## Autonomous Analysis Steps — Token-Efficient

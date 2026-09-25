@@ -71,11 +71,11 @@ Decide the layers each Story touches (frontend / backend / DB).
 - **Backend / DB (.NET + SQL Server)** → `subagent_type: "team-dotnet"`
 
 When both layers change an API, the backend agent commits the regenerated OpenAPI spec first;
-the frontend agent regenerates the Angular client from it (`api-contract.md`).
+the frontend agent regenerates the Angular client from it (`api-contract`).
 
 Each agent prompt:
 > Sprint `<SPRINT>` · Stories + specs: `<docs/requirements/*.md + docs/plans/*.md>` · Branch
-> `<BRANCH>`. Implement all <layer> work per the plans. Read `.devpilot/skills/self-heal.md`.
+> `<BRANCH>`. Implement all <layer> work per the plans. Read `.claude/skills/self-heal/SKILL.md`.
 > Build + test with `bash scripts/run-tests.sh <angular|dotnet>` (summary only). Commit per
 > Story, conventional message ending with the tracker ref (`bash scripts/tracker.sh ref <KEY>` →
 > `MSK-12` · `AB#345` · `#7`). Report what you built in 3 bullets.
@@ -88,9 +88,9 @@ QA is automated and is the only test gate — never pause for the user to test o
 
 Spawn `subagent_type: "team-qa"`:
 > Sprint `<SPRINT>`. Verify every AC of every Story: case matrix per AC
-> (`test-case-design.md`), layers per `test-strategy.md`, a Playwright journey for every
-> user-facing AC (`ui-e2e-playwright.md`; `performance.md` only for a perf AC). Run everything
-> via `bash scripts/run-tests.sh all`, gate on `definition-of-done.md`, write
+> (`test-case-design`), layers per `test-strategy`, a Playwright journey for every
+> user-facing AC (`ui-e2e-playwright`; `performance` only for a perf AC). Run everything
+> via `bash scripts/run-tests.sh all`, gate on `definition-of-done`, write
 > `docs/qa/<SPRINT_SLUG>.md`. Verdict per Story: PASS / BLOCKED.
 
 BLOCKED → `bash scripts/notify.sh blocked "QA BLOCKED in $SPRINT: <keys + reason>"`, fix, re-run QA.
@@ -99,8 +99,8 @@ BLOCKED → `bash scripts/notify.sh blocked "QA BLOCKED in $SPRINT: <keys + reas
 
 ## Step 6 — Review gate + version bump + one PR → develop
 
-**Review (Team Lead):** `.devpilot/skills/code-review.md`, `security-scan.md` over auth/input
-changes, `definition-of-done.md` — never open around a 🔴 BLOCKER. Then:
+**Review (Team Lead):** `.claude/skills/review-checklist/SKILL.md`, `security-scan` over auth/input
+changes, `definition-of-done` — never open around a 🔴 BLOCKER. Then:
 ```bash
 STRICT=1 bash scripts/test-guard.sh
 ```
@@ -153,7 +153,7 @@ Resolve by exit code:
 - **`PR_RC = 0`** — merged. → Step 7.
 - **`PR_RC = 3`** — open, not merged: `merge_policy: pr-only` → report and stop (a human merges).
   Otherwise drive it with the **`/dp-pr` loop** (review threads, CI fix cycles ≤ 3, merge per
-  `auto-merge.md`), then → Step 7 once the merge is **confirmed**.
+  `auto-merge`), then → Step 7 once the merge is **confirmed**.
 - **`PR_RC = 1`** — hard error; report it. Items stay In Progress.
 
 ---

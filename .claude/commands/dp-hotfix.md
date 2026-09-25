@@ -16,7 +16,7 @@ CD pipeline behind the production approval. Skips the backlog/sprint machinery �
    bash scripts/git-flow.sh hotfix-start "$KEY" <slug>
    ```
 3. **Implement** the minimal fix with the `team-dotnet` / `team-frontend` agent for the affected layer. Minimum diff —
-   no refactoring under pressure. Follow the debugging method in `.devpilot/skills/self-heal.md` (Part 0) first.
+   no refactoring under pressure. Follow the debugging method in `.claude/skills/self-heal/SKILL.md` (Part 0) first.
 4. **Self-review:** `git diff main...HEAD` — confirm scope is tight.
 5. **Ship through the pipeline** — push the branch; `devpilot-cd` builds it once → **SIT** (smoke)
    → waits for the **PRD approval** (hotfixes skip UAT). Tell the user to approve PRD once SIT is
@@ -32,7 +32,7 @@ CD pipeline behind the production approval. Skips the backlog/sprint machinery �
    ```
 7. **Verify on production, then close:** `bash scripts/tracker.sh comment "$KEY" "🚑 Hotfix v<version>
    deployed · verified on PRD"` and `bash scripts/tracker.sh close "$KEY"`.
-8. **Postmortem** — apply the incidents section of `.devpilot/skills/release-ops.md`. Write a blameless
+8. **Postmortem** — apply the incidents section of `.claude/skills/release-ops/SKILL.md`. Write a blameless
    postmortem to `docs/postmortems/<ticket>-<slug>.md` (timeline, root cause, action items),
    and turn each action item into a backlog Story via `/dp-plan`. Skip only for trivial
    internal-only blips.

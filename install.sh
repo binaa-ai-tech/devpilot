@@ -12,7 +12,8 @@
 #
 # This installs:
 #   .claude/          — Claude Code commands + agent definitions
-#   .devpilot/        — shared rules, prompts, templates, skills
+#   .devpilot/        — shared rules, prompts, templates
+#   .claude/skills/   — DevPilot skills (native Claude Code skills)
 #   scripts/          — git-flow, Jira, test, deploy helpers
 #   CLAUDE.md         — project context (Claude Code)
 #   project.config.md — team + Claude model config (edit with /dp-setup wizard)
@@ -102,6 +103,20 @@ fetch() {
   fi
 }
 
+# Native Claude Code skills shipped by DevPilot (.claude/skills/<name>/SKILL.md).
+DEVPILOT_SKILLS="core-rules definition-of-ready estimation-and-slicing architecture-guard angular-dev angular-testing accessibility dotnet-api efcore-sqlserver dotnet-testing api-contract test-case-design test-strategy ui-e2e-playwright token-lean-testing test-guard performance review-checklist security-scan definition-of-done auto-merge release-ops self-heal stack-upgrade"
+install_skills() {
+  local n
+  for n in $DEVPILOT_SKILLS; do fetch ".claude/skills/$n/SKILL.md" ".claude/skills/$n/SKILL.md"; done
+  fetch ".claude/skills/README.md" ".claude/skills/README.md"
+  # Before v5.5 skills lived in .devpilot/skills/*.md — remove DevPilot's copies there
+  # (code-review.md is now review-checklist), keep anything the team added.
+  if [ -d .devpilot/skills ]; then
+    for n in $DEVPILOT_SKILLS code-review README; do rm -f ".devpilot/skills/$n.md"; done
+    rmdir .devpilot/skills 2>/dev/null || true
+  fi
+}
+
 # Report any skipped files. Returns non-zero if the install is incomplete.
 fetch_summary() {
   [ "$FETCH_FAIL_COUNT" -eq 0 ] && return 0
@@ -158,7 +173,6 @@ run_update() {
   RULE_SNIPPETS="angular.md dotnet.md sqlserver.md"
   PROMPT_TEAM="ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md qa-agent.md"
   TEMPLATE_TEAM="requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md bug-report.md item-brief.md"
-  SKILLS="core-rules.md definition-of-ready.md estimation-and-slicing.md architecture-guard.md angular-dev.md angular-testing.md accessibility.md dotnet-api.md efcore-sqlserver.md dotnet-testing.md api-contract.md test-case-design.md test-strategy.md ui-e2e-playwright.md token-lean-testing.md test-guard.md performance.md code-review.md security-scan.md definition-of-done.md auto-merge.md release-ops.md self-heal.md README.md"
   CMDS="dp-deliver.md dp-plan.md dp-sprint.md dp-build.md dp-test.md dp-pr.md dp-release.md dp-hotfix.md dp-status.md dp-setup.md"
   AGENTS_LIST="team-lead.md team-ba.md team-frontend.md team-dotnet.md team-qa.md"
   SCRIPTS="git-flow.sh resolve-model.sh model-profiles.sh checkpoint.sh devpilot-config.sh devpilot-lib.sh tracker.sh jira.sh azdo.sh github.sh git-host.sh version.sh close-delivery.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy.sh smoke.sh setup-environments.sh db-package.sh usage-hook.sh deploy-init.sh generate-project-index.sh generate-backlog-index.sh md-to-adf.sh"
@@ -174,7 +188,7 @@ run_update() {
   fetch ".devpilot/templates/changelog-entry.md" ".devpilot/templates/changelog-entry.md"
   mkdir -p .devpilot/templates/deploy
   for f in appservice.sh iis.sh kubernetes.sh db.sh; do fetch ".devpilot/templates/deploy/$f" ".devpilot/templates/deploy/$f"; done
-  for f in $SKILLS;          do fetch ".devpilot/skills/$f"       ".devpilot/skills/$f";       done
+  install_skills
   fetch ".devpilot/config/models.md" ".devpilot/config/models.md"
 
   info "Refreshing .claude/..."
@@ -624,13 +638,13 @@ fi
 section "Installing devpilot files..."
 
 # Create directory structure
-mkdir -p .devpilot/{prompts/team,templates/team,skills,config}
+mkdir -p .devpilot/{prompts/team,templates/team,config}
 mkdir -p .claude/commands .claude/agents
 mkdir -p scripts
 mkdir -p .github/ISSUE_TEMPLATE
 mkdir -p docs/{requirements,plans,qa,reviews,adrs,domain-models,tasks}
 
-# .devpilot — shared rules, prompts, templates, skills
+# .devpilot — shared rules, prompts, templates
 info "Installing .devpilot/..."
 fetch ".devpilot/rules.md" ".devpilot/rules.md"
 fetch ".devpilot/process.md" ".devpilot/process.md"
@@ -738,14 +752,7 @@ for f in appservice.sh iis.sh kubernetes.sh db.sh; do
   fetch ".devpilot/templates/deploy/$f" ".devpilot/templates/deploy/$f"
 done
 
-for f in core-rules.md definition-of-ready.md estimation-and-slicing.md architecture-guard.md \
-         angular-dev.md angular-testing.md accessibility.md \
-         dotnet-api.md efcore-sqlserver.md dotnet-testing.md api-contract.md \
-         test-case-design.md test-strategy.md ui-e2e-playwright.md token-lean-testing.md test-guard.md performance.md \
-         code-review.md security-scan.md definition-of-done.md auto-merge.md release-ops.md self-heal.md \
-         README.md; do
-  fetch ".devpilot/skills/$f" ".devpilot/skills/$f"
-done
+install_skills
 
 fetch ".devpilot/config/models.md" ".devpilot/config/models.md"
 
@@ -1045,8 +1052,9 @@ echo ""
 echo "  Installed:"
 echo "    .claude/commands/    — slash commands for Claude Code"
 echo "    .claude/agents/      — agent definitions"
+echo "    .claude/skills/      — DevPilot skills (auto-loaded by Claude Code)"
 echo "    CLAUDE.md            — project context (Claude Code)"
-echo "    .devpilot/           — rules, templates, skills"
+echo "    .devpilot/           — rules, prompts, templates"
 echo "    scripts/             — tracker (Jira · Azure DevOps · GitHub · local), PRs, versioning, deploy"
 echo "    project.config.md    — team + Claude model config"
 echo ""

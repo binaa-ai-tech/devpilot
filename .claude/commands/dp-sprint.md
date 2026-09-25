@@ -31,7 +31,7 @@ a sprint**. If two items describe the same work, merge them first (`/dp-plan` FO
 sprint a duplicate. A sprint may mix types — e.g. 10 requirements + 4 issues + 6 enhancements is
 one valid sprint.
 
-**Readiness gate.** Apply `.devpilot/skills/definition-of-ready.md`: only Stories that are
+**Readiness gate.** Apply `.claude/skills/definition-of-ready/SKILL.md`: only Stories that are
 **ready** may enter a sprint. List any `needs grooming` Stories separately with what's missing —
 they stay in the backlog until groomed (via `/dp-plan`), never sprinted unclear.
 
@@ -39,7 +39,7 @@ they stay in the backlog until groomed (via `/dp-plan`), never sprinted unclear.
 
 ## Step 2 — Slice into sprints
 
-**Read `.devpilot/skills/estimation-and-slicing.md`.** Group Stories into sprints by:
+**Read `.claude/skills/estimation-and-slicing/SKILL.md`.** Group Stories into sprints by:
 - **Dependency order** — foundational/shared work before things that build on it.
 - **Cohesion** — same area/components travel together (cheaper to build + test).
 - **Size** — keep each sprint to a shippable batch, not everything at once.

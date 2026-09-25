@@ -6,7 +6,7 @@
 
 You write what you need in one sentence. DevPilot plans it, writes the code, tests it, reviews it, and merges it.
 
-[![Version](https://img.shields.io/badge/version-5.4.2-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-5.5.0-blue.svg)](VERSION)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#license)
 [![Runs on](https://img.shields.io/badge/runs%20on-Claude%20Code-7c3aed.svg)](#what-you-need)
 [![Stack](https://img.shields.io/badge/stack-Angular%20%7C%20.NET%20%7C%20SQL%20Server-orange.svg)](#what-you-need)
@@ -371,6 +371,11 @@ Azure Repos uses the same `AZDO_PAT`.
 
 ## Upgrading
 
+**From 5.4:** run `bash install.sh --update`. Skills move from `.devpilot/skills/*.md` to native Claude Code
+skills in `.claude/skills/<name>/SKILL.md`, and `code-review` is renamed `review-checklist` so it no longer
+replaces Claude Code's built-in `/code-review`. DevPilot's old copies are removed; any skill files your team
+added in `.devpilot/skills/` are kept. If you customized a DevPilot skill, copy your changes into its new file.
+
 **From 5.0:** run `bash install.sh --update`. The per-action Jira scripts are replaced by one interface,
 `scripts/tracker.sh`. Your `project.config.md` keeps working; to use the new options, add `when_unconfigured`, `git_host`,
 and `versioning` from the [Configuration](#8-configuration) example.
@@ -397,7 +402,8 @@ and `versioning` from the [Configuration](#8-configuration) example.
 ```
 .claude/commands/   the 10 /dp-* commands
 .claude/agents/     team-ba · team-lead · team-frontend (Angular) · team-dotnet (.NET) · team-qa
-.devpilot/skills/   23 short playbooks the agents load only when needed (index: skills/README.md)
+.claude/skills/    24 native Claude Code skills — stack skills load automatically on matching files,
+                    the rest when a command or agent needs them (index: .claude/skills/README.md)
 .devpilot/rules/    coding rules for angular, dotnet, sqlserver
 .devpilot/process.md  the full delivery process: phases, gates, roles
 scripts/            tracker.sh (+ jira.sh · azdo.sh · github.sh) · open-pr.sh · version.sh · close-delivery.sh
@@ -406,7 +412,9 @@ tests/run.sh        test suite for the scripts
 install.sh          installer and --update
 ```
 
-**Saving tokens.** Agents read one short rules file, then load a skill only at the step that needs it.
+**Saving tokens.** Only each skill's one-line description stays in context; its body loads when needed.
+Agents preload one short rules skill (`core-rules`); Claude loads `angular-dev` when it edits a component,
+`efcore-sqlserver` when it edits a migration, and so on.
 They find the right code files through a small project index (`scripts/scope.sh`) instead of reading
 the whole repository. Test output is summarized. Simple tasks run on Haiku, hard tasks on Opus.
 
