@@ -903,6 +903,19 @@ for f in "$REPO"/scripts/*.sh "$REPO"/.claude/skills/*/ "$REPO"/.devpilot/prompt
 done
 assert_eq "${UNUSED:-none}" "none" "every script, skill, prompt and template is used by a command, agent, skill or script"
 
+echo "== installer prints no shell errors (macOS bash 3.2 regressions) =="
+D=$(mktemp -d)
+( cd "$D" && git init -q -b develop && git remote add origin https://dev.azure.com/acme/Shop/_git/web \
+  && git commit -q --allow-empty -m init && echo '{"dependencies":{"@angular/core":"^21.0.0"}}' > package.json \
+  && DEVPILOT_LOCAL="$REPO" bash "$REPO/install.sh" --defaults >"$D/out.log" 2>"$D/err.log" < /dev/null )
+ERRS=$(grep -E 'syntax error|No such file or directory|command not found|unexpected token' "$D/out.log" "$D/err.log" | head -3)
+assert_eq "${ERRS:-none}" "none" "installer runs without shell errors"
+assert_contains "$(cat "$D/project.config.md")" '`/dp-deliver resume`' "config comment keeps its backticked command"
+assert_contains "$(cat "$D/out.log")" "Azure Repos" "summary shows the git host"
+NOCASE=$(grep -nE '\$\(case ' "$REPO/install.sh" "$REPO"/scripts/*.sh | head -3)
+assert_eq "${NOCASE:-none}" "none" "no case inside \$(…) (bash 3.2 can't parse it)"
+rm -rf "$D"
+
 echo "== DevPilot release metadata =="
 V=$(cat "$REPO/VERSION")
 assert_contains "$(cat "$REPO/CHANGELOG.md")" "## [$V]" "CHANGELOG.md has a section for VERSION $V (release notes)"

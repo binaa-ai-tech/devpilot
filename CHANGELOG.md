@@ -4,6 +4,15 @@ All notable changes to DevPilot. Versions follow [SemVer](https://semver.org); e
 section becomes the GitHub Release notes when the `vx.y.z` tag is pushed
 (`.github/workflows/release.yml`).
 
+## [5.5.1] — 2026-09-25
+
+### Fixed
+- Installer on macOS (bash 3.2): the settings summary printed a syntax error on the "Git host" line.
+  The saved setting (`git_host: auto`) was always correct; only the summary line was affected.
+- Installer printed `/dp-deliver: No such file or directory`. A comment in the generated
+  `project.config.md` was run as a command and lost its text.
+- A new test runs the installer and fails on any shell error in its output.
+
 ## [5.5.0] — 2026-09-25
 
 ### Added
