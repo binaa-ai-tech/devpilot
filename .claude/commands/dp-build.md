@@ -36,7 +36,7 @@ spec `docs/requirements/<slug>.md` (scope per Story already recorded at plan tim
 
 **Portable / fresh checkout:** if the local specs aren't present (a different session or
 teammate building from Jira alone), read each Story's **Jira description** —
-it's a self-contained implementation brief (`/dp-refine` set it via `jira-describe.sh`) with the
+it's a self-contained implementation brief (`/dp-plan` set it via `jira-describe.sh`) with the
 full ACs, scope, technical notes, repo + branch convention, and DoD. Jira is sufficient to build.
 
 ---

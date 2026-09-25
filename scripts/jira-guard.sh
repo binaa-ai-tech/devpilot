@@ -18,7 +18,7 @@
 #                           Echoes the count of valid keys on success.
 #   hotfix-gate <intent> <severity>
 #                         → exit non-zero (block) when a P0/P1 bug is being
-#                           planned/built through /dp-deliver or /dp-refine — those belong
+#                           planned/built through /dp-deliver or /dp-plan — those belong
 #                           on the expedited /dp-hotfix lane. exit 0 otherwise.
 #
 # Usage:
@@ -95,7 +95,7 @@ case "$cmd" in
       exit 0
     fi
     echo -e "${RED}${BOLD}❌ Tracker ceremony was SKIPPED — no issue key was produced.${RESET}" >&2
-    echo -e "${YELLOW}   /dp-deliver and /dp-refine MUST write the item to the tracker (Epic→Story) BEFORE any code.${RESET}" >&2
+    echo -e "${YELLOW}   /dp-deliver and /dp-plan MUST write the item to the tracker (Epic→Story) BEFORE any code.${RESET}" >&2
     echo -e "${YELLOW}   Do NOT build, branch, or write code. Go back and run the PLAN phase:${RESET}" >&2
     echo -e "     • UNRELATED → bash scripts/create-jira-epic.sh \"<epic>\" \"<goal>\"  then a child Story" >&2
     echo -e "     • RELATED   → bash scripts/create-jira-epic.sh \"<summary>\" \"<story>\" <EPIC_KEY>" >&2
@@ -109,7 +109,7 @@ case "$cmd" in
     severity="$(printf '%s' "${2:-}" | tr '[:lower:]' '[:upper:]')"
     if { [ "$intent" = "bug" ] || [ "$intent" = "issue" ]; } \
        && { [ "$severity" = "P0" ] || [ "$severity" = "P1" ]; }; then
-      echo -e "${RED}${BOLD}❌ STOP — $severity bug must not go through /dp-deliver or /dp-refine.${RESET}" >&2
+      echo -e "${RED}${BOLD}❌ STOP — $severity bug must not go through /dp-deliver or /dp-plan.${RESET}" >&2
       echo -e "${YELLOW}   A production-critical defect takes the expedited /dp-hotfix lane:${RESET}" >&2
       echo -e "     • branches from \`main\` (not develop), ships to PRD behind a manual gate" >&2
       echo -e "     • minimal diff, then a blameless postmortem (.devpilot/skills/release-ops.md)" >&2

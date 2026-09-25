@@ -4,15 +4,15 @@ Input: **$ARGUMENTS** — a feature, bug, or requirement described in plain word
 Optional trailing flag: `--to sit` also cuts the SIT release after the merge.
 `/dp-deliver resume` continues an interrupted run from its checkpoint.
 
-The walk-away path. `/dp-deliver` runs the **whole team autonomously** — BA refinement →
+The walk-away path. `/dp-deliver` runs the **whole team autonomously** — BA planning →
 sprint → Team Lead plan → Angular + .NET implementation → QA (unit, integration, Playwright UI)
 → code review → PR → merge into `develop` (DEV deploys from there). It stops only for a
 gray-zone dedup question. For the approve-first path instead, run the role commands:
-`/dp-refine` → `/dp-sprint` → `/dp-build` → `/dp-pr`.
+`/dp-plan` → `/dp-sprint` → `/dp-build` → `/dp-pr`.
 
 > ## 🚦 Non-negotiable invariant — the tracker comes first
 > **Every `/dp-deliver` run creates the work in the tracker BEFORE a single line of code.**
-> No matter the intent — bug, issue, feature, enhancement — the REFINE phase (Step 1) MUST
+> No matter the intent — bug, issue, feature, enhancement — the PLAN phase (Step 1) MUST
 > land a tracker issue (Epic→Story) and you MUST capture its key. **New features additionally
 > get a sprint** (Step 2). It is a hard error to branch, edit files, or spawn a build agent
 > before `<STORY_KEYS>` exists — Step 1 ends with `scripts/jira-guard.sh assert-key`, which
@@ -47,9 +47,9 @@ completed phases.
 
 ---
 
-## Step 1 — REFINE (delegates to the /dp-refine brain)
+## Step 1 — PLAN (delegates to the /dp-plan brain)
 
-Execute **`/dp-refine` Steps 0–6** on `$TASK`:
+Execute **`/dp-plan` Steps 0–6** on `$TASK`:
 - classify intent + slug (carry `$INTENT` forward — it decides Step 2)
 - refresh project index + backlog index (token-lean scoping)
 - run the **dedup ladder** → DUPLICATE / FOLD-IN / RELATED / UNRELATED
@@ -111,6 +111,6 @@ PATCH for bugs, from `git tag --sort=-version:refname | head -1`) and run
 
 Emit the `/dp-build` DONE block, prefixed:
 ```
-🤖  /dp-deliver — refined → built → tested → reviewed → merged
+🤖  /dp-deliver — planned → built → tested → reviewed → merged
 ```
 Then the promote ladder: `/dp-release sit → uat → prd` (or what's left of it after `--to sit`).

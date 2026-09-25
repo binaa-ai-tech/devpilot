@@ -24,7 +24,7 @@ manual approval gate. Skips the backlog/sprint machinery — this is an emergenc
 7. **Close ticket** + verify on production.
 8. **Postmortem** — apply the incidents section of `.devpilot/skills/release-ops.md`. Write a blameless
    postmortem to `docs/postmortems/<ticket>-<slug>.md` (timeline, root cause, action items),
-   and turn each action item into a backlog Story via `/dp-refine`. Skip only for trivial
+   and turn each action item into a backlog Story via `/dp-plan`. Skip only for trivial
    internal-only blips.
 
 ## Rules

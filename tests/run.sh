@@ -347,14 +347,14 @@ assert_code "$RC" "1" "update-org without an org exits 1 with usage"
 assert_contains "$(cat "$REPO/scripts/update-org.sh")" "--update" "update-org uses --update, never delete+reinstall"
 
 echo "== token-lean wiring (round 8) =="
-assert_contains "$(cat "$REPO/.claude/commands/dp-refine.md")" "scope.sh --save" "dp-refine saves the scope once"
+assert_contains "$(cat "$REPO/.claude/commands/dp-plan.md")" "scope.sh --save" "dp-plan saves the scope once"
 assert_contains "$(cat "$REPO/.claude/commands/dp-build.md")" "-scope.md" "dp-build reuses the saved scope"
 assert_contains "$(cat "$REPO/.devpilot/prompts/team/ba-agent.md")" "scope.sh --save" "ba-agent saves the scope"
 assert_contains "$(cat "$REPO/CLAUDE.md")" "Two-tier index" "CLAUDE.md documents the two-tier index"
 assert_contains "$(cat "$REPO/scripts/install-git-hooks.sh")" "post-merge" "git hooks refresh the index after merges"
 assert_contains "$INSTALL" "docs/index/.state" "installer gitignores the index state file"
-n=$(grep -c -- '-mmin' "$REPO/.claude/commands/dp-refine.md" || true); n=${n:-0}
-assert_eq "$n" "0" "time-based freshness check removed from dp-refine"
+n=$(grep -c -- '-mmin' "$REPO/.claude/commands/dp-plan.md" || true); n=${n:-0}
+assert_eq "$n" "0" "time-based freshness check removed from dp-plan"
 
 echo "== run-tests.sh (token-lean runner) =="
 D=$(sandbox)
@@ -391,7 +391,7 @@ assert_contains "$(cat "$REPO/.claude/commands/dp-build.md")" '"team-dotnet"' "d
 assert_contains "$(cat "$REPO/.claude/commands/dp-test.md")" "ui-e2e-playwright" "dp-test drives Playwright UI testing"
 
 echo "== Claude-only + role-based commands (v5) =="
-CMDS_EXPECTED="dp-build dp-deliver dp-hotfix dp-pr dp-refine dp-release dp-setup dp-sprint dp-status dp-test"
+CMDS_EXPECTED="dp-build dp-deliver dp-hotfix dp-plan dp-pr dp-release dp-setup dp-sprint dp-status dp-test"
 CMDS_ACTUAL=$(ls "$REPO/.claude/commands" | sed 's/\.md$//' | sort | tr '\n' ' ' | sed 's/ $//')
 assert_eq "$CMDS_ACTUAL" "$CMDS_EXPECTED" "exactly the 10 role commands ship"
 for C in $CMDS_EXPECTED; do
@@ -402,7 +402,7 @@ for f in .opencode AGENTS.md scripts/resolve-engine.sh scripts/run-mode.sh scrip
 done
 LEAK=$(grep -rliE 'opencode|antigravity|github-copilot' "$REPO/.claude" "$REPO/.devpilot" "$REPO/CLAUDE.md" "$REPO/project.config.md" 2>/dev/null | tr '\n' ' ')
 assert_eq "${LEAK:-none}" "none" "no non-Claude engine references in commands, skills, or config"
-OLD=$(grep -rlE '/ceo\b|/dp-plan\b|/dp-config\b|/dp-autofix|/dp-review-fix|/dp-rollback' "$REPO/.claude" "$REPO/.devpilot" "$REPO/scripts" "$REPO/CLAUDE.md" "$REPO/docs/setup-guide.md" 2>/dev/null | tr '\n' ' ')
+OLD=$(grep -rlE '/ceo\b|/dp-config\b|/dp-autofix|/dp-review-fix|/dp-rollback' "$REPO/.claude" "$REPO/.devpilot" "$REPO/scripts" "$REPO/CLAUDE.md" "$REPO/docs/setup-guide.md" 2>/dev/null | tr '\n' ' ')
 assert_eq "${OLD:-none}" "none" "no retired command names outside the README upgrade table"
 assert_contains "$(cat "$REPO/.claude/commands/dp-deliver.md")" "jira-guard.sh assert-key" "dp-deliver keeps the tracker-first gate"
 assert_contains "$(cat "$REPO/.claude/commands/dp-deliver.md")" "--to sit" "dp-deliver can promote to SIT"

@@ -45,5 +45,5 @@ changelog + version bumped.
   postmortem to `docs/postmortems/<KEY>-<slug>.md`: summary · UTC timeline (detected → mitigated
   → resolved) · root cause (5 whys, via `self-heal` Part 0) · resolution · what went well/hurt ·
   action items.
-- Every action item becomes a backlog Story via `/dp-refine` with an owner. A postmortem with no
+- Every action item becomes a backlog Story via `/dp-plan` with an owner. A postmortem with no
   follow-up is theatre; a recurring root cause is a process failure.

@@ -1,6 +1,6 @@
 # DevPilot — AI delivery team (Angular + .NET, Claude Code)
 
-Describe the requirement; the team refines → builds → tests → reviews → merges it.
+Describe the requirement; the team plans → builds → tests → reviews → merges it.
 The end-to-end SDLC contract (phases, gates, roles) lives in `.devpilot/process.md`.
 
 ---
@@ -9,8 +9,8 @@ The end-to-end SDLC contract (phases, gates, roles) lives in `.devpilot/process.
 
 | Role | Command | Does |
 |------|---------|------|
-| Whole team | `/dp-deliver <requirement> [--to sit]` | **End to end** — refine → sprint → build → QA → review → merge into `develop` (→ SIT). Stops only on a gray-zone dedup question. `/dp-deliver resume` continues after an interruption. |
-| Product Owner / BA | `/dp-refine <requirement\|Jira key>` | Dedup against the backlog, write Epic→Story with testable ACs. No code. |
+| Whole team | `/dp-deliver <requirement> [--to sit]` | **End to end** — plan → sprint → build → QA → review → merge into `develop` (→ SIT). Stops only on a gray-zone dedup question. `/dp-deliver resume` continues after an interruption. |
+| Product Owner / BA | `/dp-plan <requirement\|Jira key>` | Dedup against the backlog, write Epic→Story with testable ACs. No code. |
 | Scrum Master | `/dp-sprint` | Group READY Stories into sprints, recommend run order. |
 | Developers | `/dp-build [sprint]` | Angular + .NET agents build a sprint on one branch → one PR → `develop`. |
 | QA | `/dp-test [ui\|perf] [story\|PR\|diff]` | Cases from ACs → unit / integration / Playwright UI tests → run. |
@@ -26,7 +26,7 @@ The end-to-end SDLC contract (phases, gates, roles) lives in `.devpilot/process.
 
 ```
 /dp-deliver "add CSV export"
-  REFINE  → classify · dedup vs docs/backlog/index.md · spec to git · Epic→Story to tracker
+  PLAN    → classify · dedup vs docs/backlog/index.md · spec to git · Epic→Story to tracker
   SPRINT  → feature: own sprint · bug: active sprint · P0/P1: refused → /dp-hotfix
   BUILD   → team-dotnet (API · EF Core · OpenAPI) ║ team-frontend (Angular · generated client)
   QA      → Vitest · xUnit + real SQL Server · Playwright journeys + axe
@@ -34,7 +34,7 @@ The end-to-end SDLC contract (phases, gates, roles) lives in `.devpilot/process.
   MERGE   → one PR → develop (auto-merge ladder)  ·  --to sit → release branch → SIT
 ```
 
-**Dedup brain:** `/dp-refine` matches each new item against `docs/backlog/index.md`, reading full
+**Dedup brain:** `/dp-plan` matches each new item against `docs/backlog/index.md`, reading full
 specs of only the top 1–3 candidates. Merges are reversible tracker links + one Story with
 combined ACs.
 

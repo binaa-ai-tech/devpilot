@@ -13,7 +13,7 @@ INTAKE → READY → SPRINT → BUILD → VERIFY → MERGE → RELEASE → OPERA
 
 | # | Phase | Driven by | Exit gate (must hold to advance) |
 |---|-------|-----------|----------------------------------|
-| 1 | **Intake** | `/dp-refine` (or `/dp-deliver`) | Item is classified, **deduped** against `docs/backlog/index.md`, and written as Epic→Story with a self-contained brief. **Hard-gated by `scripts/jira-guard.sh assert-key`** — no branch/code until a tracker key exists. |
+| 1 | **Intake** | `/dp-plan` (or `/dp-deliver`) | Item is classified, **deduped** against `docs/backlog/index.md`, and written as Epic→Story with a self-contained brief. **Hard-gated by `scripts/jira-guard.sh assert-key`** — no branch/code until a tracker key exists. |
 | 2 | **Ready** | BA | `definition-of-ready.md` — clear, testable ACs; sized & sliced (`estimation-and-slicing.md`); no open questions. |
 | 3 | **Sprint** | `/dp-sprint` | Only READY Stories enter; sprint has a goal and a recommended run order. |
 | 4 | **Build** | `/dp-build` | One branch per sprint; layer agents stay in scope (`scope-guard`); every commit conventional, build never left red (`core-rules.md`). |
@@ -39,7 +39,7 @@ A failed gate sends work **back one phase**, never forward with a TODO.
 - **Defect standard** — a bug is a single typed `Bug` issue (no Epic→Story), routed by
   severity: **P0/P1 → `/dp-hotfix`** (branch from `main`, postmortem); **P2 → active sprint**;
   **P3 → next sprint, batched**. The P0/P1 redirect is **hard-enforced** by
-  `scripts/jira-guard.sh hotfix-gate` — `/dp-deliver` and `/dp-refine` refuse to plan/build one. Bug
+  `scripts/jira-guard.sh hotfix-gate` — `/dp-deliver` and `/dp-plan` refuse to plan/build one. Bug
   DoD is *reproduce-before-fix*: a regression test must fail on the unfixed code, then pass
   and stay (`definition-of-done.md` Bug DoD).
 - **Security & data** — `security-scan` (threat model at design time; secrets, PII,
@@ -53,5 +53,5 @@ A failed gate sends work **back one phase**, never forward with a TODO.
 - **Token discipline** — read indexes first; load heavy skills only at the
   step that needs them (`.devpilot/skills/README.md`).
 
-New to a repo? Run `/dp-status health`, then start at Intake with `/dp-refine` —
+New to a repo? Run `/dp-status health`, then start at Intake with `/dp-plan` —
 or say `/dp-deliver "<what you want>"` and let the process run end to end.

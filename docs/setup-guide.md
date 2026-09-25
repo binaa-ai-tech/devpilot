@@ -114,7 +114,7 @@ Shows the model each role will use. Nothing to answer.
    bash scripts/devpilot-config.sh validate
    ```
 
-**What Jira looks like during implementation** (so you know what to expect): `/dp-refine`
+**What Jira looks like during implementation** (so you know what to expect): `/dp-plan`
 writes Epic → Story with a self-contained brief; a build moves Stories
 `To Do → In Progress → Done` and posts exactly **two** comments per Story — a start
 comment and a DONE summary (detail lives in the PR and `docs/tasks/`). A QA **BLOCKED**
@@ -144,9 +144,9 @@ Two gates you should know from day one:
 Then run your first task:
 
 ```bash
-/dp-deliver "add a CSV export to the orders page"          # refine → build → test → review → merged
+/dp-deliver "add a CSV export to the orders page"          # plan → build → test → review → merged
 /dp-deliver "add a CSV export to the orders page" --to sit # …and cut the SIT release
-# or role by role: /dp-refine "…" → /dp-sprint → /dp-build sprint-1 → /dp-pr
+# or role by role: /dp-plan "…" → /dp-sprint → /dp-build sprint-1 → /dp-pr
 ```
 
 The standard process the team follows lives in `.devpilot/process.md`.

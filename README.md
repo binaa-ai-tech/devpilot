@@ -2,364 +2,325 @@
 
 # DevPilot
 
-**An AI delivery team for Angular + .NET, built on Claude Code. Describe the requirement; the team refines it, builds it, tests it end to end, reviews it, and merges it.**
+**An AI development team for Angular + .NET projects, running inside Claude Code.**
+
+You write what you need in one sentence. DevPilot plans it, writes the code, tests it, reviews it, and merges it.
 
 [![Version](https://img.shields.io/badge/version-5.0.0-blue.svg)](VERSION)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](#license)
-[![Runs on](https://img.shields.io/badge/runs%20on-Claude%20Code-7c3aed.svg)](#requirements)
-[![Stack](https://img.shields.io/badge/stack-Angular%20%7C%20.NET%20%7C%20SQL%20Server-orange.svg)](#stack)
-
-Installs into an existing Angular / ASP.NET Core repository in minutes and runs the same gated
-SDLC a large engineering organization would: backlog refinement, sprints, code review, QA,
-protected branches, DEV → SIT → UAT → PRD promotion, and postmortems.
+[![Runs on](https://img.shields.io/badge/runs%20on-Claude%20Code-7c3aed.svg)](#what-you-need)
+[![Stack](https://img.shields.io/badge/stack-Angular%20%7C%20.NET%20%7C%20SQL%20Server-orange.svg)](#what-you-need)
 
 </div>
 
 ---
 
+## In 30 seconds
+
+```bash
+/dp-deliver "add a CSV export button to the orders page"
+```
+
+That one command does what a full team does:
+
+1. **Plans**: writes the user story and acceptance criteria, and checks the backlog for duplicates.
+2. **Builds**: a .NET developer agent writes the API and database changes; an Angular developer agent writes the UI.
+3. **Tests**: writes and runs unit tests, API tests on a real SQL Server, and browser (UI) tests.
+4. **Reviews**: checks code quality, security, performance, and missing tests.
+5. **Merges**: opens a pull request into `develop` and merges it once every check is green.
+
+Production is never touched without your approval.
+
+---
+
 ## Contents
 
-- [Why DevPilot](#why-devpilot)
-- [Quick start](#quick-start)
-- [Commands — one per team role](#commands--one-per-team-role)
-- [How a requirement flows](#how-a-requirement-flows)
-- [The delivery process](#the-delivery-process)
-- [Stack](#stack)
-- [Quality and governance gates](#quality-and-governance-gates)
-- [DevOps pipeline](#devops-pipeline)
-- [Configuration](#configuration)
-- [Token efficiency](#token-efficiency)
-- [Issue tracking](#issue-tracking)
-- [Enterprise rollout](#enterprise-rollout)
-- [Project structure](#project-structure)
-- [Requirements](#requirements)
-- [Troubleshooting](#troubleshooting)
-- [Upgrading from 4.x](#upgrading-from-4x)
-- [Contributing](#contributing)
+1. [Install](#1-install)
+2. [The 10 commands](#2-the-10-commands)
+3. [Common tasks: what to type](#3-common-tasks-what-to-type)
+4. [What happens when you run /dp-deliver](#4-what-happens-when-you-run-dp-deliver)
+5. [Testing](#5-testing)
+6. [Releasing to SIT, UAT, and production](#6-releasing-to-sit-uat-and-production)
+7. [Safety checks (quality gates)](#7-safety-checks-quality-gates)
+8. [Configuration](#8-configuration)
+9. [What you need](#what-you-need)
+10. [Troubleshooting](#troubleshooting)
+11. [Upgrading from 4.x](#upgrading-from-4x)
 
 ---
 
-## Why DevPilot
+## 1. Install
 
-| | |
-|---|---|
-| 🚀 **One command, requirement → merged** | `/dp-deliver "…"` runs BA → sprint → plan → Angular + .NET build → QA → review → PR → merge. It stops only for a gray-zone backlog-dedup question. |
-| 👥 **Commands map to team roles** | Product Owner, Scrum Master, developers, QA, Tech Lead, DevOps, on-call. Each role has one command, so the team adopts it without learning a new process. |
-| 🧪 **Tested at every layer** | Vitest (Angular) · xUnit + `WebApplicationFactory` on real SQL Server via Testcontainers (.NET) · OpenAPI contract checks · Playwright UI journeys with accessibility, visual, and mobile checks. |
-| 🛡 **Enterprise gates by default** | Definition of Ready/Done, test guard, severity-tagged code review, security scan, dependency audit, protected branches, and a human-approved production release. |
-| 🪙 **Token-lean** | Skills load only when needed. The index is sharded, and test output is summarized so agents read failures, not logs. Each task goes to Haiku, Sonnet, or Opus by complexity. |
-| 🗂 **A backlog that stays clean** | Every new item is checked against the backlog: duplicates are merged and overlaps folded into existing Stories. Each Jira Story carries a self-contained implementation brief. |
-
----
-
-## Quick start
-
-**1. Install** from the root of your Angular / .NET repository:
+Run this in the **root folder of your project** (the folder with your `.sln` or `angular.json`):
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/binaa-ai-tech/devpilot/main/install.sh -o /tmp/devpilot-install.sh && bash /tmp/devpilot-install.sh
+curl -fsSL https://raw.githubusercontent.com/binaa-ai-tech/devpilot/main/install.sh -o /tmp/devpilot-install.sh
+bash /tmp/devpilot-install.sh
 ```
 
-Non-interactive (CI, devcontainers, rolling out to many repos): append `-s -- --defaults` to a
-piped install, or run `bash install.sh --defaults`. The 6-step wizard detects your stack, enables
-the matching agents, sets the Claude model profile, tracker, and merge policy, then offers to
-generate CI and protect `develop`/`main`.
-Full walkthrough: **[docs/setup-guide.md](docs/setup-guide.md)**.
+The installer asks 6 short questions. **Press Enter to accept the recommended answer** for each one.
+Want no questions at all? Run `bash /tmp/devpilot-install.sh --defaults`.
 
-**2. Verify:** `/dp-status health` (fix anything flagged with `/dp-setup fix`).
-
-**3. Deliver:**
+Then open the project in Claude Code and check the setup:
 
 ```bash
-/dp-deliver "add a CSV export to the orders page"            # → merged into develop
-/dp-deliver "add a CSV export to the orders page" --to sit   # → merged + SIT release cut
+/dp-status health     # checks everything; each warning tells you how to fix it
+/dp-setup fix         # fixes the warnings for you, asking one question at a time
 ```
 
-**Update later**, keeping your config: `bash install.sh --update`.
+Commit the new files, and you're ready:
+
+```bash
+git add -A && git commit -m "chore: install devpilot"
+```
+
+**Update DevPilot later** (your settings are kept): `bash install.sh --update`
+
+More detail on every installer question: [docs/setup-guide.md](docs/setup-guide.md).
 
 ---
 
-## Commands — one per team role
+## 2. The 10 commands
 
-| Role | Command | What it does |
-|------|---------|--------------|
-| **Whole team** | `/dp-deliver <requirement> [--to sit]` | End to end: refine → sprint → build → test → review → merge (→ SIT). `/dp-deliver resume` continues after an interruption. |
-| **Product Owner / BA** | `/dp-refine <requirement \| Jira key>` | Classify, dedup against the backlog, write Epic → Story with testable ACs. No code. |
-| **Scrum Master** | `/dp-sprint` | Group READY Stories into sprints, recommend the run order. |
-| **Developers** | `/dp-build [sprint]` | Angular + .NET agents build the sprint in parallel on one branch → one PR. |
-| **QA** | `/dp-test [ui \| perf] [story \| PR \| diff]` | Derive cases from ACs, then write unit, integration, and Playwright tests and run them. `ui` = full UI pass. |
-| **Tech Lead** | `/dp-pr [PR]` | Apply review comments, drive CI to green (bounded), merge per policy. |
-| **DevOps** | `/dp-release <sit \| uat \| prd \| rollback> [version]` | Promote DEV → SIT → UAT → PRD, or roll production back. |
-| **On-call** | `/dp-hotfix <ticket> <slug> <version>` | Emergency fix from the deployed tag, followed by a blameless postmortem. |
-| **Everyone** | `/dp-status [health \| board \| metrics]` | Health check · task board · throughput. |
-| **Admin** | `/dp-setup [fix \| models \| wizard \| index]` | Repair config, switch the Claude model profile, refresh the index. |
+Each command matches a role in a normal development team.
 
-Agents (`team-ba`, `team-lead`, `team-frontend`, `team-dotnet`, `team-qa`) are spawned by these
-commands. You never call them directly.
+| Command | Team role | What it does |
+|---------|-----------|--------------|
+| `/dp-deliver "…"` | The whole team | **Everything, end to end**: plan → code → test → review → merge. Use this most of the time. |
+| `/dp-plan "…"` | Product Owner / BA | Turns a requirement into user stories with acceptance criteria. **Writes no code.** |
+| `/dp-sprint` | Scrum Master | Groups the planned stories into sprints and tells you which sprint to build first. |
+| `/dp-build [sprint]` | Developers | Writes the code for a whole sprint on one branch and opens one pull request. |
+| `/dp-test [ui\|perf] <story>` | QA | Writes the missing tests and runs them. `ui` = full browser testing. `perf` = load testing. |
+| `/dp-pr <PR number>` | Tech Lead | Fixes review comments and failing CI on a pull request, then merges it. |
+| `/dp-release <stage>` | DevOps | Deploys to `sit`, `uat`, or `prd`, or runs `rollback`. |
+| `/dp-hotfix …` | On-call | Emergency fix for a production bug. |
+| `/dp-status` | Everyone | Shows the task board. `health` checks the setup; `metrics` shows speed. |
+| `/dp-setup` | Admin | Fixes settings and changes which Claude models the team uses. |
 
-### Everyday situations
-
-| Situation | Type |
-|-----------|------|
-| New feature or bug | `/dp-deliver "…"` (bugs get a failing-test-first flow automatically) |
-| Approve the plan before code | `/dp-refine "…"` → `/dp-sprint` → `/dp-build` |
-| Many ideas at once | several `/dp-refine` → `/dp-sprint` → `/dp-build sprint-1` |
-| Thin tests / full UI regression | `/dp-test <story>` · `/dp-test ui <story>` |
-| PR red or has review comments | `/dp-pr <PR>` |
-| Ship to test / production | `/dp-release sit 1.4.0` → `/dp-release uat` → `/dp-release prd 1.4.0` |
-| Production incident | `/dp-hotfix …` · `/dp-release rollback` |
-| Spend too high | `/dp-setup models save` |
+You never call the AI agents directly. The commands start them for you.
 
 ---
 
-## How a requirement flows
+## 3. Common tasks: what to type
+
+| I want to… | Type |
+|------------|------|
+| Build a new feature | `/dp-deliver "users can reset their password by email"` |
+| Fix a bug | `/dp-deliver "the orders page shows a 500 error when the list is empty"` |
+| Build it **and** deploy to SIT | `/dp-deliver "…" --to sit` |
+| Review the plan before any code is written | `/dp-plan "…"` → check the stories → `/dp-sprint` → `/dp-build` |
+| Plan many ideas, then build them together | run `/dp-plan` several times → `/dp-sprint` → `/dp-build sprint-1` |
+| Add missing tests to a story | `/dp-test PROJ-12` |
+| Test the whole UI in a browser | `/dp-test ui PROJ-12` |
+| Fix a pull request (red CI or review comments) | `/dp-pr 42` |
+| Deploy a release | `/dp-release sit 1.4.0` → `/dp-release uat` → `/dp-release prd 1.4.0` |
+| Undo a bad production release | `/dp-release rollback` |
+| Fix production **right now** | `/dp-hotfix PROJ-99 login-crash 1.4.1` |
+| Continue after an interruption | `/dp-deliver resume` |
+| Spend fewer tokens | `/dp-setup models save` |
+
+**Tip:** write the requirement as you would tell a colleague. Mention the page, the user, and the expected result.
+
+---
+
+## 4. What happens when you run /dp-deliver
 
 ```
 /dp-deliver "add CSV export"
-  │
-  ├─ REFINE   BA: classify → dedup vs docs/backlog/index.md → spec + Epic→Story (Jira/GitHub/local)
-  ├─ SPRINT   feature → its own sprint · bug → the active sprint · P0/P1 → refused, use /dp-hotfix
-  ├─ PLAN     Team Lead: files per layer, API contract, test layer per AC, ADRs
-  ├─ BUILD    team-dotnet (API · EF Core · migrations · OpenAPI)  ║  team-frontend (Angular · generated client)
-  ├─ QA       case matrix per AC → Vitest · xUnit + SQL Server · Playwright journeys + axe
-  ├─ REVIEW   code-review · security · performance · architecture · test guard (strict)
-  ├─ MERGE    PR → develop, auto-merge ladder green on the head commit (bounded fix loop)
-  └─ PROMOTE  (--to sit) release branch → SIT      ·  UAT and PRD stay human-gated
+   │
+   ├─ 1. PLAN     Writes the story + acceptance criteria. Checks the backlog for duplicates.
+   │              Creates the ticket (Jira, GitHub Issues, or a local file) BEFORE any code.
+   ├─ 2. SPRINT   New feature → its own sprint.  Bug → the current sprint.
+   │              Critical production bug (P0/P1) → stops and tells you to use /dp-hotfix.
+   ├─ 3. DESIGN   Tech Lead lists the files to change, the API shape, and which tests are needed.
+   ├─ 4. CODE     .NET agent: API, database, migrations  ║  Angular agent: pages, services
+   ├─ 5. TEST     Unit tests · API tests on real SQL Server · browser tests (Playwright)
+   ├─ 6. REVIEW   Code quality · security · performance · every changed file has a test
+   ├─ 7. MERGE    Pull request into develop, merged when all checks are green
+   └─ 8. DEPLOY   (only with --to sit) creates the release and deploys to SIT
+```
+
+**When does it stop and ask you?** Only when it can't tell whether your request duplicates an existing story. Everything else is automatic.
+
+**Where can I see what it did?**
+
+| What | Where |
+|------|-------|
+| Step-by-step log of the task | `docs/tasks/<TICKET>.md` |
+| Requirements and acceptance criteria | `docs/requirements/<name>.md` |
+| Technical plan | `docs/plans/<name>.md` |
+| Test results | `docs/qa/<name>.md` |
+| Code review | the pull request description |
+
+---
+
+## 5. Testing
+
+Every change is tested at four levels:
+
+| Level | Tool | What it checks |
+|-------|------|----------------|
+| Angular unit tests | **Vitest** | Components and services work on their own |
+| .NET unit tests | **xUnit** | Business logic works on its own |
+| API tests | **xUnit + WebApplicationFactory + real SQL Server** (Docker) | Endpoints, database, validation, and security work together |
+| UI tests | **Playwright** | A real browser clicks through the app like a user, and checks accessibility |
+
+The agents run tests with `bash scripts/run-tests.sh`. It saves the full output to
+`.devpilot/logs/` and shows only the failures, which saves a lot of tokens. You can use it too:
+
+```bash
+bash scripts/run-tests.sh all        # or: angular | dotnet | e2e
 ```
 
 ---
 
-## The delivery process
+## 6. Releasing to SIT, UAT, and production
 
-The full contract is `.devpilot/process.md`. Each phase has an exit gate, and a failed gate sends
-work **back one phase, never forward with a TODO**.
+```
+develop ──(automatic)──► DEV ──/dp-release sit──► SIT ──/dp-release uat──► UAT ──/dp-release prd──► PRODUCTION
+                                                                                         ▲
+                                                                          a person must approve
+```
 
-| Phase | Owner / command | Exit gate |
-|-------|-----------------|-----------|
-| Intake | PO · `/dp-refine` | Classified, deduped, Epic→Story exists (hard-gated by `jira-guard.sh`) |
-| Ready | BA | Definition of Ready: testable ACs, sized, sliced |
-| Sprint | Scrum Master · `/dp-sprint` | Only READY Stories; sprint goal + run order |
-| Build | Developers · `/dp-build` | One branch per sprint; agents stay in their layer; build never red |
-| Verify | QA · `/dp-test` | Every AC tested; UI ACs have Playwright journeys; verdict PASS |
-| Merge | Tech Lead · `/dp-pr` | Auto-merge ladder green on the PR head |
-| Release | DevOps · `/dp-release` | Same artifact promoted DEV→SIT→UAT→PRD; PRD human-approved |
-| Operate | On-call · `/dp-hotfix` | Blameless postmortem; action items back to Intake |
+| Command | What it does |
+|---------|--------------|
+| `/dp-release sit 1.4.0` | Creates the release branch and deploys to SIT |
+| `/dp-release uat` | Deploys the tested SIT build to UAT |
+| `/dp-release prd 1.4.0` | Merges to `main`, tags `v1.4.0`, and deploys to production **after you approve** |
+| `/dp-release rollback` | Goes back to the previous production version (shows the plan first) |
 
----
-
-## Stack
-
-| Layer | Technology | How it's tested |
-|-------|-----------|-----------------|
-| Frontend | Angular 21+ (standalone, signals, zoneless-ready) | Vitest + TestBed, `HttpTestingController`, harnesses |
-| Backend | ASP.NET Core (.NET 8+) — controllers or minimal APIs | xUnit unit tests + `WebApplicationFactory` integration tests |
-| Data | EF Core + SQL Server | Testcontainers (real SQL Server) + Respawn — never the InMemory provider |
-| Contract | OpenAPI committed → Angular client generated | Snapshot test + breaking-change check (`oasdiff`) |
-| UI / E2E | The running app + API | Playwright: journeys, auth-once, API seeding, axe, visual, mobile |
-
-Every suite runs through `scripts/run-tests.sh`. The full log goes to `.devpilot/logs/`; agents
-read one PASS/FAIL line plus the failures.
-
-**Skills** (`.devpilot/skills/`, 23, loaded only when needed):
-- Angular: `angular-dev`, `angular-testing`, `accessibility`
-- .NET: `dotnet-api`, `efcore-sqlserver`, `dotnet-testing`, `api-contract`
-- QA: `test-case-design`, `test-strategy`, `ui-e2e-playwright`, `token-lean-testing`, `test-guard`, `performance`
-- Gates and operations: `definition-of-ready`, `definition-of-done`, `architecture-guard`, `code-review`, `security-scan`, `auto-merge`, `release-ops`, `self-heal`, `estimation-and-slicing`, `core-rules`
-
----
-
-## Quality and governance gates
-
-- **Definition of Ready / Done**: entry and exit gates per role.
-- **Test guard**: every changed source file has a covering test. Merge gates run it strict (`STRICT=1`).
-- **Code review**: Team Lead review with 🔴/🟡/🟢 severity. An open 🔴 blocks the merge.
-- **Security**: threat model at design time, then a diff checklist covering injection, auth and
-  ownership, secrets, PII and dependencies. `scripts/audit.sh` blocks new high or critical CVEs.
-- **API contract**: breaking changes need a new version. The spec and the Angular client land in the same PR.
-- **Auto-merge ladder**: build, tests, audit, review, QA and CI must be green **on the head commit**.
-  The fix loop is capped at 3 cycles, after which it escalates.
-- **Scope guard**: a `PreToolUse` hook blocks agents from writing outside their layer.
-- **Server-side enforcement**: a generated `devpilot-ci` workflow. Branch protection requires it on
-  `develop`/`main` and blocks force-pushes. `pr-only` additionally requires a human review.
-- **Audit trail**: `docs/tasks/<KEY>.md` holds the step log, `docs/qa/` the verdicts, and the PR body
-  the review. Each ticket gets exactly one start comment and one DONE comment.
-- **Conventional commits**: enforced by a `commit-msg` hook.
-
----
-
-## DevOps pipeline
-
-| Stage | Command | Gate |
-|-------|---------|------|
-| DEV | automatic after merge to `develop` | CI green |
-| SIT | `/dp-release sit <version>` (or `/dp-deliver … --to sit`) | DEV smoke passed |
-| UAT | `/dp-release uat` | SIT deploy + smoke green; environment approval |
-| PRD | `/dp-release prd <version>` | UAT sign-off, human approval of the `production` environment |
-| Rollback | `/dp-release rollback [version]` | Dry run first; never rewrites history |
-| Hotfix | `/dp-hotfix <ticket> <slug> <version>` | Branch from the deployed tag; UAT before PRD |
-
-The pipeline builds the artifact once and promotes that same artifact through each environment.
-Releases use SemVer (MINOR for features, PATCH for fixes), and every release gets a changelog
-section and a tag.
+Version numbers: new feature → `1.4.0` → `1.5.0`. Bug fix → `1.4.0` → `1.4.1`.
 
 <details>
-<summary>One-time deploy setup</summary>
+<summary>One-time setup for deployments</summary>
 
-GitHub Secrets: `DEPLOY_HOOK_DEV`, `DEPLOY_HOOK_SIT`, `DEPLOY_HOOK_UAT`, `DEPLOY_HOOK_PRD`.
-GitHub Environments: `dev`, `sit`, `uat`, `prd`. Put required reviewers on `uat` and `prd`.
+In GitHub, add these secrets: `DEPLOY_HOOK_DEV`, `DEPLOY_HOOK_SIT`, `DEPLOY_HOOK_UAT`, `DEPLOY_HOOK_PRD`.
+Add these environments: `dev`, `sit`, `uat`, `prd`. Set required reviewers on `uat` and `prd`.
 </details>
 
 ---
 
-## Configuration
+## 7. Safety checks (quality gates)
 
-`project.config.md` is the single source of truth. Commit it.
+Code is merged only when all of these pass. The AI never skips them.
+
+- ✅ Every acceptance criterion has a test.
+- ✅ Every changed source file has a test (`scripts/test-guard.sh`).
+- ✅ All tests pass, and the build is green.
+- ✅ No security problems, such as SQL injection, missing permission checks, secrets in code, or vulnerable packages.
+- ✅ No breaking API change without a new version.
+- ✅ Code review has no blocking (🔴) issues.
+- ✅ CI is green on the pull request.
+
+If a check fails, DevPilot tries to fix it up to 3 times, then stops and explains the problem.
+It never deletes or weakens a test to make it pass.
+
+For extra safety, the installer can also protect `develop` and `main` on GitHub, so CI must pass before anything is merged.
+
+---
+
+## 8. Configuration
+
+All settings live in **`project.config.md`** in your project root. The most important ones:
 
 ```yaml
-project_name: my-app
-ticket_prefix: APP
-base_branch: develop          # PRs target this; DEV deploys from it
+ticket_prefix: APP            # your Jira project key
+base_branch: develop          # pull requests go here
 tracker:
-  type: jira                  # local | github | jira
-merge_policy: auto            # auto = the team merges green PRs · pr-only = a human merges
-language: en                  # BA/QA docs language (code stays English)
-
-stack:
-  frontend: angular           # angular | none
-  backend: dotnet             # dotnet | none
-  database: sqlserver         # sqlserver | none
+  type: jira                  # local (no setup) | github | jira
+merge_policy: auto            # auto = DevPilot merges green PRs | pr-only = a person merges
+language: en                  # language for requirement and test documents (code stays English)
 
 model_policy:
-  coding_profile: auto        # auto (Opus for hard work) | balanced (no Opus) | save (Haiku-first)
-  model_mode: recommended     # recommended | single | per-team
-
-coding_models:
-  claude:
-    power:    "claude-opus-5-5"            # architectural / cross-cutting / high-risk
-    standard: "claude-sonnet-5"            # normal feature & bug work
-    lite:     "claude-haiku-4-5-20251001"  # simple changes, BA, QA
+  coding_profile: auto        # auto | balanced | save  (see below)
 ```
 
-Switch models anytime: `/dp-setup models <auto|balanced|save>`, one model for everyone with
-`bash scripts/model-profiles.sh single <model-id>`, or per role by editing `models.*` then running
-`bash scripts/model-profiles.sh sync-agents`. Reference: `.devpilot/config/models.md`.
+**Claude models.** DevPilot picks the model for each task:
+
+| Profile | Hard tasks | Normal tasks | Simple tasks | Use when |
+|---------|-----------|--------------|--------------|----------|
+| `auto` (default) | Opus | Sonnet | Haiku | You want the best result |
+| `balanced` | Sonnet | Sonnet | Haiku | You want lower cost, still strong |
+| `save` | Sonnet | Haiku | Haiku | You want the lowest cost |
+
+Change it with `/dp-setup models balanced`.
+
+**Jira setup:** run `bash scripts/devpilot-config.sh set jira_api_token=<token>` (also `jira_base_url` and `jira_email`). The token is checked right away and stored in `.devpilot/config.sh`, which is never committed.
 
 ---
 
-## Token efficiency
+## What you need
 
-- **Skills load only when needed.** Agents read `core-rules.md` once and load a skill only at the step that needs it.
-- **Two-tier index.** `docs/project-index.md` is a small map. Per-file detail lives in shards that
-  `scope.sh` greps without spending AI tokens. Each task reads the top 3–8 files, never the whole repo.
-- **Scope once.** `scope.sh --save` persists the file list at plan time, and every later phase reuses it.
-- **Hash-gated index.** The index regenerates only when repo content changes.
-- **Summarized test output.** `run-tests.sh` returns failures only. Agents re-run just the failing tests while fixing.
-- **Per-task models.** Haiku handles light work and Opus only architectural work.
-- **Small backlog reads.** Dedup reads the backlog index plus the top 1–3 candidate specs.
+| Tool | Needed? | Why |
+|------|---------|-----|
+| [Claude Code](https://claude.ai/code) (terminal, desktop app, VS Code/JetBrains, or web) | **Yes** | Runs the AI team |
+| `git` | **Yes** | Branches and releases |
+| .NET SDK and Node.js | **Yes** | To build and test your project |
+| Docker | Recommended | API tests use a real SQL Server in a container |
+| [GitHub CLI](https://cli.github.com) (`gh`) | Recommended | Opens and merges pull requests from the terminal |
 
----
-
-## Issue tracking
-
-| `tracker.type` | Behaviour | Setup |
-|----------------|-----------|-------|
-| `local` *(default)* | Everything in `docs/tasks/<KEY>.md` | none |
-| `github` | GitHub Issues via `gh` | `gh auth login` |
-| `jira` | Jira Cloud: Epic → Story, sprints, ADF briefs | `bash scripts/devpilot-config.sh set jira_api_token=<token>` (validated live) |
-
-Credentials live in `.devpilot/config.sh` (gitignored), managed by `scripts/devpilot-config.sh`.
-
----
-
-## Enterprise rollout
-
-1. **Pilot (one repo, one week).** Install with defaults and `merge_policy: pr-only`. Run real
-   Stories through `/dp-deliver` and review every PR it opens.
-2. **Team.** Switch to `tracker: jira`, apply branch protection and CI (the installer offers both),
-   add CODEOWNERS, and set `NOTIFY_WEBHOOK` to your Teams or Slack channel.
-3. **Organization.** Roll out or update every repository with one PR each:
-   `bash scripts/update-org.sh <org> --merge [--install-missing]`.
-   Move to `merge_policy: auto` once the gates have earned trust. Production stays human-approved.
-
-These hold at every stage: never weaken a gate to get a change through, and PRD is always human-approved.
-
----
-
-## Project structure
-
-```
-.claude/
-  commands/        # the 10 /dp-* commands
-  agents/          # team-ba · team-lead · team-frontend · team-dotnet · team-qa
-  settings.json    # SessionStart + scope-guard hooks
-.devpilot/
-  process.md       # the SDLC contract — phases, gates, roles
-  rules.md         # router → rules/angular.md · rules/dotnet.md · rules/sqlserver.md
-  skills/          # 23 skills (README.md is the index)
-  templates/       # requirements, plan, QA report, review report, ADR, Jira brief
-  config/models.md # Claude model tiers and profiles
-scripts/           # tracker (Jira/GitHub/local), git-flow, tests, CI, deploy, doctor
-docs/              # per-task output: requirements, plans, qa, reviews, tasks, backlog, sprints
-CLAUDE.md          # Claude Code project context
-project.config.md  # team + model configuration
-install.sh         # installer and --update
-```
-
----
-
-## Requirements
-
-| Tool | Required | Purpose |
-|------|----------|---------|
-| [Claude Code](https://claude.ai/code) (CLI, desktop, IDE, or web) | Yes | Runs the whole team |
-| `git` | Yes | Branching and releases |
-| [GitHub CLI](https://cli.github.com) `gh` | Recommended | PR automation (Claude Code on the web uses the GitHub MCP tools instead) |
-| .NET SDK, Node.js, Docker | For your project | Build and test; Docker runs the SQL Server test container |
-| `jq` or `python3` | Optional | Checkpoint and config scripts |
+**Your project:** an Angular frontend and/or an ASP.NET Core backend with SQL Server.
 
 ---
 
 ## Troubleshooting
 
-Start with `/dp-status health`. Every warning prints its fix, and `/dp-setup fix` applies them.
+**First step for any problem:** run `/dp-status health`. It tells you what's wrong and how to fix it.
 
-| Symptom | Fix |
-|---------|-----|
-| Jira 401 / tickets not created | `bash scripts/devpilot-config.sh validate`, then rotate the token (tracking falls back to local meanwhile) |
-| Agent model differs from config | `bash scripts/model-profiles.sh sync-agents` |
-| Stale scope results | `bash scripts/generate-project-index.sh --force` |
-| Test guard blocks a file that needs no test | Justify the exemption in the PR description. Never drop `STRICT=1` |
-| Integration tests fail with a Docker error | Start Docker. Testcontainers needs it, and the InMemory provider is not a substitute |
-| Hit a Claude usage limit mid-run | Nothing is lost: work is checkpointed and pushed. Run `/dp-deliver resume` after the reset |
-| CI red on the PR | `/dp-pr <PR>` |
-| Doctor warns about a legacy `engines:` block | Delete it from `project.config.md`; models live under `model_policy` / `coding_models` |
+| Problem | Solution |
+|---------|----------|
+| Jira tickets are not created | `bash scripts/devpilot-config.sh validate`, then set a new token. Until it works, tasks are logged locally, so nothing is lost. |
+| API tests fail with a Docker error | Start Docker Desktop. The tests need a real SQL Server. |
+| Claude hit a usage limit in the middle of a task | Nothing is lost. Wait for the limit to reset, then run `/dp-deliver resume`. |
+| A pull request has red CI | `/dp-pr <PR number>` |
+| Test guard blocks a file that really needs no test | Explain why in the pull request description. Don't turn the check off. |
+| `gh` is not installed | Install it and run `gh auth login`, or use Claude Code on the web. |
+| Health check mentions a legacy `engines:` block | Delete that block from `project.config.md` (left over from version 4). |
 
 ---
 
 ## Upgrading from 4.x
 
-DevPilot 5 runs on Claude only and uses role-based command names. `bash install.sh --update`
-installs the new commands and removes the retired files. Then delete the old `engines:`,
-`layer_overrides:`, `layer_models:` and `fallback:` blocks from `project.config.md` and add
-`model_policy:` (see [Configuration](#configuration)).
+Run `bash install.sh --update`. Old commands are removed and new ones installed. Then delete the `engines:`,
+`layer_overrides:`, `layer_models:`, and `fallback:` blocks from `project.config.md`, and run `/dp-setup models auto`.
 
-| 4.x | 5.x |
-|-----|-----|
+| Old (4.x) | New (5.x) |
+|-----------|-----------|
 | `/ceo` | `/dp-deliver` |
-| `/dp-plan` | `/dp-refine` |
-| `/dp-autofix`, `/dp-review-fix` | `/dp-pr` |
+| `/dp-plan` | `/dp-plan` (same) |
+| `/dp-autofix` and `/dp-review-fix` | `/dp-pr` |
 | `/dp-rollback` | `/dp-release rollback` |
 | `/dp-config` | `/dp-setup` |
-| `--claude` / `--opencode`, OpenCode, Antigravity, `AGENTS.md`, `scripts/ceo.sh` | removed |
+| OpenCode, Antigravity, `--opencode`, `AGENTS.md` | Removed (Claude only) |
 
 ---
 
-## Contributing
+## For DevPilot contributors
 
-1. Branch from `main` (`feature/<slug>` or `fix/<slug>`) and keep one concern per commit.
-2. Use [Conventional Commits](https://www.conventionalcommits.org).
-3. Run `bash tests/run.sh` before opening a PR. CI runs shellcheck, a bash syntax check and the suite.
+<details>
+<summary>How DevPilot is built</summary>
+
+```
+.claude/commands/   the 10 /dp-* commands
+.claude/agents/     team-ba · team-lead · team-frontend (Angular) · team-dotnet (.NET) · team-qa
+.devpilot/skills/   23 short playbooks the agents load only when needed (index: skills/README.md)
+.devpilot/rules/    coding rules for angular, dotnet, sqlserver
+.devpilot/process.md  the full delivery process: phases, gates, roles
+scripts/            Jira/GitHub/local tracking, git flow, tests, CI, deploy, health check
+tests/run.sh        test suite for the scripts
+install.sh          installer and --update
+```
+
+**Saving tokens.** Agents read one short rules file, then load a skill only at the step that needs it.
+They find the right code files through a small project index (`scripts/scope.sh`) instead of reading
+the whole repository. Test output is summarized. Simple tasks run on Haiku, hard tasks on Opus.
+
+**Rolling out to many repositories:** `bash scripts/update-org.sh <github-org> --merge` opens one update PR per repository.
+
+**Contributing:** use [Conventional Commits](https://www.conventionalcommits.org), keep one change per commit, and run
+`bash tests/run.sh` before pushing.
+</details>
 
 ## License
 
-[MIT](#license). Use it freely in any project, commercial or otherwise.
+[MIT](#license). Free to use in any project, commercial or not.

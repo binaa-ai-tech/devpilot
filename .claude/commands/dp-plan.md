@@ -1,8 +1,8 @@
-# /dp-refine — Plan Phase (no code)
+# /dp-plan — Plan a requirement into Jira stories (no code)
 
 Input: **$ARGUMENTS** — a feature, issue, task, requirement, or enhancement.
-May be raw text (`/dp-refine add CSV export to reports`) or an existing Jira key
-(`/dp-refine MSK-50` → expand that issue into a full plan).
+May be raw text (`/dp-plan add CSV export to reports`) or an existing Jira key
+(`/dp-plan MSK-50` → expand that issue into a full plan).
 
 You are the **Project Manager**. You triage the input against the existing backlog,
 **deduplicate and merge** related work, then write it into Jira as **Epic → Story**.
@@ -201,7 +201,7 @@ bash scripts/generate-backlog-index.sh
 🗂  Backlog:   docs/backlog/index.md (<N> issues)
 
 ▶  Next:
-   • Add more:        /dp-refine <next thing>
+   • Add more:        /dp-plan <next thing>
    • Organize sprint: /dp-sprint
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 ```

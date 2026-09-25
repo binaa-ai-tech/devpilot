@@ -127,7 +127,7 @@ run_update() {
   TEMPLATE_TEAM="requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md jira-brief.md"
   SKILLS="core-rules.md definition-of-ready.md estimation-and-slicing.md architecture-guard.md angular-dev.md angular-testing.md accessibility.md dotnet-api.md efcore-sqlserver.md dotnet-testing.md api-contract.md test-case-design.md test-strategy.md ui-e2e-playwright.md token-lean-testing.md test-guard.md performance.md code-review.md security-scan.md definition-of-done.md auto-merge.md release-ops.md self-heal.md README.md"
   CHECKLISTS="feature.md bugfix.md hotfix.md"
-  CMDS="dp-deliver.md dp-refine.md dp-sprint.md dp-build.md dp-test.md dp-pr.md dp-release.md dp-hotfix.md dp-status.md dp-setup.md"
+  CMDS="dp-deliver.md dp-plan.md dp-sprint.md dp-build.md dp-test.md dp-pr.md dp-release.md dp-hotfix.md dp-status.md dp-setup.md"
   AGENTS_LIST="team-lead.md team-ba.md team-frontend.md team-dotnet.md team-qa.md"
   SCRIPTS="git-flow.sh new-feature.sh resolve-model.sh model-profiles.sh preflight-scan.sh run-summary.sh checkpoint.sh devpilot-config.sh track.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh create-jira-ticket.sh create-jira-epic.sh update-jira-status.sh update-jira-description.sh add-jira-comment.sh generate-project-index.sh generate-backlog-index.sh jira-sprint.sh link-jira-issues.sh md-to-adf.sh jira-describe.sh"
 
@@ -165,7 +165,7 @@ run_update() {
   for f in $RETIRED; do rm -f ".devpilot/$f"; done
   rm -f .claude/agents/team-backend.md
   # Retired in the Claude-only move (OpenCode/Antigravity support + renamed commands).
-  for f in ceo.md dp-plan.md dp-config.md dp-autofix.md dp-review-fix.md dp-rollback.md; do rm -f ".claude/commands/$f"; done
+  for f in ceo.md dp-config.md dp-autofix.md dp-review-fix.md dp-rollback.md; do rm -f ".claude/commands/$f"; done
   for f in run-command.sh run-mode.sh resolve-engine.sh ceo.sh dp-plan.sh dp-build.sh dp-sprint.sh dp-release.sh dp-status.sh dp-config.sh; do rm -f "scripts/$f"; done
   rm -rf .opencode
 
@@ -671,7 +671,7 @@ fetch ".devpilot/config/models.md" ".devpilot/config/models.md"
 
 # .claude/ — Claude Code commands + agent definitions
 info "Installing .claude/..."
-for f in dp-deliver.md dp-refine.md dp-sprint.md dp-build.md dp-test.md dp-pr.md \
+for f in dp-deliver.md dp-plan.md dp-sprint.md dp-build.md dp-test.md dp-pr.md \
          dp-release.md dp-hotfix.md dp-status.md dp-setup.md; do
   fetch ".claude/commands/$f" ".claude/commands/$f"
 done
@@ -965,7 +965,7 @@ echo ""
 echo "  In Claude Code (CLI, desktop, IDE, or claude.ai/code):"
 echo "    /dp-deliver \"your feature or bug\"        — requirement → merged into $BASE_BRANCH"
 echo "    /dp-deliver \"…\" --to sit                 — …and cut the SIT release"
-echo "    /dp-refine → /dp-sprint → /dp-build → /dp-pr   — the same flow, one role at a time"
+echo "    /dp-plan → /dp-sprint → /dp-build → /dp-pr   — the same flow, one role at a time"
 echo ""
 
 echo "  ── Change config anytime ───────────────────────────────"

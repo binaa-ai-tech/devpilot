@@ -1,6 +1,6 @@
 # Definition of Ready — a story may enter a sprint only when it passes
 
-Used by the **PM** in `/dp-refine` (before writing a Story) and `/dp-sprint` (before a
+Used by the **PM** in `/dp-plan` (before writing a Story) and `/dp-sprint` (before a
 Story joins a sprint). The mirror of `definition-of-done`: DoD gates the exit, DoR gates
 the entry. A "not ready" Story stays in the backlog — never pull unclear work into a sprint.
 
