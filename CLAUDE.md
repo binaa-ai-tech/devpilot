@@ -31,7 +31,7 @@ The end-to-end SDLC contract (phases, gates, roles) lives in `.devpilot/process.
   SPRINT  → feature: own sprint · bug: active sprint · P0/P1: refused → /dp-hotfix
   BUILD   → team-dotnet (API · EF Core · OpenAPI) ║ team-frontend (Angular · generated client)
   QA      → Vitest · xUnit + real SQL Server · Playwright journeys + axe
-  REVIEW  → code-review · security · performance · test guard (strict)
+  REVIEW  → review-checklist · security · performance · test guard (strict)
   VERSION → version.sh bump from develop (feature → minor · bug → patch)
   MERGE   → one PR "[vX.Y.Z] …" → develop (auto-merge ladder; GitHub or Azure Repos)
   CLOSE   → close-delivery.sh: items Done · Epic Done · sprint closed · back on develop
@@ -69,7 +69,8 @@ Never call a backend directly from a command — always `tracker.sh`. Secrets li
 - **Scope once, reuse everywhere** — `bash scripts/scope.sh --save <slug> "<task>"` saves the
   ranked files to `docs/tasks/<slug>-scope.md`; later phases reuse it. Read only the top 3–8 files.
 - **Hash-gated freshness** — the index regenerates only when repo content changed. Never broad-scan.
-- **Read-once core** — `.devpilot/skills/core-rules.md`; load other skills only at the step that needs them.
+- **Read-once core** — `core-rules` is preloaded into every agent; stack skills load automatically on matching
+  files (`paths:`), the others only at the step that needs them.
 - **Token-lean tests** — run suites via `bash scripts/run-tests.sh <angular|dotnet|e2e|all>`: the
   full log goes to `.devpilot/logs/`, only failures come back.
 
@@ -90,7 +91,8 @@ Change with `/dp-setup models <auto|balanced|save>`. Reference: `.devpilot/confi
   **Contract:** OpenAPI → generated Angular client.
 - **Tests:** Vitest (Angular) · xUnit + `WebApplicationFactory` + Testcontainers (.NET) · Playwright (UI/E2E).
 - **Rules:** `.devpilot/rules.md` (router) + `.devpilot/rules/<angular|dotnet|sqlserver>.md`.
-- **Skills:** `.devpilot/skills/` — index in `.devpilot/skills/README.md`.
+- **Skills:** `.claude/skills/<name>/SKILL.md` — native Claude Code skills, hidden from the `/` menu
+  (`user-invocable: false`); index in `.claude/skills/README.md`.
 - **Agents:** `.claude/agents/` — team-ba, team-lead, team-frontend, team-dotnet, team-qa
   (spawned by the commands; never called directly).
 

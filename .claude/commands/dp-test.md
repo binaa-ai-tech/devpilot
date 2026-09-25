@@ -30,9 +30,9 @@ Resolve what to test:
 ## Step 1 — Design the cases (paper before code)
 
 Spawn `subagent_type: "team-qa"`:
-> Scope: `<resolved scope>`. Read `.devpilot/skills/test-case-design.md` and derive
+> Scope: `<resolved scope>`. Read `.claude/skills/test-case-design/SKILL.md` and derive
 > the test-case matrix per AC (happy / boundary / negative / state, P0–P2,
-> traceability). For each case pick the layer per `.devpilot/skills/test-strategy.md`:
+> traceability). For each case pick the layer per `.claude/skills/test-strategy/SKILL.md`:
 > Angular unit, .NET unit, .NET integration, or Playwright UI journey. Write the matrix
 > into `docs/qa/<slug>.md` BEFORE writing test code.
 
@@ -40,20 +40,20 @@ Spawn `subagent_type: "team-qa"`:
 
 Same agent, continuing:
 > For each case with no covering test, write one in its layer:
-> Angular specs per `.devpilot/skills/angular-testing.md`, .NET tests per
-> `.devpilot/skills/dotnet-testing.md` (integration on real SQL Server).
+> Angular specs per `.claude/skills/angular-testing/SKILL.md`, .NET tests per
+> `.claude/skills/dotnet-testing/SKILL.md` (integration on real SQL Server).
 > For every user-facing AC — and for **all** of them in `ui` mode — add a Playwright
-> journey per `.devpilot/skills/ui-e2e-playwright.md` (happy path + one visible failure,
+> journey per `.claude/skills/ui-e2e-playwright/SKILL.md` (happy path + one visible failure,
 > data seeded via the API, axe scan on each new screen; visual + mobile projects in `ui`
 > mode for design-critical screens). If the repo has no Playwright setup yet, scaffold
 > `e2e/` as that skill describes first.
 > If the input started with `perf` or an AC carries a performance requirement, load
-> `.devpilot/skills/performance.md` (Part 2) and add/run the budgeted script under `perf/`.
+> `.claude/skills/performance/SKILL.md` (Part 2) and add/run the budgeted script under `perf/`.
 
 ## Step 3 — Run + verdict
 
-> Run everything through the token-lean runner (`.devpilot/skills/token-lean-testing.md`):
-> `bash scripts/run-tests.sh all` (or `e2e` in `ui` mode). Apply `.devpilot/skills/self-heal.md`
+> Run everything through the token-lean runner (`.claude/skills/token-lean-testing/SKILL.md`):
+> `bash scripts/run-tests.sh all` (or `e2e` in `ui` mode). Apply `.claude/skills/self-heal/SKILL.md`
 > on failures (3 attempts, re-running only the failing tests, test-code fixes only — an
 > implementation bug is a 🔴 BLOCKER finding, never a weakened assertion). Commit tests with
 > `test(<slug>): <what>`. Finish `docs/qa/<slug>.md` with the matrix, coverage added, suite

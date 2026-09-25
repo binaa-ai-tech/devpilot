@@ -134,6 +134,11 @@ if [ "$DOTNET" = 1 ]; then cat <<YML
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: $DOTNET_SDK
+      - uses: actions/cache@v4   # NuGet packages, keyed on the project files
+        with:
+          path: ~/.nuget/packages
+          key: nuget-\${{ runner.os }}-\${{ hashFiles('**/*.csproj', '**/packages.lock.json', '**/Directory.Packages.props') }}
+          restore-keys: nuget-\${{ runner.os }}-
       - name: build (.NET)
         run: dotnet build --configuration Release
       - name: tests (.NET · xUnit + Testcontainers SQL Server)
@@ -328,6 +333,11 @@ YML
       - uses: actions/setup-dotnet@v4
         with:
           dotnet-version: $DOTNET_SDK
+      - uses: actions/cache@v4   # NuGet packages, keyed on the project files
+        with:
+          path: ~/.nuget/packages
+          key: nuget-\${{ runner.os }}-\${{ hashFiles('**/*.csproj', '**/packages.lock.json', '**/Directory.Packages.props') }}
+          restore-keys: nuget-\${{ runner.os }}-
 YML
 cat <<YML
       - name: build once (web + api + db script)

@@ -90,7 +90,7 @@ recommendation.
 ## Step 4 — BA: write the durable spec to git
 
 **Adopt the BA persona** (`.devpilot/prompts/team/ba-agent.md`); apply
-`.devpilot/skills/definition-of-ready.md`.
+`.claude/skills/definition-of-ready/SKILL.md`.
 
 1. Read the 3–8 scoped source files.
 2. Write `docs/requirements/<SLUG>.md` (`.devpilot/templates/team/requirements.md`): user story,

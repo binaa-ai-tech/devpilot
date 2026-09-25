@@ -10,7 +10,7 @@ One command that owns a PR until its end state, with no human hand-offs:
    leave it green and ready for a human (`pr-only`).
 4. **Close** — items Done, Epic and sprint closed, back on `develop` (`close-delivery.sh`).
 
-The contract is `.devpilot/skills/auto-merge.md` — read it first.
+The contract is `.claude/skills/auto-merge/SKILL.md` — read it first.
 
 > ## 🔌 Transport — pick once by git host
 > ```bash
@@ -39,7 +39,7 @@ MERGE_POLICY=$(grep '^merge_policy:' project.config.md | head -1 | awk '{print $
 Fetch the PR (table above), check out its head branch, and read the machine line in its body:
 `<!-- devpilot: keys="…" sprint="…" version="…" -->` → `KEYS`, `SPRINT`, `VERSION` (Step 4).
 
-If any **never-auto-merge** condition in `auto-merge.md` holds (release/`main` target, unvetted
+If any **never-auto-merge** condition in `auto-merge` holds (release/`main` target, unvetted
 migrations, secrets/auth config in the diff), still fix CI and comments but stop before merging
 and say why.
 
@@ -48,7 +48,7 @@ and say why.
 For each unresolved thread:
 1. **Triage** — actionable change, question, or disagreement.
 2. **Fix** actionable ones on the PR branch, one commit per concern (`fix(review): <what>`), per
-   `.devpilot/skills/code-review.md`. Answer questions from the diff. Disagree with a reason,
+   `.claude/skills/review-checklist/SKILL.md`. Answer questions from the diff. Disagree with a reason,
    not a silent skip.
 3. **Reply** on every thread (what changed + commit, or why not); resolve the fixed ones.
    Re-request review from humans who asked for changes.
@@ -67,7 +67,7 @@ For each unresolved thread:
    ```
    Update the PR title `[vX.Y.Z]` and the body's machine line to match.
 2. **Fetch the failures** (transport table).
-3. **Root-cause and fix** per `.devpilot/skills/self-heal.md` — no skipped tests, no weakened
+3. **Root-cause and fix** per `.claude/skills/self-heal/SKILL.md` — no skipped tests, no weakened
    assertions, no suppressed errors. "Flaky" is not a root cause.
 4. **Local ladder before pushing** — `bash scripts/run-tests.sh all`,
    `STRICT=1 bash scripts/test-guard.sh`, `bash scripts/audit.sh`. Push only a locally green

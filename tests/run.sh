@@ -612,7 +612,7 @@ rm -rf "$D"
 echo "== process-logging policy (core-rules #11) =="
 # The policy: each /dp-deliver flow posts only a start + DONE comment to the ticket
 # (plus BLOCKED as the exception). Routine progress comments must not creep back.
-assert_contains "$(cat "$REPO/.devpilot/skills/core-rules.md")" "Process logging" "core-rules documents the policy"
+assert_contains "$(cat "$REPO/.claude/skills/core-rules/SKILL.md")" "Process logging" "core-rules documents the policy"
 ROUTINE_RE='tracker.sh comment "\$KEY" "(✅ QA passed|✅ Layer-Locked QA Passed|✅ Merged into|✅ Layer-Locked PR merged|📋 Plan complete|⚙️ Implementation complete|⚙️ Fix implemented)'
 # Glob the actual command set so this never goes stale when commands are renamed.
 for CMD in "$REPO"/.claude/commands/*.md; do
@@ -665,10 +665,9 @@ echo "== testing & auto-merge wiring (round 4) =="
 # New skills exist, are indexed, and the installer ships them (update + fresh lists).
 for SK in test-case-design ui-e2e-playwright performance auto-merge token-lean-testing \
           angular-dev angular-testing dotnet-api dotnet-testing efcore-sqlserver api-contract release-ops; do
-  [ -f "$REPO/.devpilot/skills/$SK.md" ] && ok "skill $SK.md exists" || no "skill $SK.md exists"
-  assert_contains "$(cat "$REPO/.devpilot/skills/README.md")" "$SK.md" "skills index lists $SK"
-  n=$(grep -c "$SK.md" "$REPO/install.sh"); n=${n:-0}
-  assert_eq "$([ "$n" -ge 2 ] && echo ok)" "ok" "installer ships $SK.md in both lists"
+  [ -f "$REPO/.claude/skills/$SK/SKILL.md" ] && ok "skill $SK exists" || no "skill $SK exists"
+  assert_contains "$(cat "$REPO/.claude/skills/README.md")" "\`$SK\`" "skills index lists $SK"
+  assert_contains " $(sed -n 's/^DEVPILOT_SKILLS="\(.*\)"/\1/p' "$REPO/install.sh") " " $SK " "installer ships skill $SK"
 done
 # New commands exist and the installer ships them.
 for C in dp-test dp-pr; do
@@ -682,8 +681,8 @@ n=$(grep -c '\.devpilot/process\.md' "$REPO/install.sh"); n=${n:-0}
 assert_eq "$([ "$n" -ge 2 ] && echo ok)" "ok" "installer fetches process.md (update + fresh)"
 assert_contains "$(cat "$REPO/CLAUDE.md")" ".devpilot/process.md" "CLAUDE.md points at the process contract"
 # QA agent derives cases before code; the build merge step honors the gate ladder.
-assert_contains "$(cat "$REPO/.devpilot/prompts/team/qa-agent.md")" "test-case-design.md" "qa-agent loads test-case-design"
-assert_contains "$(cat "$REPO/.claude/commands/dp-build.md")" "auto-merge.md" "dp-build merge step cites the gate ladder"
+assert_contains "$(cat "$REPO/.devpilot/prompts/team/qa-agent.md")" "test-case-design" "qa-agent loads test-case-design"
+assert_contains "$(cat "$REPO/.claude/commands/dp-build.md")" "auto-merge" "dp-build merge step cites the gate ladder"
 
 echo "== setup wizard: model assignment + guide (round 5) =="
 [ -f "$REPO/docs/setup-guide.md" ] && ok "setup-guide.md exists" || no "setup-guide.md exists"
@@ -700,13 +699,12 @@ assert_contains "$(cat "$REPO/project.config.md")" "model_mode:" "repo config do
 assert_contains "$(cat "$REPO/.claude/commands/dp-setup.md")" "model-profiles.sh single <model-id>" "dp-setup documents single-model switch"
 
 echo "== test-guard + doctor + jira/reconfig wiring (round 6) =="
-[ -f "$REPO/.devpilot/skills/test-guard.md" ] && ok "test-guard skill exists" || no "test-guard skill exists"
-assert_contains "$(cat "$REPO/.devpilot/skills/README.md")" "test-guard.md" "skills index lists test-guard"
-n=$(grep -c 'test-guard\.md' "$REPO/install.sh"); n=${n:-0}
-assert_eq "$([ "$n" -ge 2 ] && echo ok)" "ok" "installer ships test-guard.md in both lists"
+[ -f "$REPO/.claude/skills/test-guard/SKILL.md" ] && ok "test-guard skill exists" || no "test-guard skill exists"
+assert_contains "$(cat "$REPO/.claude/skills/README.md")" "test-guard" "skills index lists test-guard"
+assert_contains "$(sed -n '/^DEVPILOT_SKILLS=/p' "$REPO/install.sh")" " test-guard " "installer ships the test-guard skill"
 n=$(grep -c 'test-guard\.sh' "$REPO/install.sh"); n=${n:-0}
 assert_eq "$([ "$n" -ge 2 ] && echo ok)" "ok" "installer ships test-guard.sh in both lists"
-assert_contains "$(cat "$REPO/.devpilot/skills/auto-merge.md")" "test-guard" "auto-merge ladder runs the test guard"
+assert_contains "$(cat "$REPO/.claude/skills/auto-merge/SKILL.md")" "test-guard" "auto-merge ladder runs the test guard"
 assert_contains "$(cat "$REPO/.claude/commands/dp-build.md")" "test-guard.sh" "dp-build review gate runs the test guard"
 assert_contains "$(cat "$REPO/.claude/commands/dp-pr.md")" "test-guard.sh" "dp-pr ladder runs the test guard"
 assert_contains "$(cat "$REPO/scripts/doctor.sh")" "model_mode" "doctor validates model_mode"
@@ -782,19 +780,33 @@ assert_code "$(cd "$D" && bash scripts/run-tests.sh bogus >/dev/null 2>&1; echo 
 rm -rf "$D"
 
 echo "== Angular + .NET skill set =="
-SK="$REPO/.devpilot/skills"
-# Every skill a command/agent/persona/doc names must exist (no dangling references).
-# install.sh is checked separately: its retired-files cleanup list names removed skills on purpose.
+SK="$REPO/.claude/skills"
+# Every skill a command/agent/persona/doc names by path must exist (no dangling references).
 MISSING=""
-for ref in $(grep -rhoE 'skills/[a-z0-9-]+\.md' "$REPO/.claude" "$REPO/.devpilot" "$REPO/CLAUDE.md" "$REPO/README.md" | sort -u); do
-  [ -f "$REPO/.devpilot/$ref" ] || MISSING="$MISSING $ref"
+for ref in $(grep -rhoE '\.claude/skills/[a-z0-9-]+/SKILL\.md' "$REPO/.claude" "$REPO/.devpilot" "$REPO/scripts" "$REPO/CLAUDE.md" "$REPO/README.md" "$REPO/docs" | sort -u); do
+  [ -f "$REPO/$ref" ] || MISSING="$MISSING $ref"
 done
 assert_eq "${MISSING:-none}" "none" "no dangling skill references"
-MISSING=""
-for s in $(grep -oE '[a-z0-9-]+\.md' <<<"$(sed -n '/^  SKILLS="/p' "$REPO/install.sh")"); do
-  [ -f "$SK/$s" ] || MISSING="$MISSING $s"
+OLDREF=$(grep -rlE '\.devpilot/skills|[a-z-]+-(dev|testing|guard|rules|ops|heal|scan|merge|contract|sqlserver|api|design|strategy|playwright|slicing|ready|done)\.md' "$REPO/.claude" "$REPO/.devpilot" "$REPO/scripts" "$REPO/CLAUDE.md" "$REPO/docs" 2>/dev/null | tr '\n' ' ')
+# (README.md is exempt: its upgrade notes name the old layout on purpose.)
+assert_eq "${OLDREF:-none}" "none" "no references to the old .devpilot/skills/*.md layout"
+# Installer list == skills on disk; every skill is a valid native Claude Code skill.
+ONDISK=$(find "$SK" -mindepth 1 -maxdepth 1 -type d -exec basename {} \; | sort | tr '\n' ' ')
+LISTED=$(sed -n 's/^DEVPILOT_SKILLS="\(.*\)"/\1/p' "$REPO/install.sh" | tr ' ' '\n' | sort | tr '\n' ' ')
+assert_eq "$LISTED" "$ONDISK" "installer skill list matches .claude/skills on disk"
+BUNDLED="code-review security-review simplify run verify loop init debug batch doctor claude-api review run-skill-generator"
+for d in "$SK"/*/; do
+  n=$(basename "$d"); F="$d/SKILL.md"
+  assert_eq "$(sed -n 1p "$F")" "---" "skill $n: frontmatter starts on line 1"
+  FM=$(awk 'NR==1{next} /^---$/{exit} {print}' "$F")
+  assert_eq "$(sed -n 's/^name: //p' <<<"$FM")" "$n" "skill $n: name matches its directory"
+  assert_contains "$FM" "description: " "skill $n: has a description"
+  assert_contains "$FM" "user-invocable: false" "skill $n: hidden from the / menu (commands are the entry points)"
+  case " $BUNDLED " in *" $n "*) no "skill $n shadows a bundled Claude Code skill" ;; *) ok "skill $n: no clash with bundled skills" ;; esac
 done
-assert_eq "${MISSING:-none}" "none" "installer update list matches skills on disk"
+for A in "$REPO"/.claude/agents/*.md; do
+  assert_contains "$(awk 'NR==1{next} /^---$/{exit} {print}' "$A")" "  - core-rules" "$(basename "$A"): preloads core-rules"
+done
 assert_eq "$([ -f "$REPO/.claude/agents/team-backend.md" ] && echo present || echo gone)" "gone" "generic backend agent retired"
 assert_contains "$(cat "$REPO/.claude/commands/dp-build.md")" '"team-dotnet"' "dp-build routes backend work to team-dotnet"
 assert_contains "$(cat "$REPO/.claude/commands/dp-test.md")" "ui-e2e-playwright" "dp-test drives Playwright UI testing"
@@ -846,7 +858,7 @@ for A in "$REPO"/.claude/agents/*.md; do
 done
 STALE_AG=$(grep -l 'team-task\|/team-ba\|/team-lead' "$REPO"/.claude/agents/*.md 2>/dev/null | tr '\n' ' ')
 assert_eq "${STALE_AG:-none}" "none" "agent descriptions name real commands only"
-for C in "$REPO"/.claude/commands/*.md "$REPO"/.devpilot/skills/*.md; do
+for C in "$REPO"/.claude/commands/*.md "$REPO"/.claude/skills/*/SKILL.md; do
   for SUB in $(grep -oE 'checkpoint\.sh [a-z-]+' "$C" | awk '{print $2}' | sort -u); do
     case "$SUB" in write|read|update|add-commit|show|latest) ok "$(basename "$C"): checkpoint.sh $SUB exists" ;;
       *) no "$(basename "$C"): checkpoint.sh $SUB does not exist" ;; esac
@@ -880,10 +892,11 @@ echo "== lean repo: nothing shipped that nothing uses =="
 ARCHIVES=$(git -C "$REPO" ls-files | grep -E '\.(tar\.gz|tgz|zip|whl|exe|dll)$' | tr '\n' ' ')
 assert_eq "${ARCHIVES:-none}" "none" "no archives or binaries committed"
 UNUSED=""
-for f in "$REPO"/scripts/*.sh "$REPO"/.devpilot/skills/*.md "$REPO"/.devpilot/prompts/*.md "$REPO"/.devpilot/templates/*.md; do
-  n=$(basename "$f"); [ "$n" = README.md ] && continue
-  c=$(grep -rlF "$n" "$REPO/.claude/commands" "$REPO/.claude/agents" "$REPO/.devpilot" "$REPO/scripts" "$REPO/CLAUDE.md" "$REPO/README.md" "$REPO/docs" 2>/dev/null \
-      | grep -v -e "/$n\$" -e '/skills/README.md$' | head -1)
+for f in "$REPO"/scripts/*.sh "$REPO"/.claude/skills/*/ "$REPO"/.devpilot/prompts/*.md "$REPO"/.devpilot/templates/*.md; do
+  n=$(basename "$f"); SELF="/$n\$"
+  case "$f" in */skills/*/) n="\`$(basename "$f")\`"; SELF="/skills/$(basename "$f")/SKILL.md\$" ;; esac
+  c=$(grep -rlF "$n" "$REPO/.claude/commands" "$REPO/.claude/agents" "$REPO/.claude/skills" "$REPO/.devpilot" "$REPO/scripts" "$REPO/CLAUDE.md" "$REPO/README.md" "$REPO/docs" 2>/dev/null \
+      | grep -v -e "$SELF" -e '/skills/README.md$' | head -1)
   # A hook command in settings.json or a run from install.sh also counts (permission rules don't).
   [ -n "$c" ] || c=$( { jq -r '.. | .command? // empty' "$REPO/.claude/settings.json"; grep -v '^ *#' "$REPO/install.sh"; } | grep -F "bash scripts/$n" | head -1)
   [ -n "$c" ] || UNUSED="$UNUSED $n"
