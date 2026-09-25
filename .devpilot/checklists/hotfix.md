@@ -1,56 +1,33 @@
 # Hotfix — Definition of Done
 
-> Production-critical only. Expedited flow — but no shortcuts on safety.
+> Production-critical (P0/P1) only. Expedited — no shortcuts on safety. Run with `/dp-hotfix`.
 
-## Step 1 — Triage
+## 1 · Triage
 
-- [ ] Ticket created, type=hotfix, priority P0
-- [ ] Incident channel/thread linked
-- [ ] Impact scope confirmed (which users, how many, what data)
+- [ ] Bug in the tracker, P0/P1, incident channel/thread linked
+- [ ] Impact confirmed: which users, how many, what data
+- [ ] Decision made: hotfix, or roll back (`/dp-release rollback`) — prefer rollback when faster and safe
 
-## Step 2 — Investigate
+## 2 · Fix
 
-- [ ] Reproduced or root cause confirmed via logs
-- [ ] Decision: hotfix vs roll-back. If roll-back is faster and safe, prefer it.
-- [ ] Impact Map written (can be brief)
+- [ ] Branch `hotfix/<key>-<slug>` from **`main`** (what is live): `bash scripts/git-flow.sh hotfix-start <KEY> <slug>`
+- [ ] Minimum diff — no refactoring, no unrelated changes
+- [ ] Regression test added (still required under pressure)
+- [ ] Version = next patch above production: `bash scripts/version.sh next patch --ref origin/main`
 
-## Step 3 — Branch
+## 3 · Verify
 
-- [ ] Branched from **`main`** (the live production code)
-- [ ] Named `hotfix/<KEY>-<slug>`
+- [ ] `bash scripts/run-tests.sh all` green
+- [ ] `git diff main...HEAD` reviewed — minimal; second reviewer if at all possible
 
-```bash
-bash scripts/git-flow.sh hotfix-start <ticket-number> <slug>
-```
+## 4 · Ship
 
-## Step 4 — Implement
+- [ ] Push the branch → pipeline builds once → **SIT** + smoke test
+- [ ] A person approves **PRD** → smoke test → fix verified on production
+- [ ] Then `bash scripts/git-flow.sh hotfix-finish <version>`: PR into `main`, tag, PR back into `develop`
+- [ ] Bug Done in the tracker
 
-- [ ] Minimum diff. No refactoring. No unrelated improvements.
-- [ ] Regression test added (still required, even under pressure)
-- [ ] `.devpilot/rules.md` followed for touched code
+## 5 · Learn
 
-## Step 5 — Self-review
-
-- [ ] `git diff main...HEAD` reviewed — diff is minimal, no scope creep
-- [ ] Reviewed by another person if possible
-- [ ] No new issues introduced
-
-## Step 6 — Test & Verify
-
-- [ ] `npm test` + `dotnet test` green
-- [ ] Manual smoke test done
-
-## Step 7 — Deploy pipeline
-
-```bash
-bash scripts/git-flow.sh hotfix-finish X.Y.Z
-# merges hotfix → main, tags vX.Y.Z, merges back → develop
-```
-
-- [ ] CI runs on `main` push — lint + test + build pass ✅
-- [ ] **PRD** approved in the pipeline (GitHub Actions / Azure Pipelines) ✅ (manual gate)
-- [ ] Fix verified on production
-- [ ] `develop` also has the fix (git-flow.sh handles this automatically)
-- [ ] Tracker item Done
-- [ ] Post-mortem written if customer-impacting
-- [ ] Follow-up ticket created for proper fix if this was a band-aid
+- [ ] Blameless postmortem in `docs/postmortems/<key>-<slug>.md` if customers were affected
+- [ ] Action items and any proper follow-up fix planned via `/dp-plan`

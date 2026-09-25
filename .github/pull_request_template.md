@@ -1,81 +1,59 @@
 ## Work item
 
-<!-- Jira: MSK-12 · Azure Boards: AB#345 (auto-links) · GitHub: #7 -->
+<!-- Jira: MSK-12 · Azure Boards: AB#345 (auto-links) · GitHub: #7 · local: LOCAL-3 -->
 <KEY and link>
 
-**Version:** v<X.Y.Z>
+**Version:** v<X.Y.Z> <!-- /dp-deliver sets it: feature → minor, bug → patch -->
 
-## Description
+## What and why
 
-Brief description of the changes in this PR.
+<!-- One or two sentences: the user-visible change and the reason. -->
 
-## Type of Change
+## Type of change
 
-- [ ] Bug fix (non-breaking change which fixes an issue)
-- [ ] New feature (non-breaking change which adds functionality)
-- [ ] Breaking change (fix or feature that would cause existing functionality to change)
-- [ ] Documentation update
-- [ ] Refactoring
-- [ ] Dependency update
+- [ ] Feature / enhancement
+- [ ] Bug fix
+- [ ] Hotfix (production)
+- [ ] Breaking change (API contract or behaviour — say what and the migration path below)
+- [ ] Refactor / tech debt
+- [ ] Docs / CI / tooling
 
-## Changes Made
+## Changes
 
-- Change 1
-- Change 2
-- Change 3
+-
 
-## Testing Done
+## Acceptance criteria
 
-Describe the tests you ran and how to reproduce the issue.
+<!-- Each AC from the Story, and the test that proves it. -->
 
-- [ ] Unit tests added/updated
-- [ ] Integration tests added/updated
-- [ ] Manual testing completed
+| AC | Covered by |
+|----|-----------|
+| AC1 | |
 
-## RTL Testing
+## Testing
 
-- [ ] Tested with Arabic text (if UI changes)
-- [ ] Layout verified in RTL mode
-
-## Rules Compliance (.devpilot/rules.md)
-
-- [ ] No `any` type used (use `unknown` + narrowing)
-- [ ] All subscriptions use `takeUntilDestroyed()`
-- [ ] All new components have `ChangeDetectionStrategy.OnPush`
-- [ ] New state uses `signal()` / `computed()`, not `BehaviorSubject`
-- [ ] New control-flow syntax used (`@if`, `@for`) — no `*ngIf` / `*ngFor`
-- [ ] SCSS uses design tokens — no hardcoded hex or px values
-- [ ] No `console.log` in committed code
-- [ ] Every new service method / component has a `*.spec.ts`
-- [ ] SQL: `SET XACT_ABORT ON` in any multi-statement block
-- [ ] Secrets not in code — all via environment config
+- [ ] `bash scripts/run-tests.sh all` green (Vitest · xUnit + SQL Server · Playwright)
+- [ ] `STRICT=1 bash scripts/test-guard.sh` — every changed source file has a test (or a justified exemption below)
+- [ ] Bug fix: a regression test fails before the fix and passes after
+- [ ] UI change: Playwright journey + axe scan for the new/changed screen
 
 ## Checklist
 
-- [ ] `npm run lint` passes
-- [ ] `npm run test` passes
-- [ ] `dotnet build apps/api -c Release` passes
-- [ ] Arabic/RTL tested (if UI changes)
-- [ ] Impact map updated: `.devpilot/impact-maps/<TICKET>.md`
+- [ ] Follows `.devpilot/rules.md` for the touched layers (Angular · .NET · SQL Server)
+- [ ] API change: OpenAPI spec committed and the Angular client regenerated; breaking changes versioned
+- [ ] Database change: EF Core migration is backward compatible (expand → contract) and reviewed
+- [ ] No secrets, connection strings or tokens in code or config — environment settings only
+- [ ] Changelog entry in `docs/changes/` (`bash scripts/changelog.sh add <KEY> <feat|fix> "<summary>"`)
+- [ ] UI in RTL languages checked (only if the app supports them)
 
-## Changelog
+## Breaking changes / migration
 
-<!-- One line per user-visible change. Follow Keep a Changelog format. -->
+<!-- None, or what changes and how consumers migrate. -->
 
-- Added: ...
+## Deployment notes
 
-## Breaking Changes
-
-Describe any breaking changes and migration path if applicable.
+<!-- New settings per environment, feature flags, data backfills, ordering with other releases. None if nothing special. -->
 
 ## Screenshots
 
-Add screenshots or GIFs if UI/UX related.
-
-## Deployment Notes
-
-Any special considerations for deployment?
-
-## Reviewers
-
-@mention relevant reviewers
+<!-- UI changes only. -->

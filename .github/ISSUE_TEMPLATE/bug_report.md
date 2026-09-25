@@ -6,40 +6,39 @@ labels: 'bug'
 assignees: ''
 ---
 
-## Description
+## Severity
 
-A clear and concise description of what the bug is.
+<!-- P0 production down / data loss · P1 major feature broken, no workaround ·
+     P2 broken with a workaround · P3 minor. P0/P1 go through /dp-hotfix. -->
+P?
 
-## Steps to Reproduce
+## What happened
+
+A clear description of the bug.
+
+## Steps to reproduce
 
 1. Go to '...'
-2. Click on '...'
-3. See error '...'
+2. Click '...'
+3. See '...'
 
-## Expected Behavior
+## Expected vs actual
 
-What you expected to happen.
+- **Expected:**
+- **Actual:**
 
-## Actual Behavior
+## Where
 
-What actually happened.
+- **Environment:** DEV · SIT · UAT · PRD
+- **App version:** v<X.Y.Z> <!-- footer / API /health, or the release tag -->
+- **Browser / OS:** (UI bugs)
 
-## Environment
+## Evidence
 
-- **OS**: [e.g. macOS, Windows, Linux]
-- **Browser**: [e.g. Chrome, Safari, Firefox]
-- **App Version**: [e.g. 0.1.0]
+Screenshots, error message, request/response, log excerpt (no secrets or personal data).
 
-## Screenshots
+## Done when
 
-If applicable, add screenshots or screen recordings to help explain the problem.
-
-## Additional Context
-
-Add any other context about the problem here.
-
-## Acceptance Criteria
-
-- [ ] Bug is reproducible
-- [ ] Root cause identified
-- [ ] Fix tested locally
+- [ ] Reproduced, root cause identified
+- [ ] Regression test fails before the fix and passes after
+- [ ] Verified fixed on the environment above

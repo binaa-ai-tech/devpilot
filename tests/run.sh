@@ -852,6 +852,13 @@ assert_contains "$(cat "$REPO/.claude/commands/dp-release.md")" "STAGE = rollbac
 assert_contains "$(cat "$REPO/.claude/commands/dp-pr.md")" "Review comments" "dp-pr handles review comments"
 assert_contains "$(cat "$REPO/.claude/commands/dp-pr.md")" "max 3 cycles" "dp-pr keeps the bounded CI loop"
 
+echo "== shipped templates + checklists match the current flow =="
+STALE=$(grep -rlE 'impact-maps|apps/api|npm run lint` passes|Tested with Arabic' "$REPO/.github/pull_request_template.md" "$REPO/.github/ISSUE_TEMPLATE" "$REPO/.devpilot/checklists" 2>/dev/null | tr '\n' ' ')
+assert_eq "${STALE:-none}" "none" "no stale steps (impact maps, apps/api, generic npm checks)"
+assert_contains "$(cat "$REPO/.github/pull_request_template.md")" "run-tests.sh all" "PR template uses the token-lean test runner"
+assert_contains "$(cat "$REPO/.devpilot/checklists/feature.md")" "Then \`release-finish\`: PR into \`main\`" "feature checklist: tag + main only after PRD"
+assert_contains "$(cat "$REPO/.devpilot/checklists/hotfix.md")" "A person approves **PRD**" "hotfix checklist: PRD approval before hotfix-finish"
+
 echo ""
 echo "── Results: $PASS passed, $FAIL failed ──"
 [ "$FAIL" -eq 0 ]
