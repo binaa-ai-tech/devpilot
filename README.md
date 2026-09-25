@@ -215,7 +215,7 @@ Code is merged only when all of these pass. The AI never skips them.
 If a check fails, DevPilot tries to fix it up to 3 times, then stops and explains the problem.
 It never deletes or weakens a test to make it pass.
 
-For extra safety, the installer can also protect `develop` and `main` on GitHub, so CI must pass before anything is merged.
+For extra safety, the installer can generate a CI workflow (`.github/workflows/devpilot-ci.yml`) and protect `develop` and `main` on GitHub, so that CI must pass before anything is merged.
 
 ---
 
