@@ -903,6 +903,12 @@ for f in "$REPO"/scripts/*.sh "$REPO"/.claude/skills/*/ "$REPO"/.devpilot/prompt
 done
 assert_eq "${UNUSED:-none}" "none" "every script, skill, prompt and template is used by a command, agent, skill or script"
 
+echo "== DevPilot release metadata =="
+V=$(cat "$REPO/VERSION")
+assert_contains "$(cat "$REPO/CHANGELOG.md")" "## [$V]" "CHANGELOG.md has a section for VERSION $V (release notes)"
+assert_contains "$(cat "$REPO/README.md")" "version-$V-blue" "README badge shows VERSION $V"
+[ -f "$REPO/LICENSE" ] && ok "LICENSE file present" || no "LICENSE file present"
+
 echo ""
 echo "── Results: $PASS passed, $FAIL failed ──"
 [ "$FAIL" -eq 0 ]
