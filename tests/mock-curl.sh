@@ -38,6 +38,8 @@ body() {
     "POST "*/rest/agile/1.0/sprint/*)           echo '{}' ;;
     # ── Azure DevOps ────────────────────────────────────────────────────────
     "GET "*/_apis/projects/*)                   echo '{"name":"Shop"}' ;;
+    "GET "*/_apis/projects\?*)                  echo '{"value":[{"name":"Shop"}]}' ;;
+    "GET "*/_apis/git/repositories\?*)          echo "{\"value\":[{\"name\":\"web\",\"defaultBranch\":\"refs/heads/main\",\"remoteUrl\":\"${MOCK_REPO_URL:-}\"}]}" ;;
     "GET "*/_apis/wit/workitemtypes/*/states*)  echo '{"value":[{"name":"New","category":"Proposed"},{"name":"Active","category":"InProgress"},{"name":"Closed","category":"Completed"}]}' ;;
     "GET "*/_apis/wit/workitemtypes*)           echo '{"value":[{"name":"Epic"},{"name":"User Story"},{"name":"Bug"},{"name":"Task"}]}' ;;
     "PATCH "*/_apis/wit/workitems/*)            echo '{"id":345}' ;;
@@ -64,6 +66,8 @@ body() {
     "POST "*/_apis/distributedtask/environments*) echo '{"id":9,"name":"x"}' ;;
     "GET "*/_apis/pipelines/checks/configurations*)  echo '{"value":[]}' ;;
     "POST "*/_apis/pipelines/checks/configurations*) echo '{"id":3}' ;;
+    "GET "*/_apis/identities*)                  case "$URL" in *nobody*) echo '{"value":[]}' ;;
+                                                  *) N=$(printf '%s' "$URL" | sed -E 's/.*filterValue=([^&]*).*/\1/' | tr -cd 'a-z0-9'); echo "{\"value\":[{\"id\":\"id-$N\"}]}" ;; esac ;;
     "GET "*/_apis/connectionData*)              echo '{"authenticatedUser":{"id":"me-1"}}' ;;
     "GET "*/_apis/git/repositories/*)           echo '{"id":"repo-1"}' ;;
     "DELETE "*)                                 echo '' ;;

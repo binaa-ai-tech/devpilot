@@ -10,8 +10,8 @@
 #                    migrations; review it: a down-migration can drop data)
 #   migrations.txt   the migrations this release adds, vs the previous v* tag
 #   README.md        how to apply and roll back
-# The previous release = the newest v* tag reachable from HEAD that isn't HEAD itself,
-# so CI needs full history + tags (the generated pipelines fetch them).
+# The previous release = the highest v* tag below the current version, so CI needs
+# the tags (the generated pipelines fetch full history + tags).
 # =============================================================================
 set -uo pipefail
 ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
@@ -33,11 +33,13 @@ names_at() {  # migration names (timestamp_Name) at a ref — Designer/snapshot 
   git ls-tree -r --name-only "$1" -- "$MIG_DIR" 2>/dev/null \
     | sed -nE 's#.*/([0-9]{14}_[^./]+)\.cs$#\1#p' | sort
 }
-HEAD_SHA=$(git rev-parse HEAD)
-PREV_TAG=""
-for T in $(git tag --merged HEAD -l 'v[0-9]*' --sort=-version:refname 2>/dev/null); do
-  [ "$(git rev-list -n1 "$T")" != "$HEAD_SHA" ] && { PREV_TAG="$T"; break; }
-done
+# Previous release = the highest v* tag BELOW this build's version. Chosen by version,
+# not reachability: git-flow tags the merge commit on main, which develop/release
+# branches never contain.
+CUR_V=$(bash "$ROOT/scripts/version.sh" current 2>/dev/null || echo 0.0.0)
+PREV_TAG=$( { git tag -l 'v[0-9]*' 2>/dev/null | sed 's/^v//'; echo "$CUR_V"; } | sort -t. -k1,1n -k2,2n -k3,3n -u \
+  | awk -v c="$CUR_V" '$0 == c { print p; exit } { p = $0 }')
+[ -n "$PREV_TAG" ] && PREV_TAG="v$PREV_TAG"
 CUR=$(names_at HEAD); PREV=""; [ -n "$PREV_TAG" ] && PREV=$(names_at "$PREV_TAG")
 NEW=$(comm -13 <(printf '%s\n' "$PREV" | sed '/^$/d') <(printf '%s\n' "$CUR" | sed '/^$/d'))
 CUR_LAST=$(printf '%s\n' "$CUR" | sed '/^$/d' | tail -1)

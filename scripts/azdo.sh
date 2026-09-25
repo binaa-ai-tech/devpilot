@@ -11,7 +11,8 @@
 # Repos + Pipelines (called by open-pr.sh and /dp-pr when the git host is Azure):
 #   pr-create <base> <title> <body-file|text> [--items "ADO-1 ADO-2"]   → PR URL
 #   pr-show <id>        STATUS= MERGE_STATUS= POLICIES_* URL= (key=value lines)
-#   pr-complete <id>    squash + delete branch via auto-complete; exit 0 merged, 3 waiting
+#   pr-complete <id> [--merge-commit] [--keep-branch]
+#                       auto-complete (squash + delete branch by default); exit 0 merged, 3 waiting
 #   pr-threads <id>     active review threads (TSV: thread-id  file:line  author  text)
 #   pr-reply <id> <thread-id> <text> [--resolve]
 #   ci <pr-id|branch> [--log]   latest pipeline run (+ failed-step log tails)
@@ -317,7 +318,8 @@ case "$cmd" in
     ;;
 
   pr-complete)
-    ID=$(_id "${1:?pr-id}")
+    ID=$(_id "${1:?pr-id}"); STRATEGY="squash"; DELETE=true
+    for O in "${@:2}"; do case "$O" in --merge-commit) STRATEGY="noFastForward" ;; --keep-branch) DELETE=false ;; esac; done
     R=$(_az GET "$REPO_API/pullrequests/$ID?$V") || exit 1
     [ "$(echo "$R" | jq -r '.status')" = "completed" ] && { echo "merged"; exit 0; }
     # Without a build-validation policy, auto-complete would merge instantly with no
@@ -331,8 +333,8 @@ case "$cmd" in
       echo "unprotected"
       exit 3
     fi
-    _az PATCH "$REPO_API/pullrequests/$ID?$V" "$(echo "$R" | jq '{autoCompleteSetBy:{id:.createdBy.id},
-      completionOptions:{mergeStrategy:"squash", deleteSourceBranch:true, transitionWorkItems:false,
+    _az PATCH "$REPO_API/pullrequests/$ID?$V" "$(echo "$R" | jq --arg s "$STRATEGY" --argjson d "$DELETE" '{autoCompleteSetBy:{id:.createdBy.id},
+      completionOptions:{mergeStrategy:$s, deleteSourceBranch:$d, transitionWorkItems:false,
       mergeCommitMessage:"\(.title) (PR \(.pullRequestId))"}}')" >/dev/null || exit 1
     WAIT="${AZDO_MERGE_WAIT:-120}"; T=0
     while [ "$T" -lt "$WAIT" ]; do
@@ -399,6 +401,8 @@ case "$cmd" in
     ;;
 
   protect)   # protect <branch> [--reviewers N] [--build <definition-id>]
+             # merge types: main → merge commit only (release/hotfix PRs); others → squash
+             # (features) + merge commit (release/hotfix back-merges)
     BR="${1:?branch}"; shift; REVIEWERS=0; BUILD=""
     while [ $# -gt 0 ]; do case "$1" in --reviewers) REVIEWERS="${2:-0}"; shift 2 ;; --build) BUILD="${2:-}"; shift 2 ;; *) shift ;; esac; done
     RID=$(bash "$0" repo-id) || exit 1
@@ -416,8 +420,13 @@ case "$cmd" in
     RC=0
     [ -n "$BUILD" ] && { upsert 0609b952-1397-4640-95ec-e00a01b2c241 "build validation: devpilot-ci required" true \
       "$(jq -n --argjson d "$BUILD" '{buildDefinitionId:$d, displayName:"devpilot-ci", queueOnSourceUpdateOnly:false, manualQueueOnly:false, validDuration:0}')" || RC=1; }
-    upsert fa4e907d-c16b-4a4c-9dfa-4916e5d171ab "squash merge only" true \
-      '{"allowSquash":true,"allowNoFastForward":false,"allowRebase":false,"allowRebaseMerge":false}' || RC=1
+    if [ "$BR" = "main" ]; then
+      upsert fa4e907d-c16b-4a4c-9dfa-4916e5d171ab "merge commits only (release/hotfix PRs)" true \
+        '{"allowSquash":false,"allowNoFastForward":true,"allowRebase":false,"allowRebaseMerge":false}' || RC=1
+    else
+      upsert fa4e907d-c16b-4a4c-9dfa-4916e5d171ab "squash (features) + merge commit (back-merges)" true \
+        '{"allowSquash":true,"allowNoFastForward":true,"allowRebase":false,"allowRebaseMerge":false}' || RC=1
+    fi
     upsert c6a1889d-b943-4856-b76f-9e46bb6b0df2 "review comments must be resolved" true '{}' || RC=1
     upsert 40e92b44-2fe1-4dd6-b3d8-74a9c21d0c6e "linked work items (advisory)" false '{}' || RC=1
     if [ "$REVIEWERS" -gt 0 ]; then
@@ -427,26 +436,48 @@ case "$cmd" in
     exit $RC
     ;;
 
+  identity)   # identity <email | "[Project]\\Group"> → identity id (for approvers)
+    Q="${1:?email or group}"
+    VSSPS=$(printf '%s' "$R_ORG" | sed -E 's#^https://dev\.azure\.com/#https://vssps.dev.azure.com/#')
+    _az GET "$VSSPS/_apis/identities?searchFilter=General&filterValue=$(dp_urlenc "$Q")&queryMembership=None&api-version=7.1" \
+      | jq -r '.value[0].id // empty'
+    ;;
+
   env-setup)   # env-setup <name> [--approval] → create the Pipelines environment (+ approval check)
+               # approvers: DEVPILOT_APPROVERS="a@corp.com,[Shop]\Release Managers" (default: the PAT owner)
     NAME="${1:?environment}"; APPROVAL="${2:-}"
     ENV=$(_az GET "$RP/_apis/distributedtask/environments?name=$(dp_urlenc "$NAME")&api-version=7.1-preview.1" | jq '.value[0] // empty')
     [ -z "$ENV" ] && ENV=$(_az POST "$RP/_apis/distributedtask/environments?api-version=7.1-preview.1" \
       "$(jq -n --arg n "$NAME" '{name:$n, description:"DevPilot delivery stage"}')")
     EID=$(echo "$ENV" | jq -r '.id // empty'); [ -n "$EID" ] || die "could not create environment $NAME"
     if [ "$APPROVAL" = "--approval" ]; then
-      HAS=$(_az GET "$RP/_apis/pipelines/checks/configurations?resourceType=environment&resourceId=$EID&api-version=7.1-preview.1" \
-        | jq '[.value[] | select(.type.name == "Approval")] | length')
-      if [ "${HAS:-0}" -eq 0 ]; then
-        ME=$(_az GET "$R_ORG/_apis/connectionData" | jq -r '.authenticatedUser.id')
-        _az POST "$RP/_apis/pipelines/checks/configurations?api-version=7.1-preview.1" "$(jq -n --arg me "$ME" --arg id "$EID" --arg n "$NAME" '
-          {type:{id:"8C6F20A7-A545-4486-9777-F762FAFE0D4D", name:"Approval"},
-           settings:{approvers:[{id:$me}], executionOrder:"anyOrder", minRequiredApprovers:0,
-                     instructions:"DevPilot: approve only after the previous stage is verified.", blockedApprovers:[]},
-           resource:{type:"environment", id:$id, name:$n}, timeout:43200}')" >/dev/null || exit 1
-        echo "  ✅ environment $NAME — approval required (add more approvers in Pipelines → Environments)"
-      else
-        echo "  ✅ environment $NAME — approval already configured"
+      IDS=""; WHO=""
+      if [ -n "${DEVPILOT_APPROVERS:-}" ]; then
+        OLDIFS="$IFS"; IFS=','
+        for A in $DEVPILOT_APPROVERS; do
+          A=$(printf '%s' "$A" | sed 's/^ *//; s/ *$//'); [ -z "$A" ] && continue
+          AID=$(bash "$0" identity "$A" 2>/dev/null)
+          if [ -n "$AID" ]; then IDS="$IDS $AID"; WHO="$WHO, $A"; else echo "  ⚠️  approver '$A' not found in Azure DevOps — skipped" >&2; fi
+        done
+        IFS="$OLDIFS"
       fi
+      if [ -z "$IDS" ]; then IDS=$(_az GET "$R_ORG/_apis/connectionData" | jq -r '.authenticatedUser.id'); WHO=", you (the PAT owner)"; fi
+      APPROVERS=$(printf '%s\n' $IDS | jq -R '{id:.}' | jq -s .)
+      BODY=$(jq -n --argjson ap "$APPROVERS" --arg id "$EID" --arg n "$NAME" '
+          {type:{id:"8C6F20A7-A545-4486-9777-F762FAFE0D4D", name:"Approval"},
+           settings:{approvers:$ap, executionOrder:"anyOrder", minRequiredApprovers:0,
+                     instructions:"DevPilot: approve only after the previous stage is verified.", blockedApprovers:[]},
+           resource:{type:"environment", id:$id, name:$n}, timeout:43200}')
+      CID=$(_az GET "$RP/_apis/pipelines/checks/configurations?resourceType=environment&resourceId=$EID&api-version=7.1-preview.1" \
+        | jq -r '[.value[] | select(.type.name == "Approval")] | first | .id // empty')
+      if [ -z "$CID" ]; then
+        _az POST "$RP/_apis/pipelines/checks/configurations?api-version=7.1-preview.1" "$BODY" >/dev/null || exit 1
+      elif [ -n "${DEVPILOT_APPROVERS:-}" ]; then
+        _az PATCH "$RP/_apis/pipelines/checks/configurations/$CID?api-version=7.1-preview.1" "$(echo "$BODY" | jq --argjson c "$CID" '. + {id:$c}')" >/dev/null || exit 1
+      else
+        echo "  ✅ environment $NAME — approval already configured"; exit 0
+      fi
+      echo "  ✅ environment $NAME — approval by${WHO#,}"
     else
       echo "  ✅ environment $NAME"
     fi

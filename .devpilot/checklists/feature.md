@@ -1,57 +1,40 @@
 # Feature — Definition of Done
 
-Tick every box before the tracker item is marked Done.
+`/dp-deliver` runs every step below; this list is for reviewing its work or doing a step by hand.
 
-## Step 1 — Triage
+## 1 · Plan (`/dp-plan`)
 
-- [ ] Item exists in the tracker (Story under an Epic)
-- [ ] Acceptance criteria written and specific
-- [ ] Priority assigned
+- [ ] Deduplicated against the tracker, including the child tasks of the closest matches
+- [ ] Story under an Epic, with specific, testable acceptance criteria (`definition-of-ready.md`)
+- [ ] Layer tasks created: `[BE]` `[FE]` `[DB]` `[QA]` as in scope
+- [ ] Spec in `docs/requirements/<slug>.md`; plan + scoped files in `docs/plans/<slug>.md`
 
-## Step 2 — Investigate
+## 2 · Build (`/dp-build`)
 
-- [ ] Impact Map written and saved to `.devpilot/impact-maps/<KEY>.md`
-- [ ] Files in/out of scope defined
-- [ ] Risks listed
-- [ ] Rollback plan written
+- [ ] Branch `feature/<key>-<slug>` from the latest `develop`
+- [ ] Every AC implemented; follows `.devpilot/rules.md` for Angular · .NET · SQL Server
+- [ ] API change: OpenAPI spec committed, Angular client regenerated
+- [ ] DB change: EF Core migration is backward compatible (expand → contract)
+- [ ] Conventional commits ending with the tracker ref (`MSK-12` · `AB#345` · `#7`)
 
-## Step 3 — Branch
+## 3 · Verify
 
-- [ ] Branch named `feature/<KEY>-<slug>`
-- [ ] Branched from latest **`develop`** (not main)
-- [ ] Baseline tests pass on branch
+- [ ] `bash scripts/run-tests.sh all` green (Vitest · xUnit + SQL Server · Playwright)
+- [ ] `STRICT=1 bash scripts/test-guard.sh` passes
+- [ ] QA report `docs/qa/<slug>.md`: PASS on every AC; Playwright + axe for user-facing ACs
+- [ ] Review gate: no open 🔴 (`code-review`, `security-scan` on auth/input changes)
 
-## Step 4 — Implement
+## 4 · Merge
 
-- [ ] All acceptance criteria implemented
-- [ ] Code follows `.devpilot/rules.md` (no `any`, takeUntilDestroyed, OnPush, signals, etc.)
-- [ ] Tests added alongside new code
-- [ ] Commits use Conventional Commits + ticket key
+- [ ] Version bumped from `develop` (minor) and changelog entry in `docs/changes/`
+- [ ] One PR `[vX.Y.Z] …` into `develop`; CI green on the head commit; merged
+- [ ] Story + tasks Done, Epic Done when all its Stories are, sprint closed when empty
+- [ ] `develop` auto-deploys to **DEV**; smoke test passes
 
-## Step 5 — Self-review
+## 5 · Release (`/dp-release`)
 
-- [ ] `git diff develop...HEAD` reviewed against `rules.md`
-- [ ] All BLOCKERS resolved
-- [ ] Warnings addressed or deferred (noted in PR)
-
-## Step 6 — Test & Verify
-
-- [ ] `npm test` green
-- [ ] `npm run lint` clean
-- [ ] `dotnet build apps/api -c Release` clean
-- [ ] Arabic/RTL tested (if UI changes)
-
-## Step 7 — Deploy pipeline
-
-- [ ] PR opened targeting **`develop`**
-- [ ] PR merged → CI passes → **DEV** auto-deployed ✅
-- [ ] `bash scripts/git-flow.sh release-start X.Y.Z`
-- [ ] Release branch pushed → CI passes → **SIT** auto-deployed ✅
-- [ ] Smoke test on SIT passed
-- [ ] **UAT** approved in the pipeline (GitHub Actions / Azure Pipelines) ✅ (manual gate)
-- [ ] Smoke test on UAT passed
-- [ ] `bash scripts/git-flow.sh release-finish X.Y.Z` (tags vX.Y.Z, merges → main + develop)
-- [ ] **PRD** approved in the pipeline (GitHub Actions / Azure Pipelines) ✅ (manual gate)
-- [ ] Smoke test on production passed
-- [ ] Tracker item moved to Done with PR link (automatic after merge)
-- [ ] Changelog entry added
+- [ ] `sit` — `release/<version>` cut from develop → built once → **SIT** + smoke test
+- [ ] `uat` — a person approves **UAT** in the pipeline → smoke test → stakeholder sign-off
+- [ ] `prd` — a person approves **PRD** → smoke test on production
+- [ ] Then `release-finish`: PR into `main`, tag `v<version>`, PR back into `develop`
+- [ ] "Released in v<version>" noted on the shipped items

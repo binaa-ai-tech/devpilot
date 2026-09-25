@@ -25,8 +25,9 @@ The `devpilot-cd` pipeline (`generate-ci.sh`) builds **once** per branch and pro
 1. **DEV** — auto-deploys from the base branch after merge; smoke test.
 2. **SIT** (`/dp-release sit`) — release branch cut from develop's version; auto-deploy; QA verifies.
 3. **UAT** (`/dp-release uat`) — the same run, behind a human **approval**; stakeholder sign-off.
-4. **PRD** (`/dp-release prd`) — the same run, behind a human **approval**; tag + merge to `main` only
-   after PRD is verified, so the tag is what is live. Hotfixes: SIT → PRD.
+4. **PRD** (`/dp-release prd`) — the same run, behind a human **approval**; then `release-finish` PRs
+   the release into `main` (merge commit), tags it, and PRs it back into `develop` — protected
+   branches are never pushed to directly. Hotfixes: SIT → PRD, same finish.
 5. **Rollback** — rerun the pipeline on the previous tag for `prd` (still approval-gated).
 A deploy target must exist (`deploy/deploy.sh` or a `DEPLOY_HOOK` secret); `deploy.sh` never
 reports success without one. DevPilot never approves a deployment.

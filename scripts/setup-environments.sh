@@ -5,12 +5,13 @@
 #
 #   bash scripts/setup-environments.sh
 #   DEVPILOT_APPROVERS="alice,bob" bash scripts/setup-environments.sh   # GitHub logins
+#   DEVPILOT_APPROVERS="ana@corp.com,[Shop]\Release Managers" …          # Azure users / groups
 #
 # GitHub      → repo environments (gh, admin rights): uat/prd require reviewers
 #               (DEVPILOT_APPROVERS, default: you); deploy branches restricted —
 #               dev: develop · sit/uat: release/*, hotfix/* · prd: release/*, hotfix/*, v* tags
-# Azure       → Pipelines environments + an Approval check on uat/prd (you as approver —
-#               add your release managers in Pipelines → Environments), and the
+# Azure       → Pipelines environments + an Approval check on uat/prd — approvers from
+#               DEVPILOT_APPROVERS (emails and/or "[Project]\Group" names; default: you), and the
 #               devpilot-cd pipeline from azure-pipelines-cd.yml
 # Idempotent; prints the manual steps when it lacks rights. Never fails an install.
 # =============================================================================

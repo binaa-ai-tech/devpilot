@@ -62,8 +62,13 @@ Wait for the SIT job/stage and report its result.
    ```bash
    bash scripts/changelog.sh <VERSION>          # docs/changes/* entries → "## v<VERSION>" section
    git add -A CHANGELOG.md docs/changes && git commit -m "docs(changelog): v<VERSION>" || true
-   bash scripts/git-flow.sh release-finish <VERSION>      # → main + tag v<VERSION> + back into develop
+   bash scripts/git-flow.sh release-finish <VERSION>
    ```
+   `main` and `develop` are protected, so this goes **through PRs**: release → `main` (merge commit)
+   → tag `v<VERSION>` on main → release → `develop` (merge commit) → delete the branch. Exit 3 = a PR
+   is open but not merged yet (checks running, an approval, or no `gh` — then merge it with
+   `mcp__github__merge_pull_request`, `merge_method: "merge"`); re-run the same command once it
+   merged — finished steps are skipped. A conflict on the back-merge → `/dp-pr <PR>`.
 4. Release notes on the shipped items (they were closed at merge time) — the changelog knows them:
    ```bash
    for KEY in $(bash scripts/changelog.sh keys <VERSION>); do

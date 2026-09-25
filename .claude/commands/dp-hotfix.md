@@ -28,7 +28,7 @@ CD pipeline behind the production approval. Skips the backlog/sprint machinery �
    ```
 6. **Finish after PRD is green** — so `main` and the tag match what is live:
    ```bash
-   bash scripts/git-flow.sh hotfix-finish "$VERSION"     # → main + tag v<version> + back into develop
+   bash scripts/git-flow.sh hotfix-finish "$VERSION"     # PR → main, tag, PR → develop (re-run while PRs are pending)
    ```
 7. **Verify on production, then close:** `bash scripts/tracker.sh comment "$KEY" "🚑 Hotfix v<version>
    deployed · verified on PRD"` and `bash scripts/tracker.sh close "$KEY"`.
@@ -39,6 +39,6 @@ CD pipeline behind the production approval. Skips the backlog/sprint machinery �
 
 ## Rules
 - Hotfix ALWAYS branches from `main`, never `develop`.
-- `develop` receives the fix automatically via `hotfix-finish`.
+- `develop` receives the fix through the back-merge PR `hotfix-finish` opens — never a direct push.
 
 **Report:** item link (`bash scripts/tracker.sh url "$KEY"`), tag, production URL to verify, postmortem path.

@@ -69,6 +69,11 @@ MERGE_POLICY=$(grep '^merge_policy:' project.config.md 2>/dev/null | head -1 | s
 BRANCHES=("$@")
 [ ${#BRANCHES[@]} -eq 0 ] && { BRANCHES=("$BASE"); [ "$BASE" != "main" ] && BRANCHES+=("main"); }
 
+# Features squash-merge; release/hotfix PRs need merge commits — allow both on the repo.
+gh api -X PATCH "repos/$REPO_SLUG" -F allow_squash_merge=true -F allow_merge_commit=true >/dev/null 2>&1 \
+  && echo "  ✅ repo allows squash (features) + merge commits (release/hotfix PRs)" \
+  || echo "  ⚠️  could not update merge settings — enable 'Allow merge commits' + 'Allow squash merging' (Settings → General)"
+
 REVIEWS='null'
 [ "${MERGE_POLICY:-auto}" = "pr-only" ] && REVIEWS='{"required_approving_review_count":1}'
 

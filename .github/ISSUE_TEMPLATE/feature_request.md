@@ -6,33 +6,27 @@ labels: 'enhancement'
 assignees: ''
 ---
 
-## Description
+## User story
 
-A clear and concise description of the feature or enhancement.
+As a **<role>**, I want **<capability>** so that **<benefit>**.
 
-## Use Case
+## Acceptance criteria
 
-Describe the use case or user story this addresses.
+<!-- Specific and testable — each becomes a test. /dp-plan can take this issue as its input. -->
 
-## Current Behavior
+- [ ] AC1:
+- [ ] AC2:
 
-How is this currently handled (if at all)?
+## Current behaviour
 
-## Desired Behavior
+How is this handled today (if at all)?
 
-How should this work instead?
+## Scope notes
 
-## Acceptance Criteria
+- **Screens / API endpoints affected:**
+- **Data changes:** (new fields, tables, migrations)
+- **Out of scope:**
 
-- [ ] Feature meets product requirements
-- [ ] Tests pass
-- [ ] Documentation updated
-- [ ] RTL tested (if UI component)
+## Additional context
 
-## Related Issues
-
-Link any related issues here.
-
-## Additional Context
-
-Add any other context, mockups, or examples here.
+Mockups, examples, related issues.

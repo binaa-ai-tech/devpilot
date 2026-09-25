@@ -1,52 +1,32 @@
 # Bug Fix — Definition of Done
 
-## Step 1 — Triage
+For P2/P3 bugs through `/dp-deliver`. P0/P1 production bugs use `/dp-hotfix` (hotfix.md).
 
-- [ ] Ticket has clear repro steps
-- [ ] Environment (browser/OS/build/env) documented
-- [ ] Priority assigned (P0–P3)
+## 1 · Triage
 
-## Step 2 — Investigate
+- [ ] One typed Bug in the tracker, with severity P2 or P3 (P0/P1 → `/dp-hotfix`)
+- [ ] Deduplicated — not already reported, fixed or in progress
+- [ ] Repro steps, expected vs actual, environment in `docs/bugs/<slug>.md`
 
-- [ ] Bug reproduced locally
-- [ ] Root cause identified (not just symptom)
-- [ ] Impact Map written — including which other areas might break
+## 2 · Fix
 
-## Step 3 — Branch
+- [ ] Branch `feature/<key>-<slug>` from the latest `develop`
+- [ ] Bug reproduced; root cause identified (not only the symptom) — `self-heal.md` Part 0
+- [ ] Regression test written first: fails before the fix, passes after
+- [ ] Smallest fix; no unrelated refactoring; root cause stated in the PR
 
-- [ ] Branch named `fix/<KEY>-<slug>`
-- [ ] Branched from latest **`develop`** (not main)
+## 3 · Verify
 
-## Step 4 — Implement
+- [ ] `bash scripts/run-tests.sh all` green, regression test included
+- [ ] `STRICT=1 bash scripts/test-guard.sh` passes
+- [ ] Original repro steps no longer reproduce the bug
+- [ ] DB-related: the migration or data fix verified on SIT before UAT/PRD
 
-- [ ] Failing regression test written FIRST
-- [ ] Smallest possible fix applied
-- [ ] No unrelated refactoring
-- [ ] Root cause documented in code comment + PR
-- [ ] `.devpilot/rules.md` followed
+## 4 · Merge
 
-## Step 5 — Self-review
+- [ ] Version bumped from `develop` (patch); changelog entry (`fix`) in `docs/changes/`
+- [ ] PR into `develop`, CI green, merged → Bug Done → **DEV** deployed, fix verified there
 
-- [ ] `git diff develop...HEAD` reviewed — diff is minimal, no scope creep
-- [ ] Regression test now passes
-- [ ] No new BLOCKERS introduced
+## 5 · Release
 
-## Step 6 — Test & Verify
-
-- [ ] Regression test in suite
-- [ ] Full test suite green
-- [ ] Manual verification using original repro steps — bug is gone
-- [ ] For DB bugs: env-diff done; fix verified in SIT before UAT/PRD
-
-## Step 7 — Deploy pipeline
-
-- [ ] PR opened targeting **`develop`**
-- [ ] Merged → **DEV** auto-deployed ✅ — verify fix on DEV
-- [ ] `bash scripts/git-flow.sh release-start X.Y.Z`
-- [ ] **SIT** auto-deployed ✅ — verify fix on SIT
-- [ ] **UAT** approved in the pipeline (GitHub Actions / Azure Pipelines) ✅ — verify fix on UAT
-- [ ] `bash scripts/git-flow.sh release-finish X.Y.Z`
-- [ ] **PRD** approved in the pipeline (GitHub Actions / Azure Pipelines) ✅
-- [ ] Verify fix on production
-- [ ] Tracker item Done with PR link + verification note
-- [ ] Changelog entry under "Fixed"
+- [ ] Ships with the next release: SIT → UAT (approval) → PRD (approval), fix verified on each

@@ -51,7 +51,8 @@ Merges are reversible tracker links + one Story with combined ACs.
 | Work tracker | Jira · Azure DevOps Boards · GitHub Issues · local (`docs/tasks/`) | `scripts/tracker.sh` (backends `jira.sh` · `azdo.sh` · `github.sh`) |
 | Git host | GitHub (`gh` / GitHub MCP) · Azure Repos (`azdo.sh`, auto-complete) | `scripts/git-host.sh` → `open-pr.sh` |
 | Version | `VERSION` · `Directory.Build.props` · `package.json` · `*.csproj` | `scripts/version.sh` |
-| Delivery pipeline | `devpilot-cd`: build once → DEV → SIT → UAT → PRD (approvals on UAT/PRD) | `generate-ci.sh` · `deploy.sh` · `smoke.sh` · `setup-environments.sh` · `db-package.sh` |
+| Delivery pipeline | `devpilot-cd`: build once → DEV → SIT → UAT → PRD (approvals on UAT/PRD) | `generate-ci.sh` · `deploy.sh` · `smoke.sh` · `setup-environments.sh` · `db-package.sh` · `deploy-init.sh` (App Service / IIS / Kubernetes) |
+| Release finish | release/hotfix → `main` and → `develop` **through PRs** (merge commits), tag on main | `git-flow.sh release-finish` / `hotfix-finish` (re-runnable) |
 | Release notes | one entry per item in `docs/changes/` → CHANGELOG section at release | `changelog.sh add` / `changelog.sh <version>` |
 | Secrets | `.devpilot/config.sh` · keychain · Azure Key Vault (env vars win) | `devpilot-lib.sh` (`secrets.provider`) |
 | Cost | tokens per session → per work item (Stop/SessionEnd hook) | `usage-hook.sh` → `metrics.sh` |
