@@ -20,7 +20,7 @@ PR call through `scripts/open-pr.sh` / `scripts/azdo.sh` / `gh` / GitHub MCP.
 > The PLAN phase (Step 1) MUST produce a work item key before a single line of code —
 > an existing one (DUPLICATE / FOLD-IN) or a new Epic→Story / Bug. Step 1 ends with
 > `tracker.sh assert-key`; never branch, edit, or spawn a build agent before it passes.
-> With no external tracker the key is a local one (`LOCAL-12`, `docs/tasks/`) — the rule still holds.
+> With no external tracker the key is a local one (`<ticket_prefix>-12`, e.g. `MSK-12`, or `LOCAL-12` when no prefix is set; `docs/tasks/`) — the rule still holds.
 > **A P0/P1 bug is refused** (`tracker.sh hotfix-gate`) and redirected to `/dp-hotfix`.
 
 > ## 🤖 Invariant 2 — autonomous; the only questions allowed

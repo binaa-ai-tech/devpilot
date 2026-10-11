@@ -59,6 +59,13 @@ E=$(cd "$D" && bash scripts/tracker.sh new Epic "CSV export for reports" "goal" 
 K1=$(cd "$D" && bash scripts/tracker.sh new Story "Export orders report as CSV" "AC1" "$E" 2>/dev/null)
 K2=$(cd "$D" && bash scripts/tracker.sh new Story "Download invoice as PDF" "AC" "$E" 2>/dev/null)
 assert_eq "$E $K1 $K2" "LOCAL-1 LOCAL-2 LOCAL-3" "local keys are sequential and branch-friendly"
+# With a ticket_prefix the local keys carry it (and keep counting past existing files of that prefix).
+( cd "$D" && printf 'ticket_prefix: "Msk"\nbase_branch: develop\ntracker:\n  type: local\n' > project.config.md && printf '# MSK-7 — old\n- Type: Task\n- Status: Done\n' > docs/tasks/MSK-7.md )
+P1=$(cd "$D" && bash scripts/tracker.sh new Bug "Prefixed key" "body" 2>/dev/null)
+assert_eq "$P1" "MSK-8" "local keys use project.config.md ticket_prefix (upper-cased) and continue the sequence"
+( cd "$D" && printf 'ticket_prefix: "KEY"\nbase_branch: develop\ntracker:\n  type: local\n' > project.config.md )
+assert_eq "$(cd "$D" && bash scripts/tracker.sh new Task "Placeholder prefix" "body" 2>/dev/null)" "LOCAL-4" "the installer placeholder KEY still yields LOCAL keys"
+( cd "$D" && rm -f docs/tasks/MSK-7.md docs/tasks/MSK-8.md docs/tasks/LOCAL-4.md && printf 'base_branch: develop\ntracker:\n  type: local\n' > project.config.md )
 OUT=$(cd "$D" && bash scripts/tracker.sh search "export the orders report to a csv file")
 assert_eq "$(printf '%s\n' "$OUT" | head -1 | cut -f2)" "$K1" "search ranks the closest existing item first"
 assert_eq "$(printf '%s\n' "$OUT" | grep -c "$K2")" "0" "search leaves unrelated items out"
