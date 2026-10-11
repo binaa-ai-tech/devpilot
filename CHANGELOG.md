@@ -4,14 +4,25 @@ All notable changes to DevPilot. Versions follow [SemVer](https://semver.org); e
 section becomes the GitHub Release notes when the `vx.y.z` tag is pushed
 (`.github/workflows/release.yml`).
 
-## [5.8.2] — 2026-10-11
+## [5.8.2] — 2026-10-12
 
 ### Fixed
 - Generated CI runs `dotnet build` / `dotnet test` in the folder that holds the solution (`api/`,
   `src/`, …) instead of the repo root, so monorepos with the solution in a subfolder no longer fail
   with "specify a project or solution file".
 - Installer detects a .NET backend from `*.slnx` solutions too (and one level deeper, e.g. `api/src/*/*.csproj`);
-  binaa-platform had been installed as frontend-only because of this.
+  a project with that layout had been installed as frontend-only, so its gate never built the API.
+- Generated workflows leave the npm, pip and NuGet dependency caches out when `ci.runs_on` is a
+  self-hosted label. Such a runner keeps those directories between jobs, and restoring them from
+  GitHub's cache service only added time (11 to 12 minutes per job in one measurement).
+  GitHub-hosted labels (`ubuntu-*`, `windows-*`, `macos-*`) keep the caches.
+- On a self-hosted macOS runner the generated CI and CD skip `setup-python`, whose macOS builds
+  only install under `/Users/runner`, and put the host's `python<version>` into a per-job venv
+  instead. GitHub-hosted output is unchanged.
+
+### Upgrade
+`bash install.sh --update`, then regenerate the workflows to pick up the fixes:
+`bash scripts/generate-ci.sh --force`.
 
 ## [5.8.1] — 2026-10-11
 
