@@ -2,14 +2,14 @@
 
 # DevPilot
 
-**An AI development team for Angular + .NET projects, running inside Claude Code.**
+**An AI development team for Angular + .NET (or Python) projects, running inside Claude Code.**
 
 You write what you need in one sentence. DevPilot plans it, writes the code, tests it, reviews it, and merges it.
 
-[![Version](https://img.shields.io/badge/version-5.5.1-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-5.6.0-blue.svg)](VERSION)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Runs on](https://img.shields.io/badge/runs%20on-Claude%20Code-7c3aed.svg)](#what-you-need)
-[![Stack](https://img.shields.io/badge/stack-Angular%20%7C%20.NET%20%7C%20SQL%20Server-orange.svg)](#what-you-need)
+[![Stack](https://img.shields.io/badge/stack-Angular%20%7C%20.NET%20%7C%20Python%20%7C%20SQL%20Server-orange.svg)](#what-you-need)
 [![Trackers](https://img.shields.io/badge/trackers-Jira%20%7C%20Azure%20DevOps%20%7C%20GitHub-0052cc.svg)](#connect-jira-azure-devops-or-github)
 
 **New in 5.5:** the team's know-how is now native Claude Code skills that load by themselves when needed,
@@ -28,7 +28,7 @@ refreshed with the latest official Angular and .NET guidance. [What changed →]
 That one command does what a full team does:
 
 1. **Plans**: writes the user story and acceptance criteria, and checks your tracker (Jira, Azure DevOps or GitHub Issues), including existing child tasks, so nothing is created twice.
-2. **Builds**: a .NET developer agent writes the API and database changes; an Angular developer agent writes the UI.
+2. **Builds**: a .NET (or Python) developer agent writes the API and database changes; an Angular developer agent writes the UI.
 3. **Tests**: writes and runs unit tests, API tests on a real SQL Server, and browser (UI) tests.
 4. **Reviews**: checks code quality, security, performance, and missing tests.
 5. **Versions and merges**: bumps the version (`1.4.0` → `1.5.0`), opens a pull request into `develop`, and merges it once every check is green.
@@ -338,7 +338,7 @@ Azure Repos uses the same `AZDO_PAT`.
 
 ## 9. What the team knows (skills)
 
-The agents follow **24 skills**: short playbooks written for Angular + ASP.NET Core + SQL Server. They are
+The agents follow **26 skills**: short playbooks written for Angular + ASP.NET Core + SQL Server, plus Python (FastAPI / asyncio agents). They are
 native Claude Code skills in `.claude/skills/`, so Claude loads each one **only when it's needed**:
 
 | When Claude… | It loads |
@@ -348,6 +348,8 @@ native Claude Code skills in `.claude/skills/`, so Claude loads each one **only 
 | edits an API endpoint or `Program.cs` | `dotnet-api` (built-in OpenAPI, validation, ProblemDetails) |
 | edits a migration, `DbContext` or repository | `efcore-sqlserver` (safe migrations, fast queries) |
 | writes a .NET test | `dotnet-testing` (xUnit, real SQL Server) |
+| writes a Python endpoint or agent tool | `python-api` (FastAPI, Pydantic, LiveKit / LLM agents) |
+| writes a Python test | `python-testing` (pytest, httpx against the real app) |
 | writes a browser test (`e2e/**`) | `ui-e2e-playwright` |
 | plans, reviews, merges or releases | `definition-of-ready`, `review-checklist`, `security-scan`, `auto-merge`, `release-ops` |
 | upgrades Angular or .NET | `stack-upgrade` |
@@ -370,7 +372,7 @@ replaces DevPilot's skills with the new version, so keep your own rules in a ski
 | Azure DevOps Personal Access Token | If you use Azure DevOps | Tickets, pull requests, and pipeline status |
 | `curl` and `jq` | **Yes** | Talk to Jira / Azure DevOps / GitHub |
 
-**Your project:** an Angular frontend and/or an ASP.NET Core backend with SQL Server.
+**Your project:** an Angular frontend and/or an ASP.NET Core backend with SQL Server, or a Python (FastAPI / asyncio) backend.
 
 ---
 
@@ -427,7 +429,7 @@ and `versioning` from the [Configuration](#8-configuration) example.
 
 ```
 .claude/commands/   the 10 /dp-* commands
-.claude/agents/     team-ba · team-lead · team-frontend (Angular) · team-dotnet (.NET) · team-qa
+.claude/agents/     team-ba · team-lead · team-frontend (Angular) · team-dotnet (.NET) · team-python (Python) · team-qa
 .claude/skills/    24 native Claude Code skills: stack skills load on matching files,
                     the rest when a command or agent needs them (index: .claude/skills/README.md)
 .devpilot/rules/    coding rules for angular, dotnet, sqlserver

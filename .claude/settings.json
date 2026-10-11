@@ -102,7 +102,14 @@
       "Bash(dotnet build *)",
       "Bash(dotnet test *)",
       "Bash(dotnet ef *)",
-      "Bash(dotnet format *)"
+      "Bash(dotnet format *)",
+      "Bash(python -m pytest *)",
+      "Bash(python3 -m pytest *)",
+      "Bash(pytest *)",
+      "Bash(python -m ruff *)",
+      "Bash(ruff *)",
+      "Bash(pip install *)",
+      "Bash(python -m pip install *)"
     ],
     "ask": [
       "Bash(bash scripts/deploy.sh *)",

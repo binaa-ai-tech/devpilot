@@ -104,7 +104,7 @@ fetch() {
 }
 
 # Native Claude Code skills shipped by DevPilot (.claude/skills/<name>/SKILL.md).
-DEVPILOT_SKILLS="core-rules definition-of-ready estimation-and-slicing architecture-guard angular-dev angular-testing accessibility dotnet-api efcore-sqlserver dotnet-testing api-contract test-case-design test-strategy ui-e2e-playwright token-lean-testing test-guard performance review-checklist security-scan definition-of-done auto-merge release-ops self-heal stack-upgrade"
+DEVPILOT_SKILLS="core-rules definition-of-ready estimation-and-slicing architecture-guard angular-dev angular-testing accessibility dotnet-api efcore-sqlserver dotnet-testing python-api python-testing api-contract test-case-design test-strategy ui-e2e-playwright token-lean-testing test-guard performance review-checklist security-scan definition-of-done auto-merge release-ops self-heal stack-upgrade"
 install_skills() {
   local n
   for n in $DEVPILOT_SKILLS; do fetch ".claude/skills/$n/SKILL.md" ".claude/skills/$n/SKILL.md"; done
@@ -133,7 +133,7 @@ fetch_summary() {
 # and CLAUDE.md are left exactly as they are.
 # (Keep these lists in sync with STEP 9.)
 # Merge DevPilot's permission rules into an existing .claude/settings.json: adds the
-# missing allow/ask rules (routine scripts, git, npm, dotnet → no prompts; deploy,
+# missing allow/ask rules (routine scripts, git, npm, dotnet, pytest → no prompts; deploy,
 # rollback, repo settings, force-push → always ask). Never removes the user's rules.
 ensure_permissions() {
   [ -f .claude/settings.json ] && command -v jq >/dev/null 2>&1 || return 0
@@ -170,11 +170,11 @@ run_update() {
   echo -e "${BOLD}  devpilot — update (config preserved)${RESET}"
   echo ""
 
-  RULE_SNIPPETS="angular.md dotnet.md sqlserver.md"
-  PROMPT_TEAM="ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md qa-agent.md"
+  RULE_SNIPPETS="angular.md dotnet.md python.md sqlserver.md"
+  PROMPT_TEAM="ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md python-agent.md qa-agent.md"
   TEMPLATE_TEAM="requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md bug-report.md item-brief.md"
   CMDS="dp-deliver.md dp-plan.md dp-sprint.md dp-build.md dp-test.md dp-pr.md dp-release.md dp-hotfix.md dp-status.md dp-setup.md"
-  AGENTS_LIST="team-lead.md team-ba.md team-frontend.md team-dotnet.md team-qa.md"
+  AGENTS_LIST="team-lead.md team-ba.md team-frontend.md team-dotnet.md team-python.md team-qa.md"
   SCRIPTS="git-flow.sh resolve-model.sh model-profiles.sh checkpoint.sh devpilot-config.sh devpilot-lib.sh tracker.sh jira.sh azdo.sh github.sh git-host.sh version.sh close-delivery.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy.sh smoke.sh setup-environments.sh db-package.sh usage-hook.sh deploy-init.sh generate-project-index.sh generate-backlog-index.sh md-to-adf.sh"
 
   info "Refreshing .devpilot/rules..."
@@ -207,7 +207,7 @@ run_update() {
     skills/dependency-management.md skills/cost-awareness.md skills/i18n.md skills/database-performance.md
     skills/data-migration-safety.md skills/api-design.md skills/e2e-testing.md skills/performance-review.md
     skills/performance-testing.md skills/debug-method.md skills/documentation.md
-    rules/react-vue.md rules/node.md rules/python.md rules/go.md rules/java.md rules/postgres-mysql.md
+    rules/react-vue.md rules/node.md rules/go.md rules/java.md rules/postgres-mysql.md
     prompts/team/backend-agent.md"
   for f in $RETIRED; do rm -f ".devpilot/$f"; done
   rm -f .claude/agents/team-backend.md
@@ -331,8 +331,12 @@ fi
 
 if find . -maxdepth 3 \( -name "*.sln" -o -name "*.csproj" \) 2>/dev/null | grep -q .; then
   DETECT_BACKEND="dotnet"; echo "  ✅ .NET"
-elif [ -f "requirements.txt" ] || [ -f "pyproject.toml" ] || [ -f "go.mod" ] || [ -f "pom.xml" ]; then
-  warn "non-.NET backend found — DevPilot's backend skills target .NET; backend agent left off"
+elif [ -f "requirements.txt" ] || [ -f "pyproject.toml" ] || \
+     find . -maxdepth 3 -not -path '*/node_modules/*' -not -path '*/.venv/*' \
+       \( -name "requirements.txt" -o -name "pyproject.toml" \) 2>/dev/null | grep -q .; then
+  DETECT_BACKEND="python"; echo "  ✅ Python"
+elif [ -f "go.mod" ] || [ -f "pom.xml" ]; then
+  warn "unsupported backend found — DevPilot's backend skills target .NET and Python; backend agent left off"
 fi
 
 # Scan deeper than the backend probe: EF Core / monorepo migrations often nest
@@ -737,13 +741,13 @@ fi
 
 # Per-stack rule snippets (router in rules.md tells agents which to read)
 mkdir -p .devpilot/rules
-for f in angular.md dotnet.md sqlserver.md; do
+for f in angular.md dotnet.md python.md sqlserver.md; do
   fetch ".devpilot/rules/$f" ".devpilot/rules/$f"
 done
 
 fetch ".devpilot/prompts/6-env-diff.md" ".devpilot/prompts/6-env-diff.md"
 
-for f in ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md qa-agent.md; do
+for f in ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md python-agent.md qa-agent.md; do
   fetch ".devpilot/prompts/team/$f" ".devpilot/prompts/team/$f"
 done
 
@@ -769,7 +773,7 @@ for f in dp-deliver.md dp-plan.md dp-sprint.md dp-build.md dp-test.md dp-pr.md \
   fetch ".claude/commands/$f" ".claude/commands/$f"
 done
 
-for f in team-lead.md team-ba.md team-frontend.md team-dotnet.md team-qa.md; do
+for f in team-lead.md team-ba.md team-frontend.md team-dotnet.md team-python.md team-qa.md; do
   fetch ".claude/agents/$f" ".claude/agents/$f"
 done
 
@@ -953,6 +957,7 @@ sync_model ".claude/agents/team-ba.md"       "$T1_BA"
 sync_model ".claude/agents/team-qa.md"       "$T1_QA"
 sync_model ".claude/agents/team-frontend.md" "$T1_FE_DEV"
 sync_model ".claude/agents/team-dotnet.md"   "$T1_BE_DEV"
+sync_model ".claude/agents/team-python.md"   "$T1_BE_DEV"
 
 # ═════════════════════════════════════════════════════════════════════════════
 # STEP 13 — GIT BRANCH SETUP

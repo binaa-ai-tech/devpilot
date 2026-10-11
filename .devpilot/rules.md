@@ -1,7 +1,7 @@
 # Code Rules — Router
 
 > Single source of truth for rules, split so each agent reads only what applies.
-> DevPilot targets **Angular** frontends and **.NET (ASP.NET Core) + SQL Server** backends.
+> DevPilot targets **Angular** frontends and **.NET (ASP.NET Core) + SQL Server** or **Python (FastAPI / asyncio agents)** backends.
 >
 > **Every agent:** read `.claude/skills/core-rules/SKILL.md` first (the universal
 > essentials). Then read ONLY the stack snippet(s) below that match your layer.
@@ -12,6 +12,7 @@
 |-------|------|
 | Frontend (`stack.frontend: angular`) | `.devpilot/rules/angular.md` |
 | Backend (`stack.backend: dotnet`) | `.devpilot/rules/dotnet.md` |
+| Backend (`stack.backend: python`) | `.devpilot/rules/python.md` |
 | Database (`stack.database: sqlserver`) | `.devpilot/rules/sqlserver.md` |
 
 > Anything outside these stacks: follow `core-rules` + the project's existing
@@ -34,4 +35,4 @@
 1. Reference `.claude/skills/core-rules/SKILL.md` + the relevant stack snippet.
 2. Be autonomous — no "should I continue?" pauses.
 3. State which files/dirs are in/out of scope.
-4. End with a verification step: `bash scripts/run-tests.sh <angular|dotnet|e2e|all>`.
+4. End with a verification step: `bash scripts/run-tests.sh <angular|dotnet|python|e2e|all>`.

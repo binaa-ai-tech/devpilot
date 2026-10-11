@@ -9,7 +9,7 @@
 - Run it: `/dp-build` (or `/dp-deliver <KEY>`) in Claude Code. The model tier is picked per task by complexity.
 - Apply skills: `core-rules` (trace every change to an AC) → layer skills as needed
   (Angular: `angular-dev`, `angular-testing`, `accessibility`; .NET: `dotnet-api`, `efcore-sqlserver`,
-  `dotnet-testing`; both: `api-contract`, `security-scan`, `performance`, `architecture-guard`)
+  `dotnet-testing`; Python: `python-api`, `python-testing`; all: `api-contract`, `security-scan`, `performance`, `architecture-guard`)
   → `ui-e2e-playwright` for user-facing ACs → `definition-of-done` before handoff.
 - Full spec in repo (authoritative): `docs/requirements/<slug>.md`, domain model `docs/domain-models/<slug>.md`.
 

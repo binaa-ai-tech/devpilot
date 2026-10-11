@@ -21,7 +21,7 @@ Run via `bash scripts/run-tests.sh all` — paste the summary lines only; full l
 
 | Suite | Result | Notes |
 |-------|--------|-------|
-| .NET (`dotnet`) | ✅ <passed>/<total> / ❌ <n> failing | <failing tests, if any> |
+| .NET (`dotnet`) / Python (`python`) | ✅ <passed>/<total> / ❌ <n> failing | <failing tests, if any> |
 | Angular (`angular`) | ✅ <passed>/<total> / ❌ <n> failing | |
 | UI / E2E (`e2e`) | ✅ <passed>/<total> / ❌ <n> failing / n/a | <trace path for failures> |
 | Accessibility (axe) | ✅ clean / ❌ <violations> / n/a | |

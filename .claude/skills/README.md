@@ -1,4 +1,4 @@
-# devpilot Skills — the team's operating manual (Angular + .NET)
+# devpilot Skills — the team's operating manual (Angular + .NET / Python)
 
 Each skill is a short, principle-driven playbook, stored as a native Claude Code skill
 (`.claude/skills/<name>/SKILL.md`). **Token discipline:** only each skill's one-line description
@@ -34,6 +34,12 @@ All are `user-invocable: false` — the `/` menu shows only the `/dp-*` commands
 | `efcore-sqlserver` | Expand/contract migrations, idempotent scripts, no-N+1 queries, indexes, pagination. |
 | `dotnet-testing` | xUnit units + `WebApplicationFactory` integration tests on real SQL Server (Testcontainers + Respawn). |
 | `api-contract` | Committed OpenAPI → generated Angular client; snapshot + breaking-change checks. |
+
+## Python (Backend Developer, `stack.backend: python`)
+| Skill | Purpose |
+|-------|---------|
+| `python-api` | FastAPI endpoints, Pydantic schemas, async I/O, typed errors, settings, logging, LiveKit / LLM agent tools. |
+| `python-testing` | pytest units + `httpx` integration tests against the real app; fakes at the adapter boundary. |
 
 ## Testing & QA (QA Engineer, `/dp-test`)
 | Skill | Purpose |

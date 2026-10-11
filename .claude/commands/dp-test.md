@@ -33,7 +33,7 @@ Spawn `subagent_type: "team-qa"`:
 > Scope: `<resolved scope>`. Read `.claude/skills/test-case-design/SKILL.md` and derive
 > the test-case matrix per AC (happy / boundary / negative / state, P0–P2,
 > traceability). For each case pick the layer per `.claude/skills/test-strategy/SKILL.md`:
-> Angular unit, .NET unit, .NET integration, or Playwright UI journey. Write the matrix
+> Angular unit, .NET / Python unit, .NET / Python integration, or Playwright UI journey. Write the matrix
 > into `docs/qa/<slug>.md` BEFORE writing test code.
 
 ## Step 2 — Write the missing tests
@@ -41,7 +41,8 @@ Spawn `subagent_type: "team-qa"`:
 Same agent, continuing:
 > For each case with no covering test, write one in its layer:
 > Angular specs per `.claude/skills/angular-testing/SKILL.md`, .NET tests per
-> `.claude/skills/dotnet-testing/SKILL.md` (integration on real SQL Server).
+> `.claude/skills/dotnet-testing/SKILL.md` (integration on real SQL Server), Python tests per
+> `.claude/skills/python-testing/SKILL.md` (pytest + httpx against the real app).
 > For every user-facing AC — and for **all** of them in `ui` mode — add a Playwright
 > journey per `.claude/skills/ui-e2e-playwright/SKILL.md` (happy path + one visible failure,
 > data seeded via the API, axe scan on each new screen; visual + mobile projects in `ui`
@@ -65,7 +66,7 @@ Same agent, continuing:
 🧪 /dp-test — <scope>
 Cases designed:  <n> (P0: <n> · P1: <n> · P2 deferred: <n>)
 Tests added:     unit <n> · integration <n> · UI journeys <n>
-Suites:          dotnet ✅ <p>/<t> · angular ✅ <p>/<t> · e2e ✅ <p>/<t>  (or ❌ failing list)
+Suites:          dotnet|python ✅ <p>/<t> · angular ✅ <p>/<t> · e2e ✅ <p>/<t>  (or ❌ failing list)
 Accessibility:   <axe: clean | n violations | not in scope>
 Perf:            <budget table or "not in scope">
 Blockers:        <real bugs found, or none>

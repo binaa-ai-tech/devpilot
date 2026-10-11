@@ -108,7 +108,7 @@ done
 # Agent frontmatter vs config (drift breaks per-team/single modes silently)
 agent_tier1() { grep -A30 '^models:' project.config.md 2>/dev/null | grep -A3 "^  $1:" | grep 'tier1:' | head -1 | sed 's/.*tier1:[[:space:]]*//; s/#.*//' | tr -d '"' | awk '{print $1}'; }
 DRIFT=0
-for PAIR in "ba:team-ba" "team_lead:team-lead" "qa:team-qa" "frontend_dev:team-frontend" "backend_dev:team-dotnet"; do
+for PAIR in "ba:team-ba" "team_lead:team-lead" "qa:team-qa" "frontend_dev:team-frontend" "backend_dev:team-dotnet" "backend_dev:team-python"; do
   KEY="${PAIR%%:*}"; FILE=".claude/agents/${PAIR##*:}.md"
   WANT=$(agent_tier1 "$KEY"); [ -z "$WANT" ] && continue
   [ -f "$FILE" ] || continue

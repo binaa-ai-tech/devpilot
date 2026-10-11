@@ -15,7 +15,7 @@ CD pipeline behind the production approval. Skips the backlog/sprint machinery �
    ```bash
    bash scripts/git-flow.sh hotfix-start "$KEY" <slug>
    ```
-3. **Implement** the minimal fix with the `team-dotnet` / `team-frontend` agent for the affected layer. Minimum diff —
+3. **Implement** the minimal fix with the `team-dotnet` / `team-python` / `team-frontend` agent for the affected layer. Minimum diff —
    no refactoring under pressure. Follow the debugging method in `.claude/skills/self-heal/SKILL.md` (Part 0) first.
 4. **Self-review:** `git diff main...HEAD` — confirm scope is tight.
 5. **Ship through the pipeline** — push the branch; `devpilot-cd` builds it once → **SIT** (smoke)

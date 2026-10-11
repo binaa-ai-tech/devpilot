@@ -2,14 +2,15 @@
 # =============================================================================
 # run-tests.sh — token-lean test runner: full log to disk, summary to the agent.
 #
-# Runs the Angular (Vitest), .NET and Playwright suites it detects, writes each
+# Runs the Angular (Vitest), .NET, Python (pytest) and Playwright suites it detects, writes each
 # suite's complete output to .devpilot/logs/, and prints only a PASS/FAIL line
 # plus the failure lines. The skill that governs its use is
 # .claude/skills/token-lean-testing/SKILL.md.
 #
-#   bash scripts/run-tests.sh [angular|dotnet|e2e|all]   # default: all
+#   bash scripts/run-tests.sh [angular|dotnet|python|e2e|all]   # default: all
 #   bash scripts/run-tests.sh cmd "<command>"            # wrap any command
 #   bash scripts/run-tests.sh dotnet -- --filter "FullyQualifiedName~Orders"
+#   bash scripts/run-tests.sh python -- -k orders
 #
 # Env: TEST_MAX_LINES (failure lines shown per suite, default 40)
 # Exit: 0 when every suite passed (or none was found), 1 otherwise.
@@ -35,7 +36,7 @@ fi
 EXTRA_ARGS=("$@")
 
 # Lines worth an agent's attention: failures, compiler errors, assertion diffs, totals.
-FAIL_PATTERN='FAIL|Fail|✗|×|✘|[Ee]rror|[Ee]xception|Expected|Received|Actual|Assert|expect\(|failed|Tests +[0-9]|Test Files|Passed!|Failed!|Total tests|[0-9]+ (passed|failed|flaky)'
+FAIL_PATTERN='FAIL|Fail|✗|×|✘|[Ee]rror|[Ee]xception|Expected|Received|Actual|Assert|expect\(|failed|Tests +[0-9]|Test Files|Passed!|Failed!|Total tests|[0-9]+ (passed|failed|flaky)|^E  |Traceback'
 
 FAILED=0
 RAN=0
@@ -49,7 +50,7 @@ find_dir() {
     expr+=(-name "$n"); first=0
   done
   local hit
-  hit=$(find . -maxdepth "$depth" \( -path ./node_modules -o -path '*/node_modules' -o -path ./.git \) -prune \
+  hit=$(find . -maxdepth "$depth" \( -path ./node_modules -o -path '*/node_modules' -o -path ./.git -o -path '*/.venv' -o -path '*/venv' \) -prune \
     -o \( "${expr[@]}" \) -print 2>/dev/null | head -1)
   [ -n "$hit" ] && dirname "$hit"
   return 0
@@ -96,6 +97,21 @@ run_dotnet() {
   run_suite dotnet "$dir" dotnet test --nologo --verbosity quiet ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
 }
 
+# Python: the first directory with a pytest config, a conftest.py, or a tests/ folder.
+# Uses the project's virtualenv when one exists next to the code, else `python3`.
+run_python() {
+  local dir; dir=$(find_dir 3 'pytest.ini' 'conftest.py' 'setup.cfg' 'tox.ini')
+  [ -z "$dir" ] && [ -f pyproject.toml ] && grep -q '\[tool.pytest' pyproject.toml && dir="."
+  [ -z "$dir" ] && [ -d tests ] && ls tests/test_*.py >/dev/null 2>&1 && dir="."
+  [ -z "$dir" ] && dir=$(find_dir 4 'test_*.py' '*_test.py')
+  [ -z "$dir" ] && { [ "$MODE" = "python" ] && echo "⚠️  no pytest config, conftest.py or test_*.py found"; return; }
+  local py="python3" v
+  for v in "$dir/.venv" "./.venv" "$dir/venv" "./venv"; do
+    [ -x "$v/bin/python" ] && { py="$v/bin/python"; break; }
+  done
+  run_suite python "$dir" "$py" -m pytest -q -p no:cacheprovider ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
+}
+
 run_e2e() {
   local dir; dir=$(find_dir 3 'playwright.config.ts' 'playwright.config.js' 'playwright.config.mjs')
   [ -z "$dir" ] && { [ "$MODE" = "e2e" ] && echo "⚠️  no playwright.config found"; return; }
@@ -105,10 +121,11 @@ run_e2e() {
 case "$MODE" in
   angular) run_angular ;;
   dotnet)  run_dotnet ;;
+  python)  run_python ;;
   e2e)     run_e2e ;;
-  all)     run_dotnet; run_angular; run_e2e ;;
+  all)     run_dotnet; run_python; run_angular; run_e2e ;;
   cmd)     run_suite cmd . bash -c "$CUSTOM_CMD" ;;
-  *) echo "usage: run-tests.sh [angular|dotnet|e2e|all|cmd \"<command>\"] [-- extra args]" >&2; exit 2 ;;
+  *) echo "usage: run-tests.sh [angular|dotnet|python|e2e|all|cmd \"<command>\"] [-- extra args]" >&2; exit 2 ;;
 esac
 
 [ $RAN -eq 0 ] && echo "ℹ️  no test suites detected"

@@ -4,6 +4,28 @@ All notable changes to DevPilot. Versions follow [SemVer](https://semver.org); e
 section becomes the GitHub Release notes when the `vx.y.z` tag is pushed
 (`.github/workflows/release.yml`).
 
+## [5.6.0] — 2026-10-11
+
+### Added
+- **Python backend stack.** DevPilot now runs Python services (FastAPI / asyncio, LiveKit + LLM voice
+  agents) with the same team flow as .NET:
+  - `.devpilot/rules/python.md` — the one-line Python rules (layering, typing, async, settings, errors, logging, agents).
+  - Skills `python-api` (endpoints, Pydantic schemas, typed errors, settings, agent tools) and
+    `python-testing` (pytest units + `httpx` integration tests, fakes at the adapter boundary).
+  - Agent `team-python` + persona `.devpilot/prompts/team/python-agent.md`; `/dp-build`, `/dp-hotfix` and
+    `/dp-test` route backend work to it when `stack.backend: python`.
+  - Installer detects `requirements.txt` / `pyproject.toml` → `stack.backend: python`, backend agent on.
+  - `scripts/run-tests.sh python` (pytest through the project's `.venv`, failures only in context; part of `all`).
+  - `scripts/generate-ci.sh` — CI: setup-python → pip install → ruff (when configured) → pytest;
+    CD: the service source + requirements packaged into `out/api`. GitHub Actions and Azure Pipelines.
+  - Project index shards list Python entrypoints, routers, services, adapters and tests.
+  - `model-profiles.sh` / `doctor.sh` sync and check `team-python` like the other dev agents;
+    `pytest`, `ruff` and `pip install` added to the shipped permission allow-list.
+
+### Upgrade
+Run `bash install.sh --update` in each project. Python projects: set `stack.backend: python` and
+`agents.backend.enabled: true` in `project.config.md` (new installs get this from detection).
+
 ## [5.5.1] — 2026-09-25
 
 ### Fixed

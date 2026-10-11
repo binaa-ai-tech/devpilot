@@ -50,7 +50,7 @@ for KEY in <STORY_KEYS>; do
   bash scripts/tracker.sh breakdown "$KEY" "<layers of this Story>,qa" "<summary>" >/dev/null   # no-op if planned
 done
 ```
-Layer tasks follow the work: `[BE]`/`[DB]` → In Progress when `team-dotnet` starts, `[FE]` when
+Layer tasks follow the work: `[BE]`/`[DB]` → In Progress when `team-dotnet` / `team-python` starts, `[FE]` when
 `team-frontend` starts, `[QA]` when `team-qa` starts; each → **Done** when that agent reports green
 (`bash scripts/tracker.sh status <TASK> "In Progress" | "Done"`). Keys: `bash scripts/tracker.sh show <KEY>`.
 
@@ -69,6 +69,7 @@ Decide the layers each Story touches (frontend / backend / DB).
 
 - **Frontend (Angular)** → `subagent_type: "team-frontend"`
 - **Backend / DB (.NET + SQL Server)** → `subagent_type: "team-dotnet"`
+- **Backend (Python — `stack.backend: python` in `project.config.md`)** → `subagent_type: "team-python"`
 
 When both layers change an API, the backend agent commits the regenerated OpenAPI spec first;
 the frontend agent regenerates the Angular client from it (`api-contract`).
@@ -76,7 +77,7 @@ the frontend agent regenerates the Angular client from it (`api-contract`).
 Each agent prompt:
 > Sprint `<SPRINT>` · Stories + specs: `<docs/requirements/*.md + docs/plans/*.md>` · Branch
 > `<BRANCH>`. Implement all <layer> work per the plans. Read `.claude/skills/self-heal/SKILL.md`.
-> Build + test with `bash scripts/run-tests.sh <angular|dotnet>` (summary only). Commit per
+> Build + test with `bash scripts/run-tests.sh <angular|dotnet|python>` (summary only). Commit per
 > Story, conventional message ending with the tracker ref (`bash scripts/tracker.sh ref <KEY>` →
 > `MSK-12` · `AB#345` · `#7`). Report what you built in 3 bullets.
 
