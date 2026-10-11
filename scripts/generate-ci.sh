@@ -46,8 +46,13 @@ NG_DIR=$(find . -name angular.json -not -path '*/node_modules/*' 2>/dev/null | h
 [ -z "$NG_DIR" ] && [ -f package.json ] && NG_DIR="."
 [ "$FE" = "none" ] && NG_DIR=""
 [ "$FE" != "none" ] && [ -z "$NG_DIR" ] && NG_DIR="."
-HAS_E2E=0
-find . -maxdepth 4 -name 'playwright.config.*' -not -path '*/node_modules/*' 2>/dev/null | grep -q . && HAS_E2E=1
+HAS_E2E=0; E2E_DIR=""; E2E_OWN_PKG=0
+E2E_CFG=$(find . -maxdepth 4 -name 'playwright.config.*' -not -path '*/node_modules/*' 2>/dev/null | head -1)
+if [ -n "$E2E_CFG" ]; then
+  HAS_E2E=1; E2E_DIR=$(dirname "$E2E_CFG" | sed 's#^\./##')
+  # An e2e folder with its own package.json (e.g. e2e/ next to admin/ and portal/) installs its own deps.
+  [ -f "$E2E_DIR/package.json" ] && [ "$E2E_DIR" != "${NG_DIR:-.}" ] && E2E_OWN_PKG=1
+fi
 DOTNET=0; [ "$BE" = "dotnet" ] && DOTNET=1
 PYTHON=0; [ "$BE" = "python" ] && PYTHON=1
 
@@ -193,10 +198,17 @@ cat <<YML
         run: TEST_MAX_LINES=400 bash scripts/run-tests.sh python
 YML
 fi
-if [ "$HAS_E2E" = 1 ]; then cat <<YML
+if [ "$HAS_E2E" = 1 ]; then
+[ "$E2E_OWN_PKG" = 1 ] && cat <<YML
+
+      - name: npm ci (e2e)
+        working-directory: $E2E_DIR
+        run: npm ci
+YML
+cat <<YML
 
       - name: Playwright browsers
-        working-directory: ${NG_DIR:-.}
+        working-directory: $([ "$E2E_OWN_PKG" = 1 ] && echo "$E2E_DIR" || echo "${NG_DIR:-.}")
         run: npx playwright install --with-deps chromium
       - name: UI journeys (Playwright + axe)
         run: TEST_MAX_LINES=400 bash scripts/run-tests.sh e2e
@@ -304,10 +316,17 @@ cat <<YML
         displayName: tests (Python · pytest)
 YML
 fi
-if [ "$HAS_E2E" = 1 ]; then cat <<YML
+if [ "$HAS_E2E" = 1 ]; then
+[ "$E2E_OWN_PKG" = 1 ] && cat <<YML
+
+      - script: npm ci
+        workingDirectory: $E2E_DIR
+        displayName: npm ci (e2e)
+YML
+cat <<YML
 
       - script: npx playwright install --with-deps chromium
-        workingDirectory: ${NG_DIR:-.}
+        workingDirectory: $([ "$E2E_OWN_PKG" = 1 ] && echo "$E2E_DIR" || echo "${NG_DIR:-.}")
         displayName: Playwright browsers
       - script: TEST_MAX_LINES=400 bash scripts/run-tests.sh e2e
         displayName: UI journeys (Playwright + axe)

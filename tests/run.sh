@@ -999,6 +999,18 @@ OUT=$(cd "$D" && bash scripts/run-tests.sh angular 2>&1)
 assert_contains "$OUT" "no test target" "warns when neither ng test nor npm test exists"
 rm -rf "$D"
 
+echo "== generate-ci installs an e2e folder's own package.json =="
+D=$(mktemp -d)
+( cd "$D" && git init -q -b main && git config user.email t@t.t && git config user.name t \
+  && git remote add origin https://github.com/acme/shop.git && git commit -q --allow-empty -m init \
+  && mkdir -p admin e2e && echo '{"dependencies":{"@angular/core":"^21.0.0"}}' > admin/package.json && echo '{}' > admin/angular.json \
+  && echo '{"devDependencies":{"@playwright/test":"^1.50.0"}}' > e2e/package.json && echo 'export default {}' > e2e/playwright.config.js \
+  && DEVPILOT_LOCAL="$REPO" bash "$REPO/install.sh" --defaults >/dev/null 2>&1 < /dev/null \
+  && bash scripts/generate-ci.sh --force --github --no-cd >/dev/null 2>&1 )
+assert_contains "$(cat "$D/.github/workflows/devpilot-ci.yml" 2>/dev/null)" "npm ci (e2e)" "CI runs npm ci in the e2e folder"
+assert_contains "$(grep -A1 'Playwright browsers' "$D/.github/workflows/devpilot-ci.yml" 2>/dev/null)" "working-directory: e2e" "Playwright installs browsers from the e2e folder"
+rm -rf "$D"
+
 echo "== DevPilot release metadata =="
 V=$(cat "$REPO/VERSION")
 assert_contains "$(cat "$REPO/CHANGELOG.md")" "## [$V]" "CHANGELOG.md has a section for VERSION $V (release notes)"
