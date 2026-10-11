@@ -1,4 +1,4 @@
-# DevPilot — AI delivery team (Angular + .NET, Claude Code)
+# DevPilot — AI delivery team (Angular + .NET / Python, Claude Code)
 
 Describe the requirement; the team plans → builds → tests → reviews → merges it.
 The end-to-end SDLC contract (phases, gates, roles) lives in `.devpilot/process.md`.
@@ -12,7 +12,7 @@ The end-to-end SDLC contract (phases, gates, roles) lives in `.devpilot/process.
 | Whole team | `/dp-deliver <requirement\|KEY> [--to sit]` | **End to end** — plan → sprint → build → QA → review → version bump → PR → merge into `develop` → items, Epic & sprint closed (→ SIT). Asks only if no tracker is connected (connect or skip) or on a gray-zone dedup. `/dp-deliver resume` continues after an interruption. |
 | Product Owner / BA | `/dp-plan <requirement\|KEY>` | Dedup against the tracker + the top matches' child tasks, write Epic→Story with testable ACs. No code. |
 | Scrum Master | `/dp-sprint` | Group READY Stories into sprints, recommend run order. |
-| Developers | `/dp-build [sprint]` | Angular + .NET agents build a sprint on one branch → one PR → `develop`. |
+| Developers | `/dp-build [sprint]` | Angular + .NET / Python agents build a sprint on one branch → one PR → `develop`. |
 | QA | `/dp-test [ui\|perf] [story\|PR\|diff]` | Cases from ACs → unit / integration / Playwright UI tests → run. |
 | Tech Lead | `/dp-pr [PR]` | Apply review comments, drive CI green (bounded), merge per `auto-merge` gates. |
 | DevOps | `/dp-release <sit\|uat\|prd\|rollback> [version]` | Promote DEV→SIT→UAT→PRD, or roll back. PRD is always human-approved. |
@@ -29,7 +29,7 @@ The end-to-end SDLC contract (phases, gates, roles) lives in `.devpilot/process.
   TRACKER → tracker.sh check · not configured → ask once: connect (API key) or continue locally
   PLAN    → classify · dedup vs tracker.sh search + child items (tracker.sh show) · Epic→Story first
   SPRINT  → feature: own sprint · bug: active sprint · P0/P1: refused → /dp-hotfix
-  BUILD   → team-dotnet (API · EF Core · OpenAPI) ║ team-frontend (Angular · generated client)
+  BUILD   → team-dotnet (API · EF Core · OpenAPI) or team-python (FastAPI · agents) ║ team-frontend (Angular · generated client)
   QA      → Vitest · xUnit + real SQL Server · Playwright journeys + axe
   REVIEW  → review-checklist · security · performance · test guard (strict)
   VERSION → version.sh bump from develop (feature → minor · bug → patch)
@@ -71,7 +71,7 @@ Never call a backend directly from a command — always `tracker.sh`. Secrets li
 - **Hash-gated freshness** — the index regenerates only when repo content changed. Never broad-scan.
 - **Read-once core** — `core-rules` is preloaded into every agent; stack skills load automatically on matching
   files (`paths:`), the others only at the step that needs them.
-- **Token-lean tests** — run suites via `bash scripts/run-tests.sh <angular|dotnet|e2e|all>`: the
+- **Token-lean tests** — run suites via `bash scripts/run-tests.sh <angular|dotnet|python|e2e|all>`: the
   full log goes to `.devpilot/logs/`, only failures come back.
 
 ---
@@ -87,13 +87,13 @@ Change with `/dp-setup models <auto|balanced|save>`. Reference: `.devpilot/confi
 
 ## Stack, rules, skills
 
-- **Frontend:** Angular 21+ · **Backend:** ASP.NET Core (C#) + EF Core + SQL Server ·
-  **Contract:** OpenAPI → generated Angular client.
-- **Tests:** Vitest (Angular) · xUnit + `WebApplicationFactory` + Testcontainers (.NET) · Playwright (UI/E2E).
-- **Rules:** `.devpilot/rules.md` (router) + `.devpilot/rules/<angular|dotnet|sqlserver>.md`.
+- **Frontend:** Angular 21+ · **Backend:** ASP.NET Core (C#) + EF Core + SQL Server, or Python 3.11+
+  (FastAPI / asyncio / LiveKit agents) · **Contract:** OpenAPI → generated Angular client.
+- **Tests:** Vitest (Angular) · xUnit + `WebApplicationFactory` + Testcontainers (.NET) · pytest + httpx (Python) · Playwright (UI/E2E).
+- **Rules:** `.devpilot/rules.md` (router) + `.devpilot/rules/<angular|dotnet|python|sqlserver>.md`.
 - **Skills:** `.claude/skills/<name>/SKILL.md` — native Claude Code skills, hidden from the `/` menu
   (`user-invocable: false`); index in `.claude/skills/README.md`.
-- **Agents:** `.claude/agents/` — team-ba, team-lead, team-frontend, team-dotnet, team-qa
+- **Agents:** `.claude/agents/` — team-ba, team-lead, team-frontend, team-dotnet, team-python, team-qa
   (spawned by the commands; never called directly).
 
 ---

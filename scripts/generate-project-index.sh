@@ -116,7 +116,7 @@ scan() {
 
   while IFS= read -r f; do
     [ -f "$f" ] || continue
-    local rel="${f#$ROOT/}"
+    local rel="${f#$ROOT/}"; rel="${rel#./}"
     # Extract up to 3 declared symbols (multi-language) for a richer scan signal.
     local decl
     decl=$(grep -m3 -oE '(export class|export function|export const|public class|class|interface|enum|function|const|def|func|type) [A-Za-z][A-Za-z0-9_]+' "$f" 2>/dev/null \
@@ -134,6 +134,9 @@ scan() {
       ! -path "*/.angular/*" \
       ! -path "*/obj/*" \
       ! -path "*/bin/*" \
+      ! -path "*/.venv/*" \
+      ! -path "*/venv/*" \
+      ! -path "*/__pycache__/*" \
       -type f 2>/dev/null \
     | sort
   )
@@ -209,11 +212,20 @@ if $HAS_BACKEND; then
   scan "apps" "*Service.cs"
   scan "src"  "*Service.cs"
 
-  section "Node / Python Routes"
+  section "Node Routes"
   scan "src"  "*.routes.ts"
   scan "src"  "*.controller.ts"
-  scan "api"  "routes.py"
-  scan "api"  "views.py"
+
+  if [ "$BACKEND_STACK" = "python" ]; then
+    # scan is recursive, so one pass from the root covers every package.
+    section "Python entrypoints (FastAPI apps · agents · servers)"
+    for pat in main.py server.py app.py agent.py; do scan "." "$pat"; done
+    section "Python routers / services / adapters"
+    for pat in routes.py views.py router.py '*_router.py' '*_service.py' '*_repository.py' '*_adapter.py' \
+               schemas.py models.py settings.py config.py; do scan "." "$pat"; done
+    section "Python tests"
+    scan "." "test_*.py"
+  fi
 fi
 
 # ── Database (shard) ─────────────────────────────────────────────────────────

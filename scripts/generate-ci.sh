@@ -2,7 +2,7 @@
 # =============================================================================
 # generate-ci.sh — write the server-side gate ladder for THIS project:
 #   Angular (lint → build → unit tests) · .NET (build → tests incl. SQL Server
-#   via Testcontainers) · Playwright UI journeys · test-guard (strict) · dependency audit
+#   via Testcontainers) · Python (ruff → pytest) · Playwright UI journeys · test-guard (strict) · dependency audit
 #
 #   bash scripts/generate-ci.sh [--force] [--github | --azure] [--no-cd]
 #
@@ -46,6 +46,27 @@ NG_DIR=$(find . -name angular.json -not -path '*/node_modules/*' 2>/dev/null | h
 HAS_E2E=0
 find . -maxdepth 4 -name 'playwright.config.*' -not -path '*/node_modules/*' 2>/dev/null | grep -q . && HAS_E2E=1
 DOTNET=0; [ "$BE" = "dotnet" ] && DOTNET=1
+PYTHON=0; [ "$BE" = "python" ] && PYTHON=1
+
+# Python service: the directory holding requirements.txt / pyproject.toml (repo root first).
+PY_DIR=""; PY_INSTALL="pip install -e ."; PY_VER="3.12"; PY_RUFF=0; PY_RUFF_PKG=""
+if [ "$PYTHON" = 1 ]; then
+  for F in requirements.txt pyproject.toml; do [ -f "$F" ] && { PY_DIR="."; break; }; done
+  if [ -z "$PY_DIR" ]; then
+    F=$(find . -maxdepth 3 -not -path '*/node_modules/*' -not -path '*/.venv/*' \( -name requirements.txt -o -name pyproject.toml \) 2>/dev/null | head -1)
+    [ -n "$F" ] && PY_DIR=$(dirname "$F" | sed 's#^\./##')
+  fi
+  [ -z "$PY_DIR" ] && PY_DIR="."
+  [ -f "$PY_DIR/requirements.txt" ] && PY_INSTALL="pip install -r requirements.txt"
+  # Interpreter version FROM THE PROJECT: .python-version → pyproject requires-python → 3.12
+  if [ -f "$PY_DIR/.python-version" ]; then PY_VER=$(head -1 "$PY_DIR/.python-version" | tr -d '[:space:]' | cut -d. -f1-2)
+  elif [ -f .python-version ]; then PY_VER=$(head -1 .python-version | tr -d '[:space:]' | cut -d. -f1-2)
+  elif [ -f "$PY_DIR/pyproject.toml" ]; then
+    V=$(sed -n 's/^requires-python[[:space:]]*=[[:space:]]*"[^0-9]*\([0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' "$PY_DIR/pyproject.toml" | head -1); [ -n "$V" ] && PY_VER="$V"
+  fi
+  case "$PY_VER" in [0-9]*.[0-9]*) ;; *) PY_VER="3.12" ;; esac
+  { [ -f "$PY_DIR/ruff.toml" ] || [ -f "$PY_DIR/.ruff.toml" ] || grep -qs '\[tool.ruff' "$PY_DIR/pyproject.toml"; } && { PY_RUFF=1; PY_RUFF_PKG=" ruff"; }
+fi
 
 # The deployable ASP.NET Core project (Sdk.Web, not a test project) and EF migrations.
 API_PROJ=""
@@ -145,6 +166,30 @@ if [ "$DOTNET" = 1 ]; then cat <<YML
         run: dotnet test --configuration Release --no-build --logger "trx;LogFileName=results.trx"
 YML
 fi
+if [ "$PYTHON" = 1 ]; then cat <<YML
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "$PY_VER"
+          cache: pip
+      - name: pip install (Python)
+        working-directory: $PY_DIR
+        run: |
+          python -m pip install --upgrade pip
+          $PY_INSTALL
+          [ -f requirements-dev.txt ] && pip install -r requirements-dev.txt || true
+          pip install pytest pytest-asyncio httpx$PY_RUFF_PKG
+YML
+[ "$PY_RUFF" = 1 ] && cat <<YML
+      - name: lint (Python · ruff)
+        working-directory: $PY_DIR
+        run: ruff check . && ruff format --check .
+YML
+cat <<YML
+      - name: tests (Python · pytest)
+        run: TEST_MAX_LINES=400 bash scripts/run-tests.sh python
+YML
+fi
 if [ "$HAS_E2E" = 1 ]; then cat <<YML
 
       - name: Playwright browsers
@@ -233,6 +278,29 @@ if [ "$DOTNET" = 1 ]; then cat <<YML
           testResultsFiles: "**/results.trx"
 YML
 fi
+if [ "$PYTHON" = 1 ]; then cat <<YML
+
+      - task: UsePythonVersion@0
+        inputs:
+          versionSpec: "$PY_VER"
+      - script: |
+          python -m pip install --upgrade pip
+          $PY_INSTALL
+          [ -f requirements-dev.txt ] && pip install -r requirements-dev.txt || true
+          pip install pytest pytest-asyncio httpx$PY_RUFF_PKG
+        workingDirectory: $PY_DIR
+        displayName: pip install (Python)
+YML
+[ "$PY_RUFF" = 1 ] && cat <<YML
+      - script: ruff check . && ruff format --check .
+        workingDirectory: $PY_DIR
+        displayName: lint (Python · ruff)
+YML
+cat <<YML
+      - script: TEST_MAX_LINES=400 bash scripts/run-tests.sh python
+        displayName: tests (Python · pytest)
+YML
+fi
 if [ "$HAS_E2E" = 1 ]; then cat <<YML
 
       - script: npx playwright install --with-deps chromium
@@ -261,7 +329,7 @@ YML
 }
 
 # Build steps shared by both CD flavours: out/web (Angular dist) · out/api (dotnet
-# publish) · out/db (db-package.sh: migrations.sql, rollback.sql, migrations.txt) — the one artifact promoted.
+# publish, or the Python service source + requirements) · out/db (db-package.sh: migrations.sql, rollback.sql, migrations.txt) — the one artifact promoted.
 cd_build_script() {
   # One command per line: under `set -e`, a failure inside an `a && b && c` chain does NOT
   # stop the script — the build would "succeed" and ship without the frontend.
@@ -281,6 +349,11 @@ cd_build_script() {
       echo 'export PATH="$PATH:$HOME/.dotnet/tools"'
       echo "bash scripts/db-package.sh out/db ${MIG_PROJ:+--project '$MIG_PROJ' }${API_PROJ:+--startup '$API_PROJ'}"
     fi
+  fi
+  if [ "$PYTHON" = 1 ]; then
+    # Source deploy: the Python service + its requirements, minus local-only folders.
+    echo "mkdir -p out/api"
+    echo "tar -C '$PY_DIR' --exclude=.venv --exclude=venv --exclude=__pycache__ --exclude=tests --exclude=.git --exclude=node_modules --exclude=out -cf - . | tar -C out/api -xf -"
   fi
   echo 'bash scripts/version.sh current > out/VERSION'
 }
@@ -338,6 +411,11 @@ YML
           path: ~/.nuget/packages
           key: nuget-\${{ runner.os }}-\${{ hashFiles('**/*.csproj', '**/packages.lock.json', '**/Directory.Packages.props') }}
           restore-keys: nuget-\${{ runner.os }}-
+YML
+[ "$PYTHON" = 1 ] && cat <<YML
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "$PY_VER"
 YML
 cat <<YML
       - name: build once (web + api + db script)
@@ -437,6 +515,11 @@ YML
               packageType: sdk
               version: $DOTNET_SDK
 YML
+[ "$PYTHON" = 1 ] && cat <<YML
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: "$PY_VER"
+YML
 cat <<YML
           - script: |
 $(cd_build_script | sed 's/^/              /')
@@ -501,6 +584,6 @@ if [ "$HOST" = "azure" ]; then write "$OUT" azure_yml; else write "$OUT" github_
 if [ "$CD" = 1 ]; then
   if [ "$HOST" = "azure" ]; then write "$OUT_CD" azure_cd_yml; else write "$OUT_CD" github_cd_yml; fi
 fi
-echo "   toolchain: .NET SDK $DOTNET_SDK · Node $NODE_VER${EF_VER:+ · dotnet-ef $EF_VER}"
-echo "   host: $HOST · angular: ${NG_DIR:-none} · api: ${API_PROJ:-${BE}} · migrations: $([ "$HAS_MIGRATIONS" = 1 ] && echo yes || echo no) · e2e: $([ "$HAS_E2E" = 1 ] && echo yes || echo no) · base: $BASE"
+echo "   toolchain: $([ "$PYTHON" = 1 ] && echo "Python $PY_VER" || echo ".NET SDK $DOTNET_SDK") · Node $NODE_VER${EF_VER:+ · dotnet-ef $EF_VER}"
+echo "   host: $HOST · angular: ${NG_DIR:-none} · api: ${API_PROJ:-${PY_DIR:-$BE}} · migrations: $([ "$HAS_MIGRATIONS" = 1 ] && echo yes || echo no) · e2e: $([ "$HAS_E2E" = 1 ] && echo yes || echo no) · base: $BASE"
 echo "   Next: bash scripts/protect-branches.sh (CI required) · bash scripts/setup-environments.sh (CD approvals)"

@@ -47,8 +47,8 @@ local tracker, auto merge) — change anything later per §6.
 ## 3 · The wizard, step by step
 
 ### STEP 1–2 — Tool & stack scan (automatic)
-Detects Claude Code, `gh`, `jq`, and your stack (Angular · .NET · DB migrations · messaging). Other
-frontends/backends are reported and their agent left off — DevPilot's skills target Angular + .NET. Nothing to answer; fix a ❌ on `git` before continuing.
+Detects Claude Code, `gh`, `jq`, and your stack (Angular · .NET · Python · DB migrations · messaging). Other
+frontends/backends are reported and their agent left off — DevPilot's skills target Angular + .NET / Python. Nothing to answer; fix a ❌ on `git` before continuing.
 
 ### STEP 3 — Agent team
 > **Recommendation: accept the detected team.** BA, Team Lead, and QA are always on;

@@ -28,7 +28,7 @@ user-invocable: false
    `token-lean-testing`); never leave the build red.
 10. **Reach for heavier skills on demand only** — `self-heal` on a failure,
     `security-scan` on auth/input handling, `architecture-guard` on structural
-    change, `angular-*` / `dotnet-*` / `efcore-sqlserver` / `api-contract` when
+    change, `angular-*` / `dotnet-*` / `python-*` / `efcore-sqlserver` / `api-contract` when
     writing that layer. Don't pre-load them.
 11. **Process logging — two altitudes, no echo.** The blow-by-blow lives in the
     repo, not the ticket:

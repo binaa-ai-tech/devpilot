@@ -921,6 +921,57 @@ NOCASE=$( { grep -nE '\$\([^)]*\<case\>' "$REPO/install.sh" "$REPO"/scripts/*.sh
 assert_eq "${NOCASE:-none}" "none" "no case inside \$(…) (bash 3.2 can't parse it)"
 rm -rf "$D"
 
+echo "== Python backend stack (v5.6) =="
+for F in .devpilot/rules/python.md .claude/skills/python-api/SKILL.md .claude/skills/python-testing/SKILL.md \
+         .claude/agents/team-python.md .devpilot/prompts/team/python-agent.md; do
+  [ -f "$REPO/$F" ] && ok "$F present" || no "$F present"
+done
+assert_contains "$(cat "$REPO/.devpilot/rules.md")" 'stack.backend: python' "rules router points Python backends at rules/python.md"
+assert_contains "$(cat "$REPO/.claude/commands/dp-build.md")" '"team-python"' "dp-build routes Python backend work to team-python"
+assert_contains "$(sed -n '/^run_update() {/,/^}/p' "$REPO/install.sh")" "python-agent.md" "--update refreshes the Python persona"
+assert_contains "$(sed -n '/^run_update() {/,/^}/p' "$REPO/install.sh")" "team-python.md" "--update refreshes the Python agent"
+n=$(grep -c 'rules/python.md' "$REPO/install.sh"); n=${n:-0}
+assert_eq "$(grep -c 'RETIRED=.*rules/python.md' "$REPO/install.sh" | head -1)" "0" "rules/python.md is no longer on the retired list"
+assert_contains "$(cat "$REPO/scripts/run-tests.sh")" "python)  run_python" "run-tests.sh has a python mode"
+assert_contains "$(cat "$REPO/scripts/run-tests.sh")" "all)     run_dotnet; run_python" "run-tests.sh all includes python"
+assert_contains "$(cat "$REPO/scripts/model-profiles.sh")" "team-python.md" "model-profiles syncs team-python"
+assert_contains "$(cat "$REPO/scripts/doctor.sh")" "backend_dev:team-python" "doctor checks team-python frontmatter"
+# Installer detects a Python service and turns the backend agent on.
+D=$(mktemp -d)
+( cd "$D" && git init -q -b main && git config user.email t@t.t && git config user.name t \
+  && git remote add origin https://github.com/acme/voice.git \
+  && git commit -q --allow-empty -m init && printf 'fastapi\nuvicorn\n' > requirements.txt \
+  && mkdir -p tests && printf 'def test_ok():\n    assert 1 == 1\n' > tests/test_ok.py \
+  && DEVPILOT_LOCAL="$REPO" bash "$REPO/install.sh" --defaults >"$D/out.log" 2>"$D/err.log" < /dev/null )
+assert_contains "$(cat "$D/out.log")" "✅ Python" "installer detects a Python backend"
+assert_contains "$(grep -A4 '^stack:' "$D/project.config.md")" "backend: python" "project.config.md records stack.backend: python"
+assert_contains "$(grep -A6 '^agents:' "$D/project.config.md")" "backend:      { enabled: true }" "backend agent enabled for Python"
+[ -f "$D/.claude/agents/team-python.md" ] && ok "team-python installed" || no "team-python installed"
+[ -f "$D/.devpilot/rules/python.md" ] && ok "rules/python.md installed" || no "rules/python.md installed"
+# generate-ci.sh emits Python steps for both hosts.
+( cd "$D" && bash scripts/generate-ci.sh --force --github >/dev/null 2>&1 )
+assert_contains "$(cat "$D/.github/workflows/devpilot-ci.yml" 2>/dev/null)" "actions/setup-python@v5" "GitHub CI sets up Python"
+assert_contains "$(cat "$D/.github/workflows/devpilot-ci.yml" 2>/dev/null)" "run-tests.sh python" "GitHub CI runs pytest through run-tests.sh"
+assert_contains "$(cat "$D/.github/workflows/devpilot-ci.yml" 2>/dev/null)" "          pip install -r requirements.txt
+" "GitHub CI installs requirements.txt exactly once"
+assert_eq "$(grep -c "requirements.txt\./" "$D/.github/workflows/devpilot-ci.yml" 2>/dev/null)" "0" "GitHub CI pip line is not mangled"
+assert_contains "$(cat "$D/.github/workflows/devpilot-cd.yml" 2>/dev/null)" "out/api" "GitHub CD packages the Python service"
+( cd "$D" && bash scripts/generate-ci.sh --force --azure --no-cd >/dev/null 2>&1 )
+assert_contains "$(cat "$D/azure-pipelines.yml" 2>/dev/null)" "UsePythonVersion@0" "Azure CI sets up Python"
+if python3 -c "import yaml" 2>/dev/null; then
+  for F in .github/workflows/devpilot-ci.yml .github/workflows/devpilot-cd.yml azure-pipelines.yml; do
+    assert_code "$(python3 -c "import yaml,sys; yaml.safe_load(open(sys.argv[1]))" "$D/$F" 2>/dev/null; echo $?)" "0" "$F (python) is valid YAML"
+  done
+fi
+# run-tests.sh python finds and runs the pytest suite (skipped when pytest is missing).
+if python3 -c "import pytest" 2>/dev/null; then
+  OUT=$(cd "$D" && bash scripts/run-tests.sh python 2>&1)
+  assert_contains "$OUT" "PASS  python" "run-tests.sh python runs the suite"
+else
+  ok "run-tests.sh python (pytest not installed here — skipped)"
+fi
+rm -rf "$D"
+
 echo "== DevPilot release metadata =="
 V=$(cat "$REPO/VERSION")
 assert_contains "$(cat "$REPO/CHANGELOG.md")" "## [$V]" "CHANGELOG.md has a section for VERSION $V (release notes)"

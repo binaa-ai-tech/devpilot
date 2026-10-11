@@ -40,7 +40,7 @@ No tracker configured? The run asks once — connect one or continue locally —
 |------|-------|------|
 | Business Analyst | `team-ba` | Intake, dedup, requirements, Definition of Ready |
 | Team Lead | `team-lead` | Implementation plans, ADRs, review gate, merge decision |
-| Developers | `team-frontend` (Angular) / `team-dotnet` (.NET + SQL Server) | Layer implementation, tests next to code, OpenAPI contract kept in sync |
+| Developers | `team-frontend` (Angular) / `team-dotnet` (.NET + SQL Server) / `team-python` (Python) | Layer implementation, tests next to code, OpenAPI contract kept in sync |
 | QA Engineer | `team-qa` | Test-case design, coverage, mutation mindset, the verdict |
 
 ## Cross-cutting standards (always on)
