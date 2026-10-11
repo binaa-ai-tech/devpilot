@@ -17,6 +17,8 @@ refreshed with the latest official Angular and .NET guidance. [What changed →]
 
 </div>
 
+**Status:** Active · Owner: [@AbdelkaderMohamed](https://github.com/AbdelkaderMohamed) · Maintained by [Binaa AI](https://github.com/binaa-ai-tech), which uses it to deliver every one of its repositories. It is installed into a project; it is not a dependency you import.
+
 ---
 
 ## In 30 seconds
