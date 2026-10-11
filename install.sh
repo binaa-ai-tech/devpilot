@@ -884,6 +884,7 @@ pricing:
 ci:
   runs_on: ubuntu-latest
   e2e: auto              # auto: Playwright journeys run in CI when a playwright.config exists · off: skip them
+  cd: auto               # auto: generate the devpilot-cd delivery pipeline · off: CI only (no deploy target)
 
 ## Docs Language
 # Human language for BA/QA/review docs. Code & commits stay English.

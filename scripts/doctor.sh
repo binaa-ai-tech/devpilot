@@ -67,6 +67,8 @@ if [ -f .github/workflows/devpilot-cd.yml ] || [ -f azure-pipelines-cd.yml ]; th
   ok "CD pipeline present (build once → DEV → SIT → UAT → PRD)"
   [ -f deploy/deploy.sh ] && ok "deploy target: deploy/deploy.sh" \
     || ok "deploy target: DEPLOY_HOOK secrets in the pipeline (or add deploy/deploy.sh) — deploy.sh fails loudly if neither exists"
+elif grep -qE '^[[:space:]]+cd:[[:space:]]*off' project.config.md 2>/dev/null; then
+  ok "CD pipeline off (ci.cd: off) — deploys are manual; /dp-release has no pipeline to drive"
 else
   warn "no CD pipeline — releases can't deploy: /dp-setup pipelines"
 fi
