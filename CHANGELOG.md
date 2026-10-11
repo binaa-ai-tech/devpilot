@@ -4,6 +4,15 @@ All notable changes to DevPilot. Versions follow [SemVer](https://semver.org); e
 section becomes the GitHub Release notes when the `vx.y.z` tag is pushed
 (`.github/workflows/release.yml`).
 
+## [5.8.2] — 2026-10-11
+
+### Fixed
+- Generated CI runs `dotnet build` / `dotnet test` in the folder that holds the solution (`api/`,
+  `src/`, …) instead of the repo root, so monorepos with the solution in a subfolder no longer fail
+  with "specify a project or solution file".
+- Installer detects a .NET backend from `*.slnx` solutions too (and one level deeper, e.g. `api/src/*/*.csproj`);
+  binaa-platform had been installed as frontend-only because of this.
+
 ## [5.8.1] — 2026-10-11
 
 ### Fixed

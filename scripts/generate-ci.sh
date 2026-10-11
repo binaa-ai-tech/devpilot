@@ -71,6 +71,13 @@ if [ -n "$E2E_CFG" ] && [ "$E2E_MODE" != "off" ]; then
   [ -f "$E2E_DIR/package.json" ] && [ "$E2E_DIR" != "${NG_DIR:-.}" ] && E2E_OWN_PKG=1
 fi
 DOTNET=0; [ "$BE" = "dotnet" ] && DOTNET=1
+# Folder that holds the solution (repo root, or e.g. api/, src/): the build and test steps run there.
+SLN_DIR="."
+if [ "$DOTNET" = 1 ]; then
+  F=$(find . -maxdepth 3 \( -name '*.sln' -o -name '*.slnx' \) -not -path '*/node_modules/*' -not -path '*/bin/*' -not -path '*/obj/*' 2>/dev/null | head -1)
+  [ -n "$F" ] && SLN_DIR=$(dirname "$F" | sed 's#^\./##')
+  [ -z "$SLN_DIR" ] && SLN_DIR="."
+fi
 PYTHON=0; [ "$BE" = "python" ] && PYTHON=1
 
 # Python service: the directory holding requirements.txt / pyproject.toml (repo root first).
@@ -179,8 +186,10 @@ if [ "$DOTNET" = 1 ]; then cat <<YML
         with:
           dotnet-version: $DOTNET_SDK$NUGET_CACHE
       - name: build (.NET)
+        working-directory: $SLN_DIR
         run: dotnet build --configuration Release
       - name: tests (.NET · xUnit + Testcontainers SQL Server)
+        working-directory: $SLN_DIR
         run: dotnet test --configuration Release --no-build --logger "trx;LogFileName=results.trx"
 YML
 fi
@@ -292,8 +301,10 @@ if [ "$DOTNET" = 1 ]; then cat <<YML
           packageType: sdk
           version: $DOTNET_SDK
       - script: dotnet build --configuration Release
+        workingDirectory: $SLN_DIR
         displayName: build (.NET)
       - script: dotnet test --configuration Release --no-build --logger "trx;LogFileName=results.trx"
+        workingDirectory: $SLN_DIR
         displayName: tests (.NET · xUnit + Testcontainers SQL Server)
       - task: PublishTestResults@2
         condition: succeededOrFailed()
@@ -610,5 +621,5 @@ if [ "$CD" = 1 ]; then
 fi
 echo "   toolchain: $([ "$PYTHON" = 1 ] && echo "Python $PY_VER" || echo ".NET SDK $DOTNET_SDK") · Node $NODE_VER${EF_VER:+ · dotnet-ef $EF_VER}"
 echo "   runner: $RUNS_ON"
-echo "   host: $HOST · angular: ${NG_DIR:-none} · api: ${API_PROJ:-${PY_DIR:-$BE}} · migrations: $([ "$HAS_MIGRATIONS" = 1 ] && echo yes || echo no) · e2e: $([ "$HAS_E2E" = 1 ] && echo yes || { [ "$E2E_MODE" = off ] && echo off || echo no; }) · base: $BASE"
+echo "   host: $HOST · angular: ${NG_DIR:-none} · api: ${API_PROJ:-${PY_DIR:-$BE}}$([ "$DOTNET" = 1 ] && [ "$SLN_DIR" != "." ] && echo " (solution in $SLN_DIR)") · migrations: $([ "$HAS_MIGRATIONS" = 1 ] && echo yes || echo no) · e2e: $([ "$HAS_E2E" = 1 ] && echo yes || { [ "$E2E_MODE" = off ] && echo off || echo no; }) · base: $BASE"
 echo "   Next: bash scripts/protect-branches.sh (CI required) · bash scripts/setup-environments.sh (CD approvals)"
