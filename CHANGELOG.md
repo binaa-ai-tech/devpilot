@@ -4,6 +4,15 @@ All notable changes to DevPilot. Versions follow [SemVer](https://semver.org); e
 section becomes the GitHub Release notes when the `vx.y.z` tag is pushed
 (`.github/workflows/release.yml`).
 
+## [5.9.0] — 2026-10-12
+
+### Added
+- **Project CI hooks around the .NET test step.** Files under `.devpilot/ci/` survive regeneration
+  and `--update`: `before-dotnet-tests.<github|azure>.yml` and `after-dotnet-tests.<github|azure>.yml`
+  (step items emitted around `tests (.NET)`) and `dotnet-tests.env` (KEY=VALUE → `env:` on that step).
+  Use them for a throwaway Redis, a required-Docker flag or test filters, so a project no longer
+  needs a second hand-written workflow for its .NET suite.
+
 ## [5.8.2] — 2026-10-12
 
 ### Fixed
