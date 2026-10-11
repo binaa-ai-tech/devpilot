@@ -883,6 +883,7 @@ pricing:
 # (free minutes; register one with scripts/runner-setup.sh). Regenerate: bash scripts/generate-ci.sh --force
 ci:
   runs_on: ubuntu-latest
+  e2e: auto              # auto: Playwright journeys run in CI when a playwright.config exists · off: skip them
 
 ## Docs Language
 # Human language for BA/QA/review docs. Code & commits stay English.

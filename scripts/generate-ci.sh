@@ -47,8 +47,11 @@ NG_DIR=$(find . -name angular.json -not -path '*/node_modules/*' 2>/dev/null | h
 [ "$FE" = "none" ] && NG_DIR=""
 [ "$FE" != "none" ] && [ -z "$NG_DIR" ] && NG_DIR="."
 HAS_E2E=0; E2E_DIR=""; E2E_OWN_PKG=0
+# ci.e2e: auto (run Playwright when a playwright.config exists) | off (never in CI, e.g. journeys
+# that need a deployed environment and are run from /dp-test or the release smoke instead).
+E2E_MODE=$(dp_cfg ci e2e); E2E_MODE="${E2E_MODE:-auto}"
 E2E_CFG=$(find . -maxdepth 4 -name 'playwright.config.*' -not -path '*/node_modules/*' 2>/dev/null | head -1)
-if [ -n "$E2E_CFG" ]; then
+if [ -n "$E2E_CFG" ] && [ "$E2E_MODE" != "off" ]; then
   HAS_E2E=1; E2E_DIR=$(dirname "$E2E_CFG" | sed 's#^\./##')
   # An e2e folder with its own package.json (e.g. e2e/ next to admin/ and portal/) installs its own deps.
   [ -f "$E2E_DIR/package.json" ] && [ "$E2E_DIR" != "${NG_DIR:-.}" ] && E2E_OWN_PKG=1
@@ -608,5 +611,5 @@ if [ "$CD" = 1 ]; then
 fi
 echo "   toolchain: $([ "$PYTHON" = 1 ] && echo "Python $PY_VER" || echo ".NET SDK $DOTNET_SDK") · Node $NODE_VER${EF_VER:+ · dotnet-ef $EF_VER}"
 echo "   runner: $RUNS_ON"
-echo "   host: $HOST · angular: ${NG_DIR:-none} · api: ${API_PROJ:-${PY_DIR:-$BE}} · migrations: $([ "$HAS_MIGRATIONS" = 1 ] && echo yes || echo no) · e2e: $([ "$HAS_E2E" = 1 ] && echo yes || echo no) · base: $BASE"
+echo "   host: $HOST · angular: ${NG_DIR:-none} · api: ${API_PROJ:-${PY_DIR:-$BE}} · migrations: $([ "$HAS_MIGRATIONS" = 1 ] && echo yes || echo no) · e2e: $([ "$HAS_E2E" = 1 ] && echo yes || { [ "$E2E_MODE" = off ] && echo off || echo no; }) · base: $BASE"
 echo "   Next: bash scripts/protect-branches.sh (CI required) · bash scripts/setup-environments.sh (CD approvals)"

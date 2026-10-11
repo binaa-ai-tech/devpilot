@@ -12,6 +12,8 @@ section becomes the GitHub Release notes when the `vx.y.z` tag is pushed
   without hand-editing generated files. Azure pipelines keep the hosted `vmImage`.
 - `generate-ci.sh` runs `npm ci` in an `e2e/` folder that has its own `package.json` before installing
   Playwright browsers (monorepos with `admin/`, `portal/` and a separate `e2e/`).
+- **`ci.e2e: auto | off`** in `project.config.md`: `off` leaves the Playwright journeys out of the generated
+  CI (suites that need a deployed environment run from `/dp-test` or the release smoke instead).
 
 ### Fixed
 - `run-tests.sh angular` runs the package's `npm test` when `angular.json` has no `test` target

@@ -1011,6 +1011,18 @@ assert_contains "$(cat "$D/.github/workflows/devpilot-ci.yml" 2>/dev/null)" "npm
 assert_contains "$(grep -A1 'Playwright browsers' "$D/.github/workflows/devpilot-ci.yml" 2>/dev/null)" "working-directory: e2e" "Playwright installs browsers from the e2e folder"
 rm -rf "$D"
 
+echo "== ci.e2e: off skips Playwright in generated CI =="
+D=$(mktemp -d)
+( cd "$D" && git init -q -b main && git config user.email t@t.t && git config user.name t \
+  && git remote add origin https://github.com/acme/shop.git && git commit -q --allow-empty -m init \
+  && echo '{"dependencies":{"@angular/core":"^21.0.0"}}' > package.json && mkdir e2e && echo 'export default {}' > e2e/playwright.config.js \
+  && DEVPILOT_LOCAL="$REPO" bash "$REPO/install.sh" --defaults >/dev/null 2>&1 < /dev/null \
+  && bash scripts/generate-ci.sh --force --github --no-cd >/dev/null 2>&1 )
+assert_contains "$(cat "$D/.github/workflows/devpilot-ci.yml" 2>/dev/null)" "Playwright browsers" "ci.e2e auto: Playwright steps generated"
+( cd "$D" && sed -i.bak 's/^  e2e: auto.*/  e2e: off/' project.config.md && rm -f project.config.md.bak && bash scripts/generate-ci.sh --force --github --no-cd >/dev/null 2>&1 )
+assert_eq "$(grep -c 'Playwright' "$D/.github/workflows/devpilot-ci.yml" 2>/dev/null)" "0" "ci.e2e off: no Playwright steps generated"
+rm -rf "$D"
+
 echo "== DevPilot release metadata =="
 V=$(cat "$REPO/VERSION")
 assert_contains "$(cat "$REPO/CHANGELOG.md")" "## [$V]" "CHANGELOG.md has a section for VERSION $V (release notes)"
