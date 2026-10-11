@@ -987,6 +987,18 @@ assert_eq "$(grep -c 'runs-on: acme-mac' "$D/.github/workflows/devpilot-ci.yml" 
 assert_eq "$(grep -c 'runs-on: ubuntu-latest' "$D/.github/workflows/devpilot-cd.yml" 2>/dev/null)" "0" "CD workflow uses the configured runner label too"
 rm -rf "$D"
 
+echo "== run-tests.sh angular falls back to npm test without an ng test target =="
+D=$(mktemp -d)
+( cd "$D" && git init -q && mkdir -p scripts && cp "$REPO/scripts/run-tests.sh" scripts/ \
+  && printf '{"projects":{"web":{"architect":{"build":{},"serve":{}}}}}\n' > angular.json \
+  && printf '{"name":"web","scripts":{"test":"node -e 1"}}\n' > package.json )
+OUT=$(cd "$D" && bash scripts/run-tests.sh angular 2>&1)
+assert_contains "$OUT" "PASS  angular" "npm test runs when angular.json has no test target"
+printf '{"name":"web"}\n' > "$D/package.json"
+OUT=$(cd "$D" && bash scripts/run-tests.sh angular 2>&1)
+assert_contains "$OUT" "no test target" "warns when neither ng test nor npm test exists"
+rm -rf "$D"
+
 echo "== DevPilot release metadata =="
 V=$(cat "$REPO/VERSION")
 assert_contains "$(cat "$REPO/CHANGELOG.md")" "## [$V]" "CHANGELOG.md has a section for VERSION $V (release notes)"
