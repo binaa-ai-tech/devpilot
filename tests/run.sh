@@ -1020,6 +1020,20 @@ assert_eq "$(cat "$D"/.github/workflows/devpilot-c[id].yml | grep -c 'cache: npm
 assert_eq "$(cat "$D"/.github/workflows/devpilot-c[id].yml | grep -c 'cache: npm')" "2" "GitHub-hosted runner keeps the npm cache in CI and CD"
 assert_eq "$(cat "$D"/.github/workflows/devpilot-c[id].yml | grep -c 'cache-dependency-path: ./package-lock.json')" "2" "the npm cache is keyed on the lock file"
 rm -rf "$D"
+for BE in dotnet python; do
+  D=$(mktemp -d)
+  ( cd "$D" && git init -q -b main && git config user.email t@t.t && git config user.name t \
+    && git remote add origin https://github.com/acme/api.git && git commit -q --allow-empty -m init \
+    && if [ "$BE" = dotnet ]; then mkdir api && printf '<Project Sdk="Microsoft.NET.Sdk.Web"/>' > api/Api.csproj; else echo fastapi > requirements.txt; fi \
+    && DEVPILOT_LOCAL="$REPO" bash "$REPO/install.sh" --defaults >/dev/null 2>&1 < /dev/null \
+    && bash scripts/generate-ci.sh --force --github >/dev/null 2>&1 )
+  [ "$BE" = dotnet ] && PAT='actions/cache@v4' || PAT='cache: pip'
+  [ "$(cat "$D"/.github/workflows/devpilot-c[id].yml | grep -c "$PAT")" -gt 0 ] && ok "GitHub-hosted runner keeps the $BE dependency cache" || no "GitHub-hosted runner keeps the $BE dependency cache"
+  ( cd "$D" && sed -i.bak 's/^  runs_on: ubuntu-latest/  runs_on: acme-mac/' project.config.md && rm -f project.config.md.bak \
+    && bash scripts/generate-ci.sh --force --github >/dev/null 2>&1 )
+  assert_eq "$(cat "$D"/.github/workflows/devpilot-c[id].yml | grep -cE 'cache: |actions/cache')" "0" "self-hosted runner: no remote $BE dependency cache in CI or CD"
+  rm -rf "$D"
+done
 
 echo "== run-tests.sh angular falls back to npm test without an ng test target =="
 D=$(mktemp -d)
