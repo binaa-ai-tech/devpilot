@@ -1014,6 +1014,11 @@ D=$(mktemp -d)
   && bash scripts/generate-ci.sh --force --github >/dev/null 2>&1 )
 assert_eq "$(grep -c 'runs-on: acme-mac' "$D/.github/workflows/devpilot-ci.yml" 2>/dev/null)" "1" "CI workflow uses the configured runner label"
 assert_eq "$(grep -c 'runs-on: ubuntu-latest' "$D/.github/workflows/devpilot-cd.yml" 2>/dev/null)" "0" "CD workflow uses the configured runner label too"
+assert_eq "$(cat "$D"/.github/workflows/devpilot-c[id].yml | grep -c 'cache: npm')" "0" "self-hosted runner: no remote npm cache in CI or CD"
+( cd "$D" && sed -i.bak 's/^  runs_on: acme-mac/  runs_on: ubuntu-latest/' project.config.md && rm -f project.config.md.bak \
+  && bash scripts/generate-ci.sh --force --github >/dev/null 2>&1 )
+assert_eq "$(cat "$D"/.github/workflows/devpilot-c[id].yml | grep -c 'cache: npm')" "2" "GitHub-hosted runner keeps the npm cache in CI and CD"
+assert_eq "$(cat "$D"/.github/workflows/devpilot-c[id].yml | grep -c 'cache-dependency-path: ./package-lock.json')" "2" "the npm cache is keyed on the lock file"
 rm -rf "$D"
 
 echo "== run-tests.sh angular falls back to npm test without an ng test target =="

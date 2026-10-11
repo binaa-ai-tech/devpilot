@@ -46,6 +46,13 @@ NG_DIR=$(find . -name angular.json -not -path '*/node_modules/*' 2>/dev/null | h
 [ -z "$NG_DIR" ] && [ -f package.json ] && NG_DIR="."
 [ "$FE" = "none" ] && NG_DIR=""
 [ "$FE" != "none" ] && [ -z "$NG_DIR" ] && NG_DIR="."
+# setup-node's npm cache goes through GitHub's cache service. A hosted runner starts empty, so the
+# restore pays for itself; a self-hosted runner keeps ~/.npm between jobs, so the restore/save only
+# adds minutes. Emit it for GitHub-hosted labels only.
+NODE_CACHE=""
+case "$RUNS_ON" in ubuntu-*|windows-*|macos-*)
+  NODE_CACHE=$'\n          cache: npm\n          cache-dependency-path: '"$NG_DIR/package-lock.json" ;;
+esac
 HAS_E2E=0; E2E_DIR=""; E2E_OWN_PKG=0
 # ci.e2e: auto (run Playwright when a playwright.config exists) | off (never in CI, e.g. journeys
 # that need a deployed environment and are run from /dp-test or the release smoke instead).
@@ -145,9 +152,7 @@ if [ -n "$NG_DIR" ]; then cat <<YML
 
       - uses: actions/setup-node@v4
         with:
-          node-version: $NODE_VER
-          cache: npm
-          cache-dependency-path: $NG_DIR/package-lock.json
+          node-version: $NODE_VER$NODE_CACHE
       - name: npm ci (Angular)
         working-directory: $NG_DIR
         run: npm ci
@@ -423,9 +428,7 @@ YML
 [ -n "$NG_DIR" ] && cat <<YML
       - uses: actions/setup-node@v4
         with:
-          node-version: $NODE_VER
-          cache: npm
-          cache-dependency-path: $NG_DIR/package-lock.json
+          node-version: $NODE_VER$NODE_CACHE
 YML
 [ "$DOTNET" = 1 ] && cat <<YML
       - uses: actions/setup-dotnet@v4
