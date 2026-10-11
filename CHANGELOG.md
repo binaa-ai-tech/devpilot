@@ -11,7 +11,7 @@ section becomes the GitHub Release notes when the `vx.y.z` tag is pushed
   or glob per line followed by a mandatory `# reason`; an entry without a reason is warned about and
   exempts nothing. The exemption and its reason are reviewed in the diff instead of living in a PR
   description. `TEST_GUARD_EXEMPT=<file>` selects another list. `install.sh --update` leaves the file
-  alone. First built in `binaa-platform`, which had to keep a patched `test-guard.sh` across updates.
+  alone. First built in a project that had to keep a patched `test-guard.sh` across updates.
 
 ### Upgrade
 `bash install.sh --update`. Nothing else is required: without a `scripts/test-guard.exempt` file the
