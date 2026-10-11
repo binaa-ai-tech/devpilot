@@ -28,10 +28,21 @@ and reference, not quality — pairing it with the mutation mindset
 
 ## Exemptions — explicit, never silent
 The guard auto-exempts migrations, generated code, type-only files, config,
-docs, styles, and entry points. Anything else that genuinely needs no test:
-- gets a one-line justification in the **PR description** ("X is exempt
-  because …"), and
-- is the exception, not the routine. Three exemptions in one PR is a smell.
+docs, styles, and entry points. Anything else that genuinely needs no test
+goes in the durable list **`scripts/test-guard.exempt`**, one entry per line:
+
+```
+src/models/order.models.ts     # DTO interfaces only, no behaviour
+src/models/*.enums.ts          # enums only
+```
+
+- A repo-relative path or a glob, then a mandatory `# reason`. An entry
+  without a reason is warned about and exempts nothing.
+- The list is reviewed like code: the exemption and its reason are in the
+  diff. A justification written only in the PR description does not count.
+- Prefer an exact path; a glob can hide logic added later.
+- It is the exception, not the routine. Three new entries in one PR is a smell.
+- `TEST_GUARD_EXEMPT=<file>` points the guard at another list.
 
 ## Hard rules
 - Never "fix" a gap by renaming a file to look like a test, adding an empty
