@@ -34,6 +34,9 @@ if [ "$HOST" = "azure" ]; then OUT="azure-pipelines.yml"; OUT_CD="azure-pipeline
 else OUT=".github/workflows/devpilot-ci.yml"; OUT_CD=".github/workflows/devpilot-cd.yml"; fi
 
 BASE=$(dp_cfg base_branch); BASE="${BASE:-develop}"
+# Runner for the GitHub workflows: project.config.md → ci.runs_on (one label, e.g. ubuntu-latest or a
+# self-hosted runner label such as binaa-mac). Azure keeps the hosted vmImage.
+RUNS_ON=$(dp_cfg ci runs_on); RUNS_ON="${RUNS_ON:-ubuntu-latest}"
 FE=$(dp_cfg stack frontend); FE="${FE:-none}"
 BE=$(dp_cfg stack backend);  BE="${BE:-none}"
 
@@ -123,7 +126,7 @@ concurrency:
 jobs:
   devpilot-ci:
     name: devpilot-ci
-    runs-on: ubuntu-latest
+    runs-on: $RUNS_ON
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -385,7 +388,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: $RUNS_ON
     outputs:
       version: \${{ steps.version.outputs.version }}
     steps:
@@ -451,7 +454,7 @@ cat <<YML
   $e:
     needs: $2
     if: \${{ $3 }}
-    runs-on: ubuntu-latest
+    runs-on: $RUNS_ON
     environment:
       name: $e
       url: \${{ vars.FRONTEND_URL }}
@@ -585,5 +588,6 @@ if [ "$CD" = 1 ]; then
   if [ "$HOST" = "azure" ]; then write "$OUT_CD" azure_cd_yml; else write "$OUT_CD" github_cd_yml; fi
 fi
 echo "   toolchain: $([ "$PYTHON" = 1 ] && echo "Python $PY_VER" || echo ".NET SDK $DOTNET_SDK") · Node $NODE_VER${EF_VER:+ · dotnet-ef $EF_VER}"
+echo "   runner: $RUNS_ON"
 echo "   host: $HOST · angular: ${NG_DIR:-none} · api: ${API_PROJ:-${PY_DIR:-$BE}} · migrations: $([ "$HAS_MIGRATIONS" = 1 ] && echo yes || echo no) · e2e: $([ "$HAS_E2E" = 1 ] && echo yes || echo no) · base: $BASE"
 echo "   Next: bash scripts/protect-branches.sh (CI required) · bash scripts/setup-environments.sh (CD approvals)"

@@ -972,6 +972,21 @@ else
 fi
 rm -rf "$D"
 
+echo "== CI runner label (ci.runs_on) =="
+assert_contains "$(cat "$REPO/scripts/generate-ci.sh")" 'RUNS_ON=$(dp_cfg ci runs_on)' "generate-ci reads ci.runs_on"
+assert_eq "$(grep -c 'runs-on: ubuntu-latest' "$REPO/scripts/generate-ci.sh")" "0" "no hard-coded GitHub runner left in the generator"
+assert_contains "$(cat "$REPO/install.sh")" "  runs_on: ubuntu-latest" "installer writes the ci.runs_on default"
+D=$(mktemp -d)
+( cd "$D" && git init -q -b main && git config user.email t@t.t && git config user.name t \
+  && git remote add origin https://github.com/acme/web.git && git commit -q --allow-empty -m init \
+  && echo '{"dependencies":{"@angular/core":"^21.0.0"}}' > package.json \
+  && DEVPILOT_LOCAL="$REPO" bash "$REPO/install.sh" --defaults >/dev/null 2>&1 < /dev/null \
+  && sed -i.bak 's/^  runs_on: ubuntu-latest/  runs_on: acme-mac/' project.config.md && rm -f project.config.md.bak \
+  && bash scripts/generate-ci.sh --force --github >/dev/null 2>&1 )
+assert_eq "$(grep -c 'runs-on: acme-mac' "$D/.github/workflows/devpilot-ci.yml" 2>/dev/null)" "1" "CI workflow uses the configured runner label"
+assert_eq "$(grep -c 'runs-on: ubuntu-latest' "$D/.github/workflows/devpilot-cd.yml" 2>/dev/null)" "0" "CD workflow uses the configured runner label too"
+rm -rf "$D"
+
 echo "== DevPilot release metadata =="
 V=$(cat "$REPO/VERSION")
 assert_contains "$(cat "$REPO/CHANGELOG.md")" "## [$V]" "CHANGELOG.md has a section for VERSION $V (release notes)"

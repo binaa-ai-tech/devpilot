@@ -878,6 +878,12 @@ pricing:
   claude-sonnet-5: ""
   claude-haiku-4-5-20251001: ""
 
+## CI runner — label for the generated GitHub workflows' runs-on
+# ubuntu-latest (GitHub-hosted, counts against the plan's minutes) or a self-hosted runner label
+# (free minutes; register one with scripts/runner-setup.sh). Regenerate: bash scripts/generate-ci.sh --force
+ci:
+  runs_on: ubuntu-latest
+
 ## Docs Language
 # Human language for BA/QA/review docs. Code & commits stay English.
 
