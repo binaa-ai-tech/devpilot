@@ -4,7 +4,7 @@ All notable changes to DevPilot. Versions follow [SemVer](https://semver.org); e
 section becomes the GitHub Release notes when the `vx.y.z` tag is pushed
 (`.github/workflows/release.yml`).
 
-## [Unreleased]
+## [5.8.0] — 2026-10-11
 
 ### Added
 - **`scripts/test-guard.exempt`**: a durable exemption list for the test guard. One repo-relative path
@@ -12,6 +12,11 @@ section becomes the GitHub Release notes when the `vx.y.z` tag is pushed
   exempts nothing. The exemption and its reason are reviewed in the diff instead of living in a PR
   description. `TEST_GUARD_EXEMPT=<file>` selects another list. `install.sh --update` leaves the file
   alone. First built in `binaa-platform`, which had to keep a patched `test-guard.sh` across updates.
+
+### Upgrade
+`bash install.sh --update`. Nothing else is required: without a `scripts/test-guard.exempt` file the
+guard behaves as before. A project that patched its own `scripts/test-guard.sh` for this can take the
+stock script.
 
 ## [5.7.0] — 2026-10-11
 
