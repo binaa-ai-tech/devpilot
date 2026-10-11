@@ -1088,6 +1088,20 @@ assert_contains "$(cat "$D/.github/workflows/devpilot-ci.yml" 2>/dev/null)" "Pla
 assert_eq "$(grep -c 'Playwright' "$D/.github/workflows/devpilot-ci.yml" 2>/dev/null)" "0" "ci.e2e off: no Playwright steps generated"
 rm -rf "$D"
 
+echo "== .NET steps run in the solution's folder =="
+D=$(mktemp -d)
+( cd "$D" && git init -q -b main && git config user.email t@t.t && git config user.name t \
+  && git remote add origin https://github.com/acme/shop.git && git commit -q --allow-empty -m init \
+  && mkdir -p api/src/Shop.Api && printf '<Project Sdk="Microsoft.NET.Sdk.Web"><PropertyGroup><TargetFramework>net10.0</TargetFramework></PropertyGroup></Project>\n' > api/src/Shop.Api/Shop.Api.csproj \
+  && printf '<Solution><Project Path="src/Shop.Api/Shop.Api.csproj" /></Solution>\n' > api/Shop.slnx \
+  && DEVPILOT_LOCAL="$REPO" bash "$REPO/install.sh" --defaults >/dev/null 2>&1 < /dev/null \
+  && bash scripts/generate-ci.sh --force --github --no-cd >/dev/null 2>&1 )
+assert_contains "$(grep -A1 'build (.NET)' "$D/.github/workflows/devpilot-ci.yml" 2>/dev/null)" "working-directory: api" "dotnet build runs in the solution folder"
+assert_contains "$(grep -A1 'tests (.NET' "$D/.github/workflows/devpilot-ci.yml" 2>/dev/null)" "working-directory: api" "dotnet test runs in the solution folder"
+( cd "$D" && bash scripts/generate-ci.sh --force --azure --no-cd >/dev/null 2>&1 )
+assert_contains "$(grep -A1 'dotnet build' "$D/azure-pipelines.yml" 2>/dev/null)" "workingDirectory: api" "Azure: dotnet build runs in the solution folder"
+rm -rf "$D"
+
 echo "== DevPilot release metadata =="
 V=$(cat "$REPO/VERSION")
 assert_contains "$(cat "$REPO/CHANGELOG.md")" "## [$V]" "CHANGELOG.md has a section for VERSION $V (release notes)"

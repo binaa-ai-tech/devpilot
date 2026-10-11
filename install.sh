@@ -329,7 +329,7 @@ elif [ -f "package.json" ]; then
   warn "package.json found but no Angular — DevPilot's frontend skills target Angular; frontend agent left off"
 fi
 
-if find . -maxdepth 3 \( -name "*.sln" -o -name "*.csproj" \) 2>/dev/null | grep -q .; then
+if find . -maxdepth 4 -not -path '*/node_modules/*' \( -name "*.sln" -o -name "*.slnx" -o -name "*.csproj" \) 2>/dev/null | grep -q .; then
   DETECT_BACKEND="dotnet"; echo "  ✅ .NET"
 elif [ -f "requirements.txt" ] || [ -f "pyproject.toml" ] || \
      find . -maxdepth 3 -not -path '*/node_modules/*' -not -path '*/.venv/*' \
