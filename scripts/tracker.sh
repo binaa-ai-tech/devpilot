@@ -121,6 +121,13 @@ local_set_status() {
   local_append "$1" "Status → $2"
 }
 local_sprint_file() { printf '%s/%s.md' "$SPRINTS" "$(printf '%s' "$1" | tr '[:upper:] ' '[:lower:]-' | tr -cd 'a-z0-9._-')"; }
+# Key prefix for local items: project.config.md → ticket_prefix (upper-cased), the same prefix the
+# project would use on Jira / Azure DevOps, so keys survive a later tracker switch. LOCAL only when
+# the prefix is unset or still the installer placeholder KEY.
+local_prefix() {
+  local p; p=$(dp_cfg ticket_prefix | tr '[:lower:]' '[:upper:]' | tr -cd 'A-Z0-9_')
+  case "$p" in ""|KEY) echo "LOCAL" ;; *) echo "$p" ;; esac
+}
 
 local_cmd() {
   local c="$1"; shift
@@ -129,10 +136,11 @@ local_cmd() {
     new)
       local type="$1" summary="$2" body="${3:-}" parent="${4:-}" labels="${5:-}" key
       mkdir -p "$TASKS"
-      # Sequential keys (LOCAL-1, LOCAL-2 …) — short and branch-friendly.
-      key=$(find "$TASKS" -maxdepth 1 -name 'LOCAL-*.md' 2>/dev/null | sed -nE 's#.*/LOCAL-([0-9]+)\.md$#\1#p' \
+      # Sequential keys (<PREFIX>-1, <PREFIX>-2 …) — short and branch-friendly.
+      local prefix; prefix=$(local_prefix)
+      key=$(find "$TASKS" -maxdepth 1 -name "$prefix-*.md" 2>/dev/null | sed -nE "s#.*/$prefix-([0-9]+)\\.md\$#\\1#p" \
         | sort -n | tail -1)
-      key="LOCAL-$(( ${key:-0} + 1 ))"
+      key="$prefix-$(( ${key:-0} + 1 ))"
       {
         echo "# $key — $summary"
         echo "- Type: $type"

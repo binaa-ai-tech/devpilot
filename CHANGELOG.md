@@ -4,6 +4,13 @@ All notable changes to DevPilot. Versions follow [SemVer](https://semver.org); e
 section becomes the GitHub Release notes when the `vx.y.z` tag is pushed
 (`.github/workflows/release.yml`).
 
+## [5.8.1] — 2026-10-11
+
+### Fixed
+- **Local tracker keys use the project's `ticket_prefix`** (`MSK-12`) instead of always `LOCAL-12`,
+  so items created locally keep the same key shape as on Jira / Azure DevOps and the sequence
+  continues from existing files of that prefix. `LOCAL` remains the fallback when no prefix is set.
+
 ## [5.8.0] — 2026-10-11
 
 ### Added
