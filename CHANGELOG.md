@@ -4,6 +4,23 @@ All notable changes to DevPilot. Versions follow [SemVer](https://semver.org); e
 section becomes the GitHub Release notes when the `vx.y.z` tag is pushed
 (`.github/workflows/release.yml`).
 
+## [5.7.0] — 2026-10-11
+
+### Added
+- **`ci.runs_on`** in `project.config.md`: the generated GitHub workflows take their `runs-on` from it
+  (default `ubuntu-latest`), so a project can run CI on a self-hosted runner label (e.g. `binaa-mac`)
+  without hand-editing generated files. Azure pipelines keep the hosted `vmImage`.
+- `generate-ci.sh` runs `npm ci` in an `e2e/` folder that has its own `package.json` before installing
+  Playwright browsers (monorepos with `admin/`, `portal/` and a separate `e2e/`).
+
+### Fixed
+- `run-tests.sh angular` runs the package's `npm test` when `angular.json` has no `test` target
+  (sites tested with `node:test`) instead of failing on `ng test`.
+
+### Upgrade
+`bash install.sh --update`, then add to `project.config.md` if you use a self-hosted runner:
+`ci:` / `  runs_on: <label>` and regenerate with `bash scripts/generate-ci.sh --force`.
+
 ## [5.6.0] — 2026-10-11
 
 ### Added
