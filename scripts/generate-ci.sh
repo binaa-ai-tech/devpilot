@@ -34,6 +34,9 @@ if [ "$HOST" = "azure" ]; then OUT="azure-pipelines.yml"; OUT_CD="azure-pipeline
 else OUT=".github/workflows/devpilot-ci.yml"; OUT_CD=".github/workflows/devpilot-cd.yml"; fi
 
 BASE=$(dp_cfg base_branch); BASE="${BASE:-develop}"
+# Runner for the GitHub workflows: project.config.md → ci.runs_on (one label, e.g. ubuntu-latest or a
+# self-hosted runner label such as binaa-mac). Azure keeps the hosted vmImage.
+RUNS_ON=$(dp_cfg ci runs_on); RUNS_ON="${RUNS_ON:-ubuntu-latest}"
 FE=$(dp_cfg stack frontend); FE="${FE:-none}"
 BE=$(dp_cfg stack backend);  BE="${BE:-none}"
 
@@ -43,8 +46,16 @@ NG_DIR=$(find . -name angular.json -not -path '*/node_modules/*' 2>/dev/null | h
 [ -z "$NG_DIR" ] && [ -f package.json ] && NG_DIR="."
 [ "$FE" = "none" ] && NG_DIR=""
 [ "$FE" != "none" ] && [ -z "$NG_DIR" ] && NG_DIR="."
-HAS_E2E=0
-find . -maxdepth 4 -name 'playwright.config.*' -not -path '*/node_modules/*' 2>/dev/null | grep -q . && HAS_E2E=1
+HAS_E2E=0; E2E_DIR=""; E2E_OWN_PKG=0
+# ci.e2e: auto (run Playwright when a playwright.config exists) | off (never in CI, e.g. journeys
+# that need a deployed environment and are run from /dp-test or the release smoke instead).
+E2E_MODE=$(dp_cfg ci e2e); E2E_MODE="${E2E_MODE:-auto}"
+E2E_CFG=$(find . -maxdepth 4 -name 'playwright.config.*' -not -path '*/node_modules/*' 2>/dev/null | head -1)
+if [ -n "$E2E_CFG" ] && [ "$E2E_MODE" != "off" ]; then
+  HAS_E2E=1; E2E_DIR=$(dirname "$E2E_CFG" | sed 's#^\./##')
+  # An e2e folder with its own package.json (e.g. e2e/ next to admin/ and portal/) installs its own deps.
+  [ -f "$E2E_DIR/package.json" ] && [ "$E2E_DIR" != "${NG_DIR:-.}" ] && E2E_OWN_PKG=1
+fi
 DOTNET=0; [ "$BE" = "dotnet" ] && DOTNET=1
 PYTHON=0; [ "$BE" = "python" ] && PYTHON=1
 
@@ -123,7 +134,7 @@ concurrency:
 jobs:
   devpilot-ci:
     name: devpilot-ci
-    runs-on: ubuntu-latest
+    runs-on: $RUNS_ON
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
@@ -190,10 +201,17 @@ cat <<YML
         run: TEST_MAX_LINES=400 bash scripts/run-tests.sh python
 YML
 fi
-if [ "$HAS_E2E" = 1 ]; then cat <<YML
+if [ "$HAS_E2E" = 1 ]; then
+[ "$E2E_OWN_PKG" = 1 ] && cat <<YML
+
+      - name: npm ci (e2e)
+        working-directory: $E2E_DIR
+        run: npm ci
+YML
+cat <<YML
 
       - name: Playwright browsers
-        working-directory: ${NG_DIR:-.}
+        working-directory: $([ "$E2E_OWN_PKG" = 1 ] && echo "$E2E_DIR" || echo "${NG_DIR:-.}")
         run: npx playwright install --with-deps chromium
       - name: UI journeys (Playwright + axe)
         run: TEST_MAX_LINES=400 bash scripts/run-tests.sh e2e
@@ -301,10 +319,17 @@ cat <<YML
         displayName: tests (Python · pytest)
 YML
 fi
-if [ "$HAS_E2E" = 1 ]; then cat <<YML
+if [ "$HAS_E2E" = 1 ]; then
+[ "$E2E_OWN_PKG" = 1 ] && cat <<YML
+
+      - script: npm ci
+        workingDirectory: $E2E_DIR
+        displayName: npm ci (e2e)
+YML
+cat <<YML
 
       - script: npx playwright install --with-deps chromium
-        workingDirectory: ${NG_DIR:-.}
+        workingDirectory: $([ "$E2E_OWN_PKG" = 1 ] && echo "$E2E_DIR" || echo "${NG_DIR:-.}")
         displayName: Playwright browsers
       - script: TEST_MAX_LINES=400 bash scripts/run-tests.sh e2e
         displayName: UI journeys (Playwright + axe)
@@ -385,7 +410,7 @@ concurrency:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: $RUNS_ON
     outputs:
       version: \${{ steps.version.outputs.version }}
     steps:
@@ -451,7 +476,7 @@ cat <<YML
   $e:
     needs: $2
     if: \${{ $3 }}
-    runs-on: ubuntu-latest
+    runs-on: $RUNS_ON
     environment:
       name: $e
       url: \${{ vars.FRONTEND_URL }}
@@ -585,5 +610,6 @@ if [ "$CD" = 1 ]; then
   if [ "$HOST" = "azure" ]; then write "$OUT_CD" azure_cd_yml; else write "$OUT_CD" github_cd_yml; fi
 fi
 echo "   toolchain: $([ "$PYTHON" = 1 ] && echo "Python $PY_VER" || echo ".NET SDK $DOTNET_SDK") · Node $NODE_VER${EF_VER:+ · dotnet-ef $EF_VER}"
-echo "   host: $HOST · angular: ${NG_DIR:-none} · api: ${API_PROJ:-${PY_DIR:-$BE}} · migrations: $([ "$HAS_MIGRATIONS" = 1 ] && echo yes || echo no) · e2e: $([ "$HAS_E2E" = 1 ] && echo yes || echo no) · base: $BASE"
+echo "   runner: $RUNS_ON"
+echo "   host: $HOST · angular: ${NG_DIR:-none} · api: ${API_PROJ:-${PY_DIR:-$BE}} · migrations: $([ "$HAS_MIGRATIONS" = 1 ] && echo yes || echo no) · e2e: $([ "$HAS_E2E" = 1 ] && echo yes || { [ "$E2E_MODE" = off ] && echo off || echo no; }) · base: $BASE"
 echo "   Next: bash scripts/protect-branches.sh (CI required) · bash scripts/setup-environments.sh (CD approvals)"

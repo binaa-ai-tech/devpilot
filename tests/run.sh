@@ -972,6 +972,57 @@ else
 fi
 rm -rf "$D"
 
+echo "== CI runner label (ci.runs_on) =="
+assert_contains "$(cat "$REPO/scripts/generate-ci.sh")" 'RUNS_ON=$(dp_cfg ci runs_on)' "generate-ci reads ci.runs_on"
+assert_eq "$(grep -c 'runs-on: ubuntu-latest' "$REPO/scripts/generate-ci.sh")" "0" "no hard-coded GitHub runner left in the generator"
+assert_contains "$(cat "$REPO/install.sh")" "  runs_on: ubuntu-latest" "installer writes the ci.runs_on default"
+D=$(mktemp -d)
+( cd "$D" && git init -q -b main && git config user.email t@t.t && git config user.name t \
+  && git remote add origin https://github.com/acme/web.git && git commit -q --allow-empty -m init \
+  && echo '{"dependencies":{"@angular/core":"^21.0.0"}}' > package.json \
+  && DEVPILOT_LOCAL="$REPO" bash "$REPO/install.sh" --defaults >/dev/null 2>&1 < /dev/null \
+  && sed -i.bak 's/^  runs_on: ubuntu-latest/  runs_on: acme-mac/' project.config.md && rm -f project.config.md.bak \
+  && bash scripts/generate-ci.sh --force --github >/dev/null 2>&1 )
+assert_eq "$(grep -c 'runs-on: acme-mac' "$D/.github/workflows/devpilot-ci.yml" 2>/dev/null)" "1" "CI workflow uses the configured runner label"
+assert_eq "$(grep -c 'runs-on: ubuntu-latest' "$D/.github/workflows/devpilot-cd.yml" 2>/dev/null)" "0" "CD workflow uses the configured runner label too"
+rm -rf "$D"
+
+echo "== run-tests.sh angular falls back to npm test without an ng test target =="
+D=$(mktemp -d)
+( cd "$D" && git init -q && mkdir -p scripts && cp "$REPO/scripts/run-tests.sh" scripts/ \
+  && printf '{"projects":{"web":{"architect":{"build":{},"serve":{}}}}}\n' > angular.json \
+  && printf '{"name":"web","scripts":{"test":"node -e 1"}}\n' > package.json )
+OUT=$(cd "$D" && bash scripts/run-tests.sh angular 2>&1)
+assert_contains "$OUT" "PASS  angular" "npm test runs when angular.json has no test target"
+printf '{"name":"web"}\n' > "$D/package.json"
+OUT=$(cd "$D" && bash scripts/run-tests.sh angular 2>&1)
+assert_contains "$OUT" "no test target" "warns when neither ng test nor npm test exists"
+rm -rf "$D"
+
+echo "== generate-ci installs an e2e folder's own package.json =="
+D=$(mktemp -d)
+( cd "$D" && git init -q -b main && git config user.email t@t.t && git config user.name t \
+  && git remote add origin https://github.com/acme/shop.git && git commit -q --allow-empty -m init \
+  && mkdir -p admin e2e && echo '{"dependencies":{"@angular/core":"^21.0.0"}}' > admin/package.json && echo '{}' > admin/angular.json \
+  && echo '{"devDependencies":{"@playwright/test":"^1.50.0"}}' > e2e/package.json && echo 'export default {}' > e2e/playwright.config.js \
+  && DEVPILOT_LOCAL="$REPO" bash "$REPO/install.sh" --defaults >/dev/null 2>&1 < /dev/null \
+  && bash scripts/generate-ci.sh --force --github --no-cd >/dev/null 2>&1 )
+assert_contains "$(cat "$D/.github/workflows/devpilot-ci.yml" 2>/dev/null)" "npm ci (e2e)" "CI runs npm ci in the e2e folder"
+assert_contains "$(grep -A1 'Playwright browsers' "$D/.github/workflows/devpilot-ci.yml" 2>/dev/null)" "working-directory: e2e" "Playwright installs browsers from the e2e folder"
+rm -rf "$D"
+
+echo "== ci.e2e: off skips Playwright in generated CI =="
+D=$(mktemp -d)
+( cd "$D" && git init -q -b main && git config user.email t@t.t && git config user.name t \
+  && git remote add origin https://github.com/acme/shop.git && git commit -q --allow-empty -m init \
+  && echo '{"dependencies":{"@angular/core":"^21.0.0"}}' > package.json && mkdir e2e && echo 'export default {}' > e2e/playwright.config.js \
+  && DEVPILOT_LOCAL="$REPO" bash "$REPO/install.sh" --defaults >/dev/null 2>&1 < /dev/null \
+  && bash scripts/generate-ci.sh --force --github --no-cd >/dev/null 2>&1 )
+assert_contains "$(cat "$D/.github/workflows/devpilot-ci.yml" 2>/dev/null)" "Playwright browsers" "ci.e2e auto: Playwright steps generated"
+( cd "$D" && sed -i.bak 's/^  e2e: auto.*/  e2e: off/' project.config.md && rm -f project.config.md.bak && bash scripts/generate-ci.sh --force --github --no-cd >/dev/null 2>&1 )
+assert_eq "$(grep -c 'Playwright' "$D/.github/workflows/devpilot-ci.yml" 2>/dev/null)" "0" "ci.e2e off: no Playwright steps generated"
+rm -rf "$D"
+
 echo "== DevPilot release metadata =="
 V=$(cat "$REPO/VERSION")
 assert_contains "$(cat "$REPO/CHANGELOG.md")" "## [$V]" "CHANGELOG.md has a section for VERSION $V (release notes)"

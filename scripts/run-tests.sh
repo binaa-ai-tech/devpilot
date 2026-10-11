@@ -87,6 +87,16 @@ run_suite() {
 run_angular() {
   local dir; dir=$(find_dir 3 angular.json)
   [ -z "$dir" ] && { [ "$MODE" = "angular" ] && echo "⚠️  no angular.json found"; return; }
+  # A workspace without a `test` architect target (e.g. a prerendered site tested with node:test)
+  # runs its package.json `test` script instead of `ng test`.
+  if ! grep -qE '"test"[[:space:]]*:[[:space:]]*\{' "$dir/angular.json" 2>/dev/null; then
+    if [ -f "$dir/package.json" ] && grep -qE '"test"[[:space:]]*:[[:space:]]*"' "$dir/package.json"; then
+      run_suite angular "$dir" npm test --silent -- ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
+    else
+      [ "$MODE" = "angular" ] && echo "⚠️  angular.json has no test target and package.json has no test script"
+    fi
+    return
+  fi
   run_suite angular "$dir" npx ng test --watch=false ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
 }
 
