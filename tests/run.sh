@@ -1102,6 +1102,27 @@ assert_contains "$(grep -A1 'tests (.NET' "$D/.github/workflows/devpilot-ci.yml"
 assert_contains "$(grep -A1 'dotnet build' "$D/azure-pipelines.yml" 2>/dev/null)" "workingDirectory: api" "Azure: dotnet build runs in the solution folder"
 rm -rf "$D"
 
+echo "== project CI hooks around the .NET test step =="
+D=$(mktemp -d)
+( cd "$D" && git init -q -b main && git config user.email t@t.t && git config user.name t \
+  && git remote add origin https://github.com/acme/shop.git && git commit -q --allow-empty -m init \
+  && mkdir -p src/Shop.Api .devpilot/ci && printf '<Project Sdk="Microsoft.NET.Sdk.Web"></Project>\n' > src/Shop.Api/Shop.Api.csproj && printf '' > Shop.sln \
+  && printf '      - name: Start Redis\n        run: docker run -d --rm --name ci-redis -p 127.0.0.1:16379:6379 redis:7-alpine\n' > .devpilot/ci/before-dotnet-tests.github.yml \
+  && printf '      - name: Stop Redis\n        if: always()\n        run: docker rm -f ci-redis || true\n' > .devpilot/ci/after-dotnet-tests.github.yml \
+  && printf '# throwaway redis\nSHOP_TEST_REDIS=localhost:16379,defaultDatabase=15\nSHOP_REQUIRE_DB_TESTS=true\n' > .devpilot/ci/dotnet-tests.env \
+  && DEVPILOT_LOCAL="$REPO" bash "$REPO/install.sh" --defaults >/dev/null 2>&1 < /dev/null \
+  && bash scripts/generate-ci.sh --force --github --no-cd >/dev/null 2>&1 )
+Y="$D/.github/workflows/devpilot-ci.yml"
+assert_eq "$(awk '/Start Redis/{a=NR} /tests \(\.NET/{b=NR} /Stop Redis/{c=NR} END{print (a<b && b<c) ? "ordered" : "wrong"}' "$Y" 2>/dev/null)" "ordered" "before/after hooks wrap the .NET test step"
+assert_contains "$(grep -A4 'tests (.NET' "$Y" 2>/dev/null)" 'SHOP_TEST_REDIS: "localhost:16379,defaultDatabase=15"' "dotnet-tests.env becomes env: on the test step"
+assert_contains "$(grep -A4 'tests (.NET' "$Y" 2>/dev/null)" 'SHOP_REQUIRE_DB_TESTS: "true"' "every env line is carried"
+if python3 -c "import yaml" 2>/dev/null; then
+  assert_code "$(python3 -c "import yaml,sys; yaml.safe_load(open(sys.argv[1]))" "$Y" 2>/dev/null; echo $?)" "0" "workflow with hooks is valid YAML"
+fi
+( cd "$D" && rm -rf .devpilot/ci && bash scripts/generate-ci.sh --force --github --no-cd >/dev/null 2>&1 )
+assert_eq "$(grep -c 'Redis\|env:' "$Y" 2>/dev/null)" "0" "no hooks → no extra steps and no env block"
+rm -rf "$D"
+
 echo "== DevPilot release metadata =="
 V=$(cat "$REPO/VERSION")
 assert_contains "$(cat "$REPO/CHANGELOG.md")" "## [$V]" "CHANGELOG.md has a section for VERSION $V (release notes)"

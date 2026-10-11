@@ -71,6 +71,24 @@ if [ -n "$E2E_CFG" ] && [ "$E2E_MODE" != "off" ]; then
   [ -f "$E2E_DIR/package.json" ] && [ "$E2E_DIR" != "${NG_DIR:-.}" ] && E2E_OWN_PKG=1
 fi
 DOTNET=0; [ "$BE" = "dotnet" ] && DOTNET=1
+# Project-owned hooks around the .NET test step (kept across regeneration and --update):
+#   .devpilot/ci/before-dotnet-tests.<github|azure>.yml   step items emitted before the test step
+#   .devpilot/ci/after-dotnet-tests.<github|azure>.yml    step items emitted after it (add `if: always()` yourself)
+#   .devpilot/ci/dotnet-tests.env                         KEY=VALUE lines → env: on the test step
+# Use them for a throwaway Redis, a required-Docker flag, test filters — anything the generic step lacks.
+CI_HOOKS=".devpilot/ci"
+hook_file() { [ -f "$CI_HOOKS/$1" ] && grep -vE '^[[:space:]]*(#|$)' "$CI_HOOKS/$1"; return 0; }
+# env: block for the test step, indented for the host ($1 = indent of the `env:` key)
+dotnet_test_env() {
+  [ -f "$CI_HOOKS/dotnet-tests.env" ] || return 0
+  local ind="$1" line k v
+  printf '%senv:\n' "$ind"
+  while IFS= read -r line; do
+    case "$line" in ''|'#'*) continue ;; esac
+    k="${line%%=*}"; v="${line#*=}"
+    printf '%s  %s: "%s"\n' "$ind" "$k" "$(printf '%s' "$v" | sed 's/"/\\"/g')"
+  done < "$CI_HOOKS/dotnet-tests.env"
+}
 # Folder that holds the solution (repo root, or e.g. api/, src/): the build and test steps run there.
 SLN_DIR="."
 if [ "$DOTNET" = 1 ]; then
@@ -201,9 +219,12 @@ if [ "$DOTNET" = 1 ]; then cat <<YML
       - name: build (.NET)
         working-directory: $SLN_DIR
         run: dotnet build --configuration Release
+$(hook_file before-dotnet-tests.github.yml)
       - name: tests (.NET · xUnit + Testcontainers SQL Server)
         working-directory: $SLN_DIR
+$(dotnet_test_env "        ")
         run: dotnet test --configuration Release --no-build --logger "trx;LogFileName=results.trx"
+$(hook_file after-dotnet-tests.github.yml)
 YML
 fi
 if [ "$PYTHON" = 1 ]; then cat <<YML
@@ -316,9 +337,12 @@ if [ "$DOTNET" = 1 ]; then cat <<YML
       - script: dotnet build --configuration Release
         workingDirectory: $SLN_DIR
         displayName: build (.NET)
+$(hook_file before-dotnet-tests.azure.yml)
       - script: dotnet test --configuration Release --no-build --logger "trx;LogFileName=results.trx"
         workingDirectory: $SLN_DIR
+$(dotnet_test_env "        ")
         displayName: tests (.NET · xUnit + Testcontainers SQL Server)
+$(hook_file after-dotnet-tests.azure.yml)
       - task: PublishTestResults@2
         condition: succeededOrFailed()
         inputs:
