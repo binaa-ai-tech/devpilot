@@ -69,7 +69,7 @@ User Story · Product Backlog Item · Requirement · Issue). Then refresh the ba
 ## pipelines — CI + CD + protection + environments (once per repo)
 Everything between "PR merged" and "live in production", for the git host (`scripts/git-host.sh`):
 ```bash
-bash scripts/generate-ci.sh           # CI (gate ladder on PRs) + CD (build once → DEV → SIT → UAT → PRD)
+bash scripts/generate-ci.sh           # CI (gate ladder on PRs) + CD (build once → DEV → SIT → UAT → PRD; ci.cd: off = CI only)
 git add .github azure-pipelines*.yml && git commit -m "ci: devpilot CI/CD pipelines" && git push
 bash scripts/protect-branches.sh      # CI required on develop + main (GitHub protection / Azure policies)
 bash scripts/setup-environments.sh    # dev · sit · uat · prd — approvals on uat + prd

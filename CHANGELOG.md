@@ -12,6 +12,10 @@ section becomes the GitHub Release notes when the `vx.y.z` tag is pushed
   (step items emitted around `tests (.NET)`) and `dotnet-tests.env` (KEY=VALUE → `env:` on that step).
   Use them for a throwaway Redis, a required-Docker flag or test filters, so a project no longer
   needs a second hand-written workflow for its .NET suite.
+- **`ci.cd: auto | off`** in `project.config.md`: `off` makes `generate-ci.sh` write the CI gate only,
+  on every run, for a project with no deploy target (deployed by hand). Until now that needed
+  `--no-cd` each time, and a plain `--force` wrote a `devpilot-cd` that failed on every push. An
+  existing CD file is reported, not deleted; `doctor.sh` no longer warns about the missing pipeline.
 
 ## [5.8.2] — 2026-10-12
 

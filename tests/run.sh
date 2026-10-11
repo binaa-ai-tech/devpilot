@@ -1088,6 +1088,27 @@ assert_contains "$(cat "$D/.github/workflows/devpilot-ci.yml" 2>/dev/null)" "Pla
 assert_eq "$(grep -c 'Playwright' "$D/.github/workflows/devpilot-ci.yml" 2>/dev/null)" "0" "ci.e2e off: no Playwright steps generated"
 rm -rf "$D"
 
+echo "== ci.cd: off leaves the CD pipeline out =="
+assert_contains "$(cat "$REPO/install.sh")" "  cd: auto" "installer writes the ci.cd default"
+D=$(mktemp -d)
+( cd "$D" && git init -q -b main && git config user.email t@t.t && git config user.name t \
+  && git remote add origin https://github.com/acme/agent.git && git commit -q --allow-empty -m init \
+  && echo fastapi > requirements.txt \
+  && DEVPILOT_LOCAL="$REPO" bash "$REPO/install.sh" --defaults >/dev/null 2>&1 < /dev/null \
+  && bash scripts/generate-ci.sh --force --github >/dev/null 2>&1 )
+[ -f "$D/.github/workflows/devpilot-cd.yml" ] && ok "ci.cd auto: CD workflow generated" || no "ci.cd auto: CD workflow generated"
+( cd "$D" && sed -i.bak 's/^  cd: auto.*/  cd: off/' project.config.md && rm -f project.config.md.bak )
+OUT=$( cd "$D" && bash scripts/generate-ci.sh --force --github 2>&1 )
+assert_contains "$OUT" "ci.cd is off but .github/workflows/devpilot-cd.yml exists" "ci.cd off: an existing CD workflow is reported"
+[ -f "$D/.github/workflows/devpilot-cd.yml" ] && ok "ci.cd off: the existing CD workflow is not deleted" || no "ci.cd off: the existing CD workflow is not deleted"
+rm -f "$D/.github/workflows/devpilot-cd.yml"
+OUT=$( cd "$D" && bash scripts/generate-ci.sh --force --github 2>&1 )
+[ ! -f "$D/.github/workflows/devpilot-cd.yml" ] && ok "ci.cd off: a plain --force does not write the CD workflow" || no "ci.cd off: a plain --force does not write the CD workflow"
+[ -f "$D/.github/workflows/devpilot-ci.yml" ] && ok "ci.cd off: CI workflow still generated" || no "ci.cd off: CI workflow still generated"
+assert_contains "$OUT" "cd: off" "ci.cd off: the summary says so"
+assert_contains "$(cd "$D" && bash scripts/doctor.sh 2>&1)" "CD pipeline off (ci.cd: off)" "doctor accepts ci.cd: off instead of warning"
+rm -rf "$D"
+
 echo "== .NET steps run in the solution's folder =="
 D=$(mktemp -d)
 ( cd "$D" && git init -q -b main && git config user.email t@t.t && git config user.name t \

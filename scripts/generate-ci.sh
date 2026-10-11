@@ -15,6 +15,8 @@
 #        develop → DEV · release/* → SIT → UAT (approval) → PRD (approval)
 #        hotfix/* → SIT → PRD (approval) · manual run on a tag → redeploy/rollback one env
 #        (environments + approvals: bash scripts/setup-environments.sh)
+#        Left out with --no-cd, or for good with ci.cd: off in project.config.md
+#        (a project with no deploy target, deployed by hand).
 # =============================================================================
 set -uo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -27,6 +29,9 @@ FORCE=0; HOST=""; CD=1
 for a in "$@"; do
   case "$a" in --force) FORCE=1 ;; --github) HOST=github ;; --azure) HOST=azure ;; --no-cd) CD=0 ;; esac
 done
+# ci.cd: auto (write the CD pipeline) | off (CI only, same as --no-cd on every run).
+CD_MODE=$(dp_cfg ci cd); CD_MODE="${CD_MODE:-auto}"
+[ "$CD_MODE" = "off" ] && CD=0
 [ -z "$HOST" ] && HOST=$(bash "$DIR/git-host.sh")
 [ "$HOST" = "azure" ] || HOST="github"
 
@@ -655,8 +660,11 @@ write() {
 if [ "$HOST" = "azure" ]; then write "$OUT" azure_yml; else write "$OUT" github_yml; fi
 if [ "$CD" = 1 ]; then
   if [ "$HOST" = "azure" ]; then write "$OUT_CD" azure_cd_yml; else write "$OUT_CD" github_cd_yml; fi
+elif [ "$CD_MODE" = "off" ] && [ -f "$OUT_CD" ]; then
+  echo "⚠️  ci.cd is off but $OUT_CD exists — it is no longer generated; delete it: git rm $OUT_CD"
 fi
 echo "   toolchain: $([ "$PYTHON" = 1 ] && echo "Python $PY_VER" || echo ".NET SDK $DOTNET_SDK") · Node $NODE_VER${EF_VER:+ · dotnet-ef $EF_VER}"
 echo "   runner: $RUNS_ON"
-echo "   host: $HOST · angular: ${NG_DIR:-none} · api: ${API_PROJ:-${PY_DIR:-$BE}}$([ "$DOTNET" = 1 ] && [ "$SLN_DIR" != "." ] && echo " (solution in $SLN_DIR)") · migrations: $([ "$HAS_MIGRATIONS" = 1 ] && echo yes || echo no) · e2e: $([ "$HAS_E2E" = 1 ] && echo yes || { [ "$E2E_MODE" = off ] && echo off || echo no; }) · base: $BASE"
-echo "   Next: bash scripts/protect-branches.sh (CI required) · bash scripts/setup-environments.sh (CD approvals)"
+echo "   host: $HOST · angular: ${NG_DIR:-none} · api: ${API_PROJ:-${PY_DIR:-$BE}}$([ "$DOTNET" = 1 ] && [ "$SLN_DIR" != "." ] && echo " (solution in $SLN_DIR)") · migrations: $([ "$HAS_MIGRATIONS" = 1 ] && echo yes || echo no) · e2e: $([ "$HAS_E2E" = 1 ] && echo yes || { [ "$E2E_MODE" = off ] && echo off || echo no; }) · cd: $([ "$CD" = 1 ] && echo yes || { [ "$CD_MODE" = off ] && echo off || echo no; }) · base: $BASE"
+if [ "$CD" = 1 ]; then echo "   Next: bash scripts/protect-branches.sh (CI required) · bash scripts/setup-environments.sh (CD approvals)"
+else echo "   Next: bash scripts/protect-branches.sh (CI required)"; fi
