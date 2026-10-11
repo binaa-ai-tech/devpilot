@@ -1036,9 +1036,19 @@ for BE in dotnet python; do
     && bash scripts/generate-ci.sh --force --github >/dev/null 2>&1 )
   [ "$BE" = dotnet ] && PAT='actions/cache@v4' || PAT='cache: pip'
   [ "$(cat "$D"/.github/workflows/devpilot-c[id].yml | grep -c "$PAT")" -gt 0 ] && ok "GitHub-hosted runner keeps the $BE dependency cache" || no "GitHub-hosted runner keeps the $BE dependency cache"
+  assert_eq "$(cat "$D"/.github/workflows/devpilot-c[id].yml | grep -c "if: runner.os")" "0" "GitHub-hosted runner ($BE): setup steps are unconditional"
   ( cd "$D" && sed -i.bak 's/^  runs_on: ubuntu-latest/  runs_on: acme-mac/' project.config.md && rm -f project.config.md.bak \
     && bash scripts/generate-ci.sh --force --github >/dev/null 2>&1 )
   assert_eq "$(cat "$D"/.github/workflows/devpilot-c[id].yml | grep -cE 'cache: |actions/cache')" "0" "self-hosted runner: no remote $BE dependency cache in CI or CD"
+  if [ "$BE" = python ]; then
+    assert_eq "$(cat "$D"/.github/workflows/devpilot-c[id].yml | grep -c "if: runner.os != 'macOS'")" "2" "self-hosted runner: setup-python is skipped on macOS in CI and CD"
+    assert_eq "$(cat "$D"/.github/workflows/devpilot-c[id].yml | grep -c 'python3.12 -m venv "$RUNNER_TEMP/venv"')" "2" "self-hosted macOS: host Python goes into a per-job venv in CI and CD"
+    if python3 -c "import yaml" 2>/dev/null; then
+      for F in devpilot-ci.yml devpilot-cd.yml; do
+        assert_code "$(python3 -c "import yaml,sys; yaml.safe_load(open(sys.argv[1]))" "$D/.github/workflows/$F" 2>/dev/null; echo $?)" "0" "$F (python, self-hosted) is valid YAML"
+      done
+    fi
+  fi
   rm -rf "$D"
 done
 
