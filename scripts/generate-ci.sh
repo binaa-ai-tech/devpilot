@@ -92,6 +92,19 @@ if [ "$PYTHON" = 1 ]; then
   case "$PY_VER" in [0-9]*.[0-9]*) ;; *) PY_VER="3.12" ;; esac
   { [ -f "$PY_DIR/ruff.toml" ] || [ -f "$PY_DIR/.ruff.toml" ] || grep -qs '\[tool.ruff' "$PY_DIR/pyproject.toml"; } && { PY_RUFF=1; PY_RUFF_PKG=" ruff"; }
 fi
+# setup-python's macOS builds are compiled for /Users/runner/hostedtoolcache and install nowhere else,
+# so on a self-hosted Mac (any other user) the step fails on "mkdir: /Users/runner". There the job
+# takes the host's python$PY_VER into a per-job venv instead; other self-hosted runners keep setup-python.
+PY_IF=""; PY_VENV=""
+case "$RUNS_ON" in ubuntu-*|windows-*|macos-*) ;; *)
+  PY_IF=$'\n        if: runner.os != \'macOS\''
+  PY_VENV="
+      - name: Python $PY_VER venv (self-hosted macOS)
+        if: runner.os == 'macOS'
+        run: |
+          python$PY_VER -m venv \"\$RUNNER_TEMP/venv\"
+          echo \"\$RUNNER_TEMP/venv/bin\" >> \"\$GITHUB_PATH\"" ;;
+esac
 
 # The deployable ASP.NET Core project (Sdk.Web, not a test project) and EF migrations.
 API_PROJ=""
@@ -186,9 +199,9 @@ YML
 fi
 if [ "$PYTHON" = 1 ]; then cat <<YML
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5$PY_IF
         with:
-          python-version: "$PY_VER"$PIP_CACHE
+          python-version: "$PY_VER"$PIP_CACHE$PY_VENV
       - name: pip install (Python)
         working-directory: $PY_DIR
         run: |
@@ -437,9 +450,9 @@ YML
           dotnet-version: $DOTNET_SDK$NUGET_CACHE
 YML
 [ "$PYTHON" = 1 ] && cat <<YML
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5$PY_IF
         with:
-          python-version: "$PY_VER"
+          python-version: "$PY_VER"$PY_VENV
 YML
 cat <<YML
       - name: build once (web + api + db script)
