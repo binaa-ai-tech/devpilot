@@ -521,6 +521,35 @@ assert_code "$RC" "0" "STRICT=1 passes once the spec exists"
 ( cd "$D" && echo 'x' > notes.md && git add notes.md && git -c commit.gpgsign=false commit -qm "docs: notes" )
 ( cd "$D" && STRICT=1 bash scripts/test-guard.sh >/dev/null 2>&1 ); RC=$?
 assert_code "$RC" "0" "docs/config changes are exempt"
+# Durable exemption list: scripts/test-guard.exempt — "<path-or-glob>  # <reason>" per line.
+( cd "$D" && mkdir -p src/models src/services \
+  && printf 'export interface FooDto { a: string }\n' > src/models/foo.models.ts \
+  && printf 'export enum Colour { Red }\n' > src/models/colour.enums.ts \
+  && printf 'export class Pricing {}\n' > src/services/pricing.ts \
+  && git add -A && git -c commit.gpgsign=false commit -qm "feat: models" )
+OUT=$( cd "$D" && STRICT=1 bash scripts/test-guard.sh 2>/dev/null ); RC=$?
+assert_code "$RC" "1" "no exemption list → untested files still fail STRICT"
+assert_contains "$OUT" "missing: 3" "no exemption list → all three files are missing"
+assert_contains "$OUT" "scripts/test-guard.exempt" "the gap message names the exemption list"
+( cd "$D" && printf '%s\n' '# comments and blank lines are ignored' '' \
+  'src/models/foo.models.ts   # DTO interface only' 'src/models/*.enums.ts   # enums only' > scripts/test-guard.exempt )
+OUT=$( cd "$D" && STRICT=1 bash scripts/test-guard.sh 2>/dev/null ); RC=$?
+assert_code "$RC" "1" "a partial list still fails STRICT"
+assert_contains "$OUT" "missing: 1" "listed paths and globs are exempt"
+assert_contains "$OUT" "src/services/pricing.ts" "an unlisted file is still reported"
+[[ "$OUT" == *"foo.models.ts"* ]] && no "a listed file must not be reported" || ok "a listed file is not reported"
+( cd "$D" && printf 'src/services/pricing.ts\n' >> scripts/test-guard.exempt )
+ERR=$( cd "$D" && STRICT=1 bash scripts/test-guard.sh 2>&1 >/dev/null ); RC=$?
+assert_code "$RC" "1" "an entry without a reason exempts nothing"
+assert_contains "$ERR" "has no '# reason'" "an entry without a reason is warned about"
+( cd "$D" && printf 'src/services/pricing.ts   # holder class, no behaviour yet\n' >> scripts/test-guard.exempt )
+( cd "$D" && STRICT=1 bash scripts/test-guard.sh >/dev/null 2>&1 ); RC=$?
+assert_code "$RC" "0" "everything covered or listed with a reason → STRICT passes"
+( cd "$D" && printf 'src/models/foo.models.ts # dto\n' > other.exempt )
+OUT=$( cd "$D" && TEST_GUARD_EXEMPT=other.exempt STRICT=1 bash scripts/test-guard.sh 2>/dev/null ); RC=$?
+assert_code "$RC" "1" "TEST_GUARD_EXEMPT points the guard at another list"
+assert_contains "$OUT" "missing: 2" "the override list replaces the default one"
+( cd "$D" && bash "$REPO/install.sh" --update >/dev/null 2>&1; [ -f scripts/test-guard.exempt ] ) && ok "install.sh --update keeps scripts/test-guard.exempt" || no "install.sh --update keeps scripts/test-guard.exempt"
 rm -rf "$D"
 
 echo "== two-tier index + scope cache (token-lean) =="
