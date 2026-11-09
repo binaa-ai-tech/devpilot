@@ -132,7 +132,7 @@ EOF
   ls "$AGENTS_DIR"/egm-*.md | sort
 } > "$DEST/MANIFEST"
 
-LEFT=$(grep -rl 'CLAUDE_PLUGIN_ROOT\|/egm:egm-' "$DEST" "$AGENTS_DIR"/egm-*.md 2>/dev/null | grep -v '/docs/claude\.md$\|egm/README\.md$\|egm/DEVPILOT\.md$' || true)
+LEFT=$(grep -rlE 'CLAUDE_PLUGIN_ROOT|/egm:egm-' "$DEST" "$AGENTS_DIR"/egm-*.md 2>/dev/null | grep -vE '/docs/claude\.md$|egm/README\.md$|egm/DEVPILOT\.md$' || true)
 [ -z "$LEFT" ] || { echo "❌ unrewritten plugin paths in: $LEFT" >&2; exit 1; }
 [ -f "$DEST/DEVPILOT.md" ] || echo "⚠️  $DEST/DEVPILOT.md is missing — restore it from DevPilot (git checkout -- $DEST/DEVPILOT.md)"
 

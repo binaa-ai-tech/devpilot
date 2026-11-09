@@ -874,7 +874,7 @@ MISSING=""; while IFS= read -r f; do [ -f "$REPO/$f" ] || MISSING="$MISSING $f";
 assert_eq "${MISSING:-none}" "none" "egm: every MANIFEST file exists"
 ONDISK=$( { find "$EGM" -type f ! -name MANIFEST; ls "$REPO"/.claude/agents/egm-*.md; } | sed "s#^$REPO/##" | sort | tr '\n' ' ')
 assert_eq "$(sort "$EGM/MANIFEST" | tr '\n' ' ')" "$ONDISK" "egm: MANIFEST matches the vendored files (re-run scripts/sync-egm.sh)"
-LEFT=$(grep -rl 'CLAUDE_PLUGIN_ROOT\|/egm:egm-' "$EGM" "$REPO"/.claude/agents/egm-*.md | grep -v '/docs/claude\.md$\|/egm/README\.md$\|/egm/DEVPILOT\.md$' | tr '\n' ' ')
+LEFT=$(grep -rlE 'CLAUDE_PLUGIN_ROOT|/egm:egm-' "$EGM" "$REPO"/.claude/agents/egm-*.md | grep -vE '/docs/claude\.md$|/egm/README\.md$|/egm/DEVPILOT\.md$' | tr '\n' ' ')
 assert_eq "${LEFT:-none}" "none" "egm: plugin paths rewritten for the project install"
 for p in $(grep -hoE '\.devpilot/egm/[A-Za-z0-9_./-]+\.md' "$REPO"/.claude/agents/egm-*.md "$REPO/.claude/commands/dp-spec.md" "$REPO/.claude/skills/spec-review/SKILL.md" | sort -u); do
   [ -f "$REPO/$p" ] && ok "egm path resolves: $p" || no "egm path resolves: $p"
