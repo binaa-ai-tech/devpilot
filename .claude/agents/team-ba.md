@@ -1,6 +1,6 @@
 ---
 name: team-ba
-model: claude-haiku-4-5-20251001
+model: claude-sonnet-5-5
 description: Business Analyst — requirements, domain model, testable acceptance criteria, Definition of Ready. Spawned by /dp-plan and /dp-deliver.
 skills:
   - core-rules

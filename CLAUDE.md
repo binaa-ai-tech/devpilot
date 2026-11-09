@@ -80,7 +80,7 @@ Never call a backend directly from a command — always `tracker.sh`. Secrets li
 
 Each agent has a role model (`.claude/agents/*.md`); tasks are routed per complexity by
 `scripts/resolve-model.sh`: **power** (Opus) for architectural / cross-cutting / high-risk work,
-**standard** (Sonnet) for normal implementation, **lite** (Haiku) for simple, BA, and QA work.
+**standard** (Sonnet) for normal implementation, **lite** (Haiku) for simple and QA work; the BA writes specs on Sonnet.
 Change with `/dp-setup models <auto|balanced|save>`. Reference: `.devpilot/config/models.md`.
 
 ---

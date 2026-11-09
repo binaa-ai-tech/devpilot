@@ -1,6 +1,6 @@
 ---
 name: team-python
-model: claude-sonnet-5
+model: claude-sonnet-5-5
 description: Python developer — FastAPI / asyncio services, Pydantic schemas, LiveKit + LLM agent tools, pytest + httpx tests. Spawned by /dp-build and /dp-deliver for backend work when stack.backend is python.
 skills:
   - core-rules

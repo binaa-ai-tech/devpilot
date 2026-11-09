@@ -1,6 +1,6 @@
 ---
 name: team-dotnet
-model: claude-sonnet-5
+model: claude-sonnet-5-5
 description: .NET developer — ASP.NET Core APIs, EF Core + SQL Server migrations, OpenAPI contract, xUnit + WebApplicationFactory + Testcontainers tests. Spawned by /dp-build and /dp-deliver for backend/DB work.
 skills:
   - core-rules

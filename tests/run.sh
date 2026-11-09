@@ -302,16 +302,16 @@ unset FAKE_LOG; rm -rf "$D" "$FK"
 
 echo "== usage-hook.sh + metrics (cost per delivery) =="
 D=$(sandbox); TR="$D/t.jsonl"; mkdir -p "$D/t/subagents"
-for _ in 1 2 3; do echo '{"type":"assistant","message":{"id":"m1","model":"claude-sonnet-5","usage":{"input_tokens":100,"output_tokens":1000000,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}' >> "$TR"; done
+for _ in 1 2 3; do echo '{"type":"assistant","message":{"id":"m1","model":"claude-sonnet-5-5","usage":{"input_tokens":100,"output_tokens":1000000,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}' >> "$TR"; done
 echo '{"type":"user","message":{"content":"hi"}}' >> "$TR"
-echo '{"type":"assistant","message":{"id":"s1","model":"claude-haiku-4-5-20251001","usage":{"input_tokens":5,"output_tokens":7}}}' > "$D/t/subagents/agent-1.jsonl"
+echo '{"type":"assistant","message":{"id":"s1","model":"claude-haiku-5-5","usage":{"input_tokens":5,"output_tokens":7}}}' > "$D/t/subagents/agent-1.jsonl"
 ( cd "$D" && git commit -q --allow-empty -m base && git checkout -q -b feature/ado-345-csv \
   && printf '{"session_id":"s-1","transcript_path":"%s","hook_event_name":"SessionEnd","cwd":"%s"}' "$TR" "$D" | bash scripts/usage-hook.sh )
 U="$D/.devpilot/logs/usage/s-1.json"
 assert_eq "$(jq -r .key "$U" 2>/dev/null)" "ADO-345" "usage attributed to the branch's work item"
-assert_eq "$(jq -r '.models[] | select(.model=="claude-sonnet-5") | .output' "$U" 2>/dev/null)" "1000000" "a message repeated in the transcript is counted once"
+assert_eq "$(jq -r '.models[] | select(.model=="claude-sonnet-5-5") | .output' "$U" 2>/dev/null)" "1000000" "a message repeated in the transcript is counted once"
 assert_eq "$(jq -r '.models[] | select(.model|startswith("claude-haiku")) | .output' "$U" 2>/dev/null)" "7" "subagent usage included"
-printf 'pricing:\n  claude-sonnet-5: "3/15"\n' >> "$D/project.config.md"
+printf 'pricing:\n  claude-sonnet-5-5: "3/15"\n' >> "$D/project.config.md"
 assert_contains "$(cd "$D" && bash scripts/metrics.sh usage)" '$15.00' "metrics prices output tokens per model"
 assert_contains "$(cat "$REPO/.claude/settings.json")" "usage-hook.sh" "usage hook registered (Stop + SessionEnd)"
 rm -rf "$D"
@@ -661,8 +661,10 @@ echo "== model-profiles.sh =="
 MP="$REPO/scripts/model-profiles.sh"
 # claude profile → tier mapping
 assert_contains "$(bash "$MP" claude-map auto)"     "POWER=claude-opus-5-5"   "claude auto uses Opus for power"
-assert_contains "$(bash "$MP" claude-map balanced)" "POWER=claude-sonnet-5" "claude balanced caps power at Sonnet"
-assert_contains "$(bash "$MP" claude-map save)"     "STANDARD=claude-haiku-4-5-20251001" "claude save defaults standard to Haiku"
+assert_contains "$(bash "$MP" claude-map balanced)" "POWER=claude-sonnet-5-5" "claude balanced caps power at Sonnet"
+assert_contains "$(bash "$MP" claude-map save)"     "STANDARD=claude-haiku-5-5" "claude save defaults standard to Haiku"
+assert_contains "$(bash "$MP" claude-map auto)"     "BA=claude-sonnet-5-5"     "claude auto runs the BA (spec author) on Sonnet"
+assert_contains "$(bash "$MP" claude-map save)"     "BA=claude-haiku-5-5"      "claude save keeps the BA on Haiku"
 assert_code "$(bash "$MP" claude-map bogus >/dev/null 2>&1; echo $?)" "1" "claude-map rejects an unknown profile"
 # non-Claude engines are gone
 assert_code "$(bash "$MP" opencode-map recommended >/dev/null 2>&1; echo $?)" "1" "opencode support removed"
@@ -676,8 +678,8 @@ assert_eq "$(grep -c 'coding_profile:' "$D/project.config.md")" "1" "apply is id
 assert_eq "$(grep -cE '^[[:space:]]+model_mode:' "$D/project.config.md")" "1" "apply keeps one model_mode line"
 assert_contains "$(cat "$D/project.config.md")" "coding_profile: save" "apply records the profile"
 assert_contains "$(cat "$D/project.config.md")" "model_mode: recommended" "apply records model_mode recommended"
-assert_contains "$(grep '^model:' "$D/.claude/agents/team-lead.md")" "claude-haiku-4-5-20251001" "apply syncs agent frontmatter (save → Haiku lead)"
-assert_contains "$(grep '^model:' "$D/.claude/agents/team-frontend.md")" "claude-haiku-4-5-20251001" "apply syncs dev agents to the standard tier (save → Haiku FE)"
+assert_contains "$(grep '^model:' "$D/.claude/agents/team-lead.md")" "claude-haiku-5-5" "apply syncs agent frontmatter (save → Haiku lead)"
+assert_contains "$(grep '^model:' "$D/.claude/agents/team-frontend.md")" "claude-haiku-5-5" "apply syncs dev agents to the standard tier (save → Haiku FE)"
 # single-model mode: one model everywhere (tiers + every agent + model_mode)
 ( cd "$D" && bash scripts/model-profiles.sh single claude test-model-x >/dev/null 2>&1 )
 assert_contains "$(cat "$D/project.config.md")" "model_mode: single" "single records model_mode"
@@ -687,8 +689,8 @@ assert_contains "$(grep '^model:' "$D/.claude/agents/team-ba.md")" "test-model-x
 assert_eq "$(grep -c '"test-model-x"' "$D/project.config.md")" "3" "single sets all three claude tiers"
 ( cd "$D" && bash scripts/model-profiles.sh apply claude save >/dev/null 2>&1 )   # back to a profile
 # sync-agents re-applies frontmatter from project.config.md (the --update repair path)
-( cd "$D" && sed -i.bak 's/^model: .*/model: claude-sonnet-5/' .claude/agents/team-lead.md && rm -f .claude/agents/team-lead.md.bak && bash scripts/model-profiles.sh sync-agents >/dev/null 2>&1 )
-assert_contains "$(grep '^model:' "$D/.claude/agents/team-lead.md")" "claude-haiku-4-5-20251001" "sync-agents restores frontmatter from config"
+( cd "$D" && sed -i.bak 's/^model: .*/model: claude-sonnet-5-5/' .claude/agents/team-lead.md && rm -f .claude/agents/team-lead.md.bak && bash scripts/model-profiles.sh sync-agents >/dev/null 2>&1 )
+assert_contains "$(grep '^model:' "$D/.claude/agents/team-lead.md")" "claude-haiku-5-5" "sync-agents restores frontmatter from config"
 # switching profile keeps a single coding_profile line
 ( cd "$D" && bash scripts/model-profiles.sh apply balanced >/dev/null 2>&1 )
 assert_eq "$(grep -c 'coding_profile:' "$D/project.config.md")" "1" "profile switch keeps one coding_profile line"

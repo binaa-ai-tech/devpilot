@@ -303,7 +303,7 @@ Environment variables always win, which is what CI uses.
 
 ```yaml
 pricing:
-  claude-sonnet-5: "<input>/<output>"   # USD per million tokens, from your Anthropic price sheet
+  claude-sonnet-5-5: "<input>/<output>"   # USD per million tokens, from your Anthropic price sheet
 ```
 
 **Claude models.** DevPilot picks the model for each task:

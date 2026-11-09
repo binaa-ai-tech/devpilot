@@ -68,7 +68,7 @@ Guidance inside the modes:
   Choose `balanced` to avoid Opus, `save` to minimize tokens.
 - **single** → **Sonnet** is the sweet spot. Opus everywhere is the highest-cost choice;
   Haiku everywhere is fine for small/simple projects.
-- **per-team** → defaults already follow the role: BA/QA → Haiku, Team Lead/devs → Sonnet.
+- **per-team** → defaults already follow the role: QA → Haiku; BA, Team Lead and devs → Sonnet (the BA writes the spec reviewers attack).
   Upgrade the Team Lead to Opus for architecture-heavy projects.
 
 Everything here is changeable later in one command — see §6.
@@ -202,7 +202,7 @@ The standard process the team follows lives in `.devpilot/process.md`.
 | Change | How |
 |--------|-----|
 | Model profile (recommended mode) | `/dp-setup models save` — or `bash scripts/model-profiles.sh apply save` |
-| One model for everything | `bash scripts/model-profiles.sh single claude-sonnet-5` |
+| One model for everything | `bash scripts/model-profiles.sh single claude-sonnet-5-5` |
 | Per-team models | edit `models.*` in `project.config.md` → `bash scripts/model-profiles.sh sync-agents` |
 | Tracker (Jira / Azure DevOps / GitHub / local) | `/dp-setup tracker` · test it: `/dp-setup tracker test` |
 | Where tokens are kept | `secrets.provider: file \| keychain \| azure-keyvault` in `project.config.md` |

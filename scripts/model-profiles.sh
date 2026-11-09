@@ -33,16 +33,16 @@ CONFIG="$ROOT/project.config.md"
 
 # ── Claude model ids (single source of truth) ──────────────────────────────────
 CL_OPUS="claude-opus-5-5"
-CL_SONNET="claude-sonnet-5"
-CL_HAIKU="claude-haiku-4-5-20251001"
+CL_SONNET="claude-sonnet-5-5"
+CL_HAIKU="claude-haiku-5-5"
 
 # ── Claude profile → tier + orchestrator models ────────────────────────────────
 claude_map() {
   local profile="${1:-auto}"
   local P S L BA LEAD QA
   case "$profile" in
-    auto)     P="$CL_OPUS";   S="$CL_SONNET"; L="$CL_HAIKU"; BA="$CL_HAIKU"; LEAD="$CL_SONNET"; QA="$CL_HAIKU" ;;
-    balanced) P="$CL_SONNET"; S="$CL_SONNET"; L="$CL_HAIKU"; BA="$CL_HAIKU"; LEAD="$CL_SONNET"; QA="$CL_HAIKU" ;;
+    auto)     P="$CL_OPUS";   S="$CL_SONNET"; L="$CL_HAIKU"; BA="$CL_SONNET"; LEAD="$CL_SONNET"; QA="$CL_HAIKU" ;;
+    balanced) P="$CL_SONNET"; S="$CL_SONNET"; L="$CL_HAIKU"; BA="$CL_SONNET"; LEAD="$CL_SONNET"; QA="$CL_HAIKU" ;;
     save)     P="$CL_SONNET"; S="$CL_HAIKU";  L="$CL_HAIKU"; BA="$CL_HAIKU"; LEAD="$CL_HAIKU";  QA="$CL_HAIKU" ;;
     *) echo "Unknown Claude profile: $profile (use auto|balanced|save)" >&2; return 1 ;;
   esac

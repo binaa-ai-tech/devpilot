@@ -102,7 +102,7 @@ for T in power standard lite; do
   if [ -z "$M" ]; then
     warn "coding_models.claude.$T is empty — set it: /dp-setup models <profile>"; CL_BAD=1
   elif ! printf '%s' "$M" | grep -qE '^claude-(opus|sonnet|haiku|fable|mythos)-[0-9a-z.-]+$'; then
-    warn "coding_models.claude.$T='$M' doesn't look like a Claude model id — typo? (e.g. claude-sonnet-5)"; CL_BAD=1
+    warn "coding_models.claude.$T='$M' doesn't look like a Claude model id — typo? (e.g. claude-sonnet-5-5)"; CL_BAD=1
   fi
 done
 [ "$CL_BAD" = 0 ] && ok "claude model tiers look valid"

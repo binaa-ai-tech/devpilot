@@ -391,25 +391,25 @@ fi
 section "STEP 4/6 · Claude model assignment"
 
 # NOTE: profile mappings mirror scripts/model-profiles.sh — keep them in sync.
-CL_OPUS="claude-opus-5-5"; CL_SONNET="claude-sonnet-5"; CL_HAIKU="claude-haiku-4-5-20251001"
+CL_OPUS="claude-opus-5-5"; CL_SONNET="claude-sonnet-5-5"; CL_HAIKU="claude-haiku-5-5"
 
 CL_POWER="$CL_OPUS"; CL_STANDARD="$CL_SONNET"; CL_LITE="$CL_HAIKU"
 CODING_PROFILE="auto"
 MODEL_MODE="recommended"
 
 # Role models — follow the choices below.
-T1_BA="$CL_HAIKU"; T1_LEAD="$CL_SONNET"; T1_QA="$CL_HAIKU"
+T1_BA="$CL_SONNET"; T1_LEAD="$CL_SONNET"; T1_QA="$CL_HAIKU"
 # Dev agent role models (synced into .claude/agents/*.md frontmatter in STEP 12)
 T1_FE_DEV="$CL_SONNET"; T1_BE_DEV="$CL_SONNET"
 # Map a Claude profile → coding tiers + orchestrator tier1 (mirrors model-profiles.sh).
 claude_profile_apply() {
   case "$1" in
     balanced) CL_POWER="$CL_SONNET"; CL_STANDARD="$CL_SONNET"; CL_LITE="$CL_HAIKU"
-              T1_BA="$CL_HAIKU"; T1_LEAD="$CL_SONNET"; T1_QA="$CL_HAIKU" ;;
+              T1_BA="$CL_SONNET"; T1_LEAD="$CL_SONNET"; T1_QA="$CL_HAIKU" ;;
     save)     CL_POWER="$CL_SONNET"; CL_STANDARD="$CL_HAIKU"; CL_LITE="$CL_HAIKU"
               T1_BA="$CL_HAIKU"; T1_LEAD="$CL_HAIKU"; T1_QA="$CL_HAIKU" ;;
     *)        CL_POWER="$CL_OPUS"; CL_STANDARD="$CL_SONNET"; CL_LITE="$CL_HAIKU"
-              T1_BA="$CL_HAIKU"; T1_LEAD="$CL_SONNET"; T1_QA="$CL_HAIKU" ;;
+              T1_BA="$CL_SONNET"; T1_LEAD="$CL_SONNET"; T1_QA="$CL_HAIKU" ;;
   esac
   T1_FE_DEV="$CL_STANDARD"; T1_BE_DEV="$CL_STANDARD"
 }
@@ -418,7 +418,7 @@ claude_profile_apply() {
 claude_model_menu() {
   echo "    [1] Sonnet — strong all-round coder (recommended for most roles)"
   echo "    [2] Opus   — highest quality, most tokens (architecture / hard problems)"
-  echo "    [3] Haiku  — fastest & cheapest (light tasks: BA, QA, simple changes)"
+  echo "    [3] Haiku  — fastest & cheapest (light tasks: QA, simple changes)"
   echo "    [4] other  — type a model id"
 }
 pick_claude_model() {
@@ -487,7 +487,7 @@ else
   echo "  Pick a Claude model per role:"
   echo ""
   claude_model_menu
-  pick_claude_model "BA (requirements, dedup)     " "$CL_HAIKU";  T1_BA="$PICKED_MODEL"
+  pick_claude_model "BA (requirements, dedup)     " "$CL_SONNET";  T1_BA="$PICKED_MODEL"
   pick_claude_model "Team Lead (plans, review)    " "$CL_SONNET"; T1_LEAD="$PICKED_MODEL"
   pick_claude_model "QA (test design, verdict)    " "$CL_HAIKU";  T1_QA="$PICKED_MODEL"
   pick_claude_model "Frontend developer (Angular) " "$CL_SONNET"; T1_FE_DEV="$PICKED_MODEL"
@@ -875,8 +875,8 @@ versioning:
 ## Pricing — optional: USD per million tokens "input/output" → cost per delivery in /dp-status metrics
 pricing:
   claude-opus-5-5: ""
-  claude-sonnet-5: ""
-  claude-haiku-4-5-20251001: ""
+  claude-sonnet-5-5: ""
+  claude-haiku-5-5: ""
 
 ## CI runner — label for the generated GitHub workflows' runs-on
 # ubuntu-latest (GitHub-hosted, counts against the plan's minutes) or a self-hosted runner label

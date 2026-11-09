@@ -108,13 +108,13 @@ A **profile** is a one-word preset over the `power / standard / lite` tiers; per
 (`scripts/resolve-model.sh`) still picks the tier per task.
 | Profile | Behavior |
 |---------|----------|
-| `auto` *(default)* | Opus for hard/architectural work, Sonnet normal, Haiku for light/BA/QA |
+| `auto` *(default)* | Opus for hard/architectural work, Sonnet normal and for the BA, Haiku for light/QA |
 | `balanced` | Sonnet for real work, Haiku for light tasks — no Opus |
 | `save` | token-saving: Haiku by default, Sonnet only when complex |
 
 ```bash
 bash scripts/model-profiles.sh apply auto                  # or balanced | save
-bash scripts/model-profiles.sh single claude-sonnet-5      # one model for the whole team
+bash scripts/model-profiles.sh single claude-sonnet-5-5      # one model for the whole team
 bash scripts/model-profiles.sh sync-agents                 # after editing models.* by hand
 bash scripts/resolve-model.sh show                         # verify the tiers
 ```

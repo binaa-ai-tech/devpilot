@@ -1,6 +1,6 @@
 ---
 name: team-qa
-model: claude-haiku-4-5-20251001
+model: claude-haiku-5-5
 description: QA engineer — test cases per acceptance criterion, unit/integration coverage, Playwright UI journeys + axe, QA verdict. Spawned by /dp-build, /dp-deliver and /dp-test.
 skills:
   - core-rules

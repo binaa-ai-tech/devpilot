@@ -8,8 +8,8 @@ tier by complexity so hard work gets the strongest model and simple work stays c
 | Tier | When | Model (`auto` profile) |
 |------|------|------------------------|
 | `power` | architectural / cross-cutting / high-risk / large changes | `claude-opus-5-5` |
-| `standard` | normal feature & bug work (default) | `claude-sonnet-5` |
-| `lite` | simple / mechanical changes, BA and QA work | `claude-haiku-4-5-20251001` |
+| `standard` | normal feature & bug work (default) | `claude-sonnet-5-5` |
+| `lite` | simple / mechanical changes and QA work | `claude-haiku-5-5` |
 
 `scripts/resolve-model.sh suggest "<task>"` classifies a task and returns its tier + model;
 `/dp-build` spawns implementation agents on Opus when a sprint resolves to `power`.
@@ -18,11 +18,12 @@ tier by complexity so hard work gets the strongest model and simple work stays c
 
 | Agent | `auto` | `balanced` | `save` |
 |-------|--------|------------|--------|
-| BA (`team-ba`) | Haiku | Haiku | Haiku |
+| BA (`team-ba`) | Sonnet | Sonnet | Haiku |
 | Team Lead (`team-lead`) | Sonnet | Sonnet | Haiku |
 | QA (`team-qa`) | Haiku | Haiku | Haiku |
 | Frontend — Angular (`team-frontend`) | Sonnet | Sonnet | Haiku |
 | Backend — .NET (`team-dotnet`) | Sonnet | Sonnet | Haiku |
+| Backend — Python (`team-python`) | Sonnet | Sonnet | Haiku |
 | Power tier (escalation) | Opus | Sonnet | Sonnet |
 
 ## Profiles and modes

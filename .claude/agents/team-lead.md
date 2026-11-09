@@ -1,6 +1,6 @@
 ---
 name: team-lead
-model: claude-sonnet-5
+model: claude-sonnet-5-5
 description: Team Lead — implementation plans, ADRs, and the review gate (code review, security, test guard) before merge. Spawned by /dp-build, /dp-deliver and /dp-pr.
 skills:
   - core-rules
