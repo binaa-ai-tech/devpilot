@@ -635,6 +635,27 @@ assert_contains "$( cd "$D" && bash scripts/doctor.sh 2>&1 )" "net8.0 is out of 
 sed -i.bak 's/net8.0/net10.0/' "$D/src/Api/Api.csproj" && rm -f "$D/src/Api/Api.csproj.bak"
 assert_eq "$( cd "$D" && bash scripts/doctor.sh 2>&1 | grep -c 'out of support' )" "0" "doctor is quiet on net10.0"
 rm -rf "$D/src"
+cp "$D/project.config.md" "$D/project.config.md.orig"
+cat >> "$D/project.config.md" <<'EOF'
+coding_models:
+  claude:
+    power:    "claude-opus-5-5"
+    standard: "claude-sonnet-5"
+    lite:     "claude-haiku-4-5-20251001"
+models:
+  ba:
+    tier1: claude-haiku-4-5-20251001
+  team_lead:
+    tier1: claude-sonnet-5-5
+EOF
+OUT=$( cd "$D" && bash scripts/doctor.sh 2>&1 )
+assert_contains "$OUT" "retired model id(s) still configured: claude-haiku-4-5-20251001 claude-sonnet-5 " "doctor flags retired model ids pinned in the config"
+assert_contains "$OUT" "/dp-setup models" "the retired-model warning says how to fix it"
+sed -i.bak -e 's/"claude-sonnet-5"/"claude-sonnet-5-5"/' -e 's/claude-haiku-4-5-20251001/claude-haiku-5-5/g' "$D/project.config.md" && rm -f "$D/project.config.md.bak"
+OUT=$( cd "$D" && bash scripts/doctor.sh 2>&1 )
+assert_eq "$(printf '%s\n' "$OUT" | grep -c 'still configured')" "0" "doctor is quiet on current model ids"
+assert_contains "$OUT" "no retired model ids configured" "doctor confirms the model ids are current"
+mv "$D/project.config.md.orig" "$D/project.config.md"
 ( cd "$D" && bash scripts/status.sh >/dev/null 2>&1 ); assert_code "$?" "0" "status runs"
 ( cd "$D" && bash scripts/metrics.sh >/dev/null 2>&1 ); assert_code "$?" "0" "metrics runs"
 ( cd "$D" && bash scripts/audit.sh >/dev/null 2>&1 ); assert_code "$?" "0" "audit runs (no manifest)"
