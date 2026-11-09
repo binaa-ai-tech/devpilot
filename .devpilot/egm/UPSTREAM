@@ -1,6 +1,6 @@
 repository: https://github.com/google/elephant-goldfish-model
 ref: main
-commit: 5382b17619be07811a14b2146c7672620b34a791
+commit: b7d9e2706fb96314a0a3123684f53cedd97e7d79
 plugin_version: 0.1.1
 synced: 2026-11-09
 license: Apache-2.0 (see LICENSE) — Copyright Google LLC
