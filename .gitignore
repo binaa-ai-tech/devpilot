@@ -33,3 +33,7 @@ docs/index/*.md
 
 # Token-lean test runner logs (scripts/run-tests.sh)
 .devpilot/logs/
+
+# Claude Code: per-user settings and agent worktrees
+.claude/worktrees/
+.claude/settings.local.json
