@@ -1,0 +1,50 @@
+# Publishes a GitHub Release with that version's section of CHANGELOG.md.
+#   - push a tag vX.Y.Z (it must match VERSION), or
+#   - run the workflow by hand on main ("Run workflow"): it tags v<VERSION> on the
+#     current commit and publishes the release — useful where you can't push tags.
+name: release
+
+on:
+  push:
+    tags: ['v*.*.*']
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - name: Resolve the tag
+        id: tag
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V="$(cat VERSION)"
+          if [ "$GITHUB_EVENT_NAME" = push ]; then
+            [ "v$V" = "$GITHUB_REF_NAME" ] || { echo "::error::tag $GITHUB_REF_NAME but VERSION is $V"; exit 1; }
+          else
+            [ "$GITHUB_REF_NAME" = main ] || { echo "::error::run this workflow on main"; exit 1; }
+            if gh release view "v$V" >/dev/null 2>&1; then echo "::error::release v$V already exists"; exit 1; fi
+          fi
+          echo "version=$V" >> "$GITHUB_OUTPUT"
+      - name: Extract release notes from CHANGELOG.md
+        env:
+          V: ${{ steps.tag.outputs.version }}
+        run: |
+          awk -v v="$V" '
+            index($0, "## [" v "]") == 1 { on = 1; next }
+            on && /^## \[/               { exit }
+            on                            { print }
+          ' CHANGELOG.md > notes.md
+          [ -s notes.md ] || { echo "::error::CHANGELOG.md has no section for $V"; exit 1; }
+      - name: Create the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          V: ${{ steps.tag.outputs.version }}
+        run: |
+          if [ "$GITHUB_EVENT_NAME" = push ]; then TARGET=(--verify-tag); else TARGET=(--target "$GITHUB_SHA"); fi
+          gh release create "v$V" --title "DevPilot v$V" --notes-file notes.md --latest "${TARGET[@]}"

@@ -1,0 +1,670 @@
+#!/usr/bin/env bash
+# =============================================================================
+# generate-ci.sh — write the server-side gate ladder for THIS project:
+#   Angular (lint → build → unit tests) · .NET (build → tests incl. SQL Server
+#   via Testcontainers) · Python (ruff → pytest) · Playwright UI journeys · test-guard (strict) · dependency audit
+#
+#   bash scripts/generate-ci.sh [--force] [--github | --azure] [--no-cd]
+#
+# Writes two pipelines for the git host (scripts/git-host.sh):
+#   CI — the gate ladder on every PR
+#        github → .github/workflows/devpilot-ci.yml · azure → azure-pipelines.yml
+#        (made required by: bash scripts/protect-branches.sh)
+#   CD — build ONCE, promote the same artifact DEV → SIT → UAT → PRD
+#        github → .github/workflows/devpilot-cd.yml · azure → azure-pipelines-cd.yml
+#        develop → DEV · release/* → SIT → UAT (approval) → PRD (approval)
+#        hotfix/* → SIT → PRD (approval) · manual run on a tag → redeploy/rollback one env
+#        (environments + approvals: bash scripts/setup-environments.sh)
+#        Left out with --no-cd, or for good with ci.cd: off in project.config.md
+#        (a project with no deploy target, deployed by hand).
+# =============================================================================
+set -uo pipefail
+DIR="$(cd "$(dirname "$0")" && pwd)"
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$ROOT" || exit 1
+# shellcheck source=devpilot-lib.sh
+. "$DIR/devpilot-lib.sh"
+
+FORCE=0; HOST=""; CD=1
+for a in "$@"; do
+  case "$a" in --force) FORCE=1 ;; --github) HOST=github ;; --azure) HOST=azure ;; --no-cd) CD=0 ;; esac
+done
+# ci.cd: auto (write the CD pipeline) | off (CI only, same as --no-cd on every run).
+CD_MODE=$(dp_cfg ci cd); CD_MODE="${CD_MODE:-auto}"
+[ "$CD_MODE" = "off" ] && CD=0
+[ -z "$HOST" ] && HOST=$(bash "$DIR/git-host.sh")
+[ "$HOST" = "azure" ] || HOST="github"
+
+if [ "$HOST" = "azure" ]; then OUT="azure-pipelines.yml"; OUT_CD="azure-pipelines-cd.yml"
+else OUT=".github/workflows/devpilot-ci.yml"; OUT_CD=".github/workflows/devpilot-cd.yml"; fi
+
+BASE=$(dp_cfg base_branch); BASE="${BASE:-develop}"
+# Runner for the GitHub workflows: project.config.md → ci.runs_on (one label, e.g. ubuntu-latest or a
+# self-hosted runner label such as binaa-mac). Azure keeps the hosted vmImage.
+RUNS_ON=$(dp_cfg ci runs_on); RUNS_ON="${RUNS_ON:-ubuntu-latest}"
+FE=$(dp_cfg stack frontend); FE="${FE:-none}"
+BE=$(dp_cfg stack backend);  BE="${BE:-none}"
+
+# Where the Angular workspace lives (repo root, or e.g. src/web, ClientApp).
+NG_DIR=$(find . -name angular.json -not -path '*/node_modules/*' 2>/dev/null | head -1)
+[ -n "$NG_DIR" ] && NG_DIR=$(dirname "$NG_DIR" | sed 's#^\./##')
+[ -z "$NG_DIR" ] && [ -f package.json ] && NG_DIR="."
+[ "$FE" = "none" ] && NG_DIR=""
+[ "$FE" != "none" ] && [ -z "$NG_DIR" ] && NG_DIR="."
+# Dependency caches (npm, pip, NuGet) go through GitHub's cache service. A hosted runner starts empty,
+# so the restore pays for itself; a self-hosted runner keeps ~/.npm, the pip cache and ~/.nuget/packages
+# between jobs, so the restore/save only adds minutes. Emit them for GitHub-hosted labels only.
+NODE_CACHE=""; PIP_CACHE=""; NUGET_CACHE=""
+case "$RUNS_ON" in ubuntu-*|windows-*|macos-*)
+  NODE_CACHE=$'\n          cache: npm\n          cache-dependency-path: '"$NG_DIR/package-lock.json"
+  PIP_CACHE=$'\n          cache: pip'
+  NUGET_CACHE='
+      - uses: actions/cache@v4   # NuGet packages, keyed on the project files
+        with:
+          path: ~/.nuget/packages
+          key: nuget-${{ runner.os }}-${{ hashFiles('"'**/*.csproj', '**/packages.lock.json', '**/Directory.Packages.props'"') }}
+          restore-keys: nuget-${{ runner.os }}-' ;;
+esac
+HAS_E2E=0; E2E_DIR=""; E2E_OWN_PKG=0
+# ci.e2e: auto (run Playwright when a playwright.config exists) | off (never in CI, e.g. journeys
+# that need a deployed environment and are run from /dp-test or the release smoke instead).
+E2E_MODE=$(dp_cfg ci e2e); E2E_MODE="${E2E_MODE:-auto}"
+E2E_CFG=$(find . -maxdepth 4 -name 'playwright.config.*' -not -path '*/node_modules/*' 2>/dev/null | head -1)
+if [ -n "$E2E_CFG" ] && [ "$E2E_MODE" != "off" ]; then
+  HAS_E2E=1; E2E_DIR=$(dirname "$E2E_CFG" | sed 's#^\./##')
+  # An e2e folder with its own package.json (e.g. e2e/ next to admin/ and portal/) installs its own deps.
+  [ -f "$E2E_DIR/package.json" ] && [ "$E2E_DIR" != "${NG_DIR:-.}" ] && E2E_OWN_PKG=1
+fi
+DOTNET=0; [ "$BE" = "dotnet" ] && DOTNET=1
+# Project-owned hooks around the .NET test step (kept across regeneration and --update):
+#   .devpilot/ci/before-dotnet-tests.<github|azure>.yml   step items emitted before the test step
+#   .devpilot/ci/after-dotnet-tests.<github|azure>.yml    step items emitted after it (add `if: always()` yourself)
+#   .devpilot/ci/dotnet-tests.env                         KEY=VALUE lines → env: on the test step
+# Use them for a throwaway Redis, a required-Docker flag, test filters — anything the generic step lacks.
+CI_HOOKS=".devpilot/ci"
+hook_file() { [ -f "$CI_HOOKS/$1" ] && grep -vE '^[[:space:]]*(#|$)' "$CI_HOOKS/$1"; return 0; }
+# env: block for the test step, indented for the host ($1 = indent of the `env:` key)
+dotnet_test_env() {
+  [ -f "$CI_HOOKS/dotnet-tests.env" ] || return 0
+  local ind="$1" line k v
+  printf '%senv:\n' "$ind"
+  while IFS= read -r line; do
+    case "$line" in ''|'#'*) continue ;; esac
+    k="${line%%=*}"; v="${line#*=}"
+    printf '%s  %s: "%s"\n' "$ind" "$k" "$(printf '%s' "$v" | sed 's/"/\\"/g')"
+  done < "$CI_HOOKS/dotnet-tests.env"
+}
+# Folder that holds the solution (repo root, or e.g. api/, src/): the build and test steps run there.
+SLN_DIR="."
+if [ "$DOTNET" = 1 ]; then
+  F=$(find . -maxdepth 3 \( -name '*.sln' -o -name '*.slnx' \) -not -path '*/node_modules/*' -not -path '*/bin/*' -not -path '*/obj/*' 2>/dev/null | head -1)
+  [ -n "$F" ] && SLN_DIR=$(dirname "$F" | sed 's#^\./##')
+  [ -z "$SLN_DIR" ] && SLN_DIR="."
+fi
+PYTHON=0; [ "$BE" = "python" ] && PYTHON=1
+
+# Python service: the directory holding requirements.txt / pyproject.toml (repo root first).
+PY_DIR=""; PY_INSTALL="pip install -e ."; PY_VER="3.12"; PY_RUFF=0; PY_RUFF_PKG=""
+if [ "$PYTHON" = 1 ]; then
+  for F in requirements.txt pyproject.toml; do [ -f "$F" ] && { PY_DIR="."; break; }; done
+  if [ -z "$PY_DIR" ]; then
+    F=$(find . -maxdepth 3 -not -path '*/node_modules/*' -not -path '*/.venv/*' \( -name requirements.txt -o -name pyproject.toml \) 2>/dev/null | head -1)
+    [ -n "$F" ] && PY_DIR=$(dirname "$F" | sed 's#^\./##')
+  fi
+  [ -z "$PY_DIR" ] && PY_DIR="."
+  [ -f "$PY_DIR/requirements.txt" ] && PY_INSTALL="pip install -r requirements.txt"
+  # Interpreter version FROM THE PROJECT: .python-version → pyproject requires-python → 3.12
+  if [ -f "$PY_DIR/.python-version" ]; then PY_VER=$(head -1 "$PY_DIR/.python-version" | tr -d '[:space:]' | cut -d. -f1-2)
+  elif [ -f .python-version ]; then PY_VER=$(head -1 .python-version | tr -d '[:space:]' | cut -d. -f1-2)
+  elif [ -f "$PY_DIR/pyproject.toml" ]; then
+    V=$(sed -n 's/^requires-python[[:space:]]*=[[:space:]]*"[^0-9]*\([0-9][0-9]*\.[0-9][0-9]*\).*/\1/p' "$PY_DIR/pyproject.toml" | head -1); [ -n "$V" ] && PY_VER="$V"
+  fi
+  case "$PY_VER" in [0-9]*.[0-9]*) ;; *) PY_VER="3.12" ;; esac
+  { [ -f "$PY_DIR/ruff.toml" ] || [ -f "$PY_DIR/.ruff.toml" ] || grep -qs '\[tool.ruff' "$PY_DIR/pyproject.toml"; } && { PY_RUFF=1; PY_RUFF_PKG=" ruff"; }
+fi
+# setup-python's macOS builds are compiled for /Users/runner/hostedtoolcache and install nowhere else,
+# so on a self-hosted Mac (any other user) the step fails on "mkdir: /Users/runner". There the job
+# takes the host's python$PY_VER into a per-job venv instead; other self-hosted runners keep setup-python.
+PY_IF=""; PY_VENV=""
+case "$RUNS_ON" in ubuntu-*|windows-*|macos-*) ;; *)
+  PY_IF=$'\n        if: runner.os != \'macOS\''
+  PY_VENV="
+      - name: Python $PY_VER venv (self-hosted macOS)
+        if: runner.os == 'macOS'
+        run: |
+          python$PY_VER -m venv \"\$RUNNER_TEMP/venv\"
+          echo \"\$RUNNER_TEMP/venv/bin\" >> \"\$GITHUB_PATH\"" ;;
+esac
+
+# The deployable ASP.NET Core project (Sdk.Web, not a test project) and EF migrations.
+API_PROJ=""
+if [ "$DOTNET" = 1 ]; then
+  API_PROJ=$(find . -maxdepth 5 -name '*.csproj' -not -path '*/bin/*' -not -path '*/obj/*' 2>/dev/null \
+    | grep -viE 'test' | while read -r f; do grep -q 'Microsoft.NET.Sdk.Web' "$f" && echo "${f#./}"; done | head -1)
+fi
+# Toolchain versions FROM THE PROJECT (never assume the newest):
+#   .NET SDK  global.json sdk.version → else the API's <TargetFramework> (net8.0 → 8.0.x) → else 10.0.x
+#   Node      .nvmrc / .node-version → else package.json engines.node → else 22
+#   dotnet-ef the project's EF Core package version (tool and runtime must match)
+DOTNET_SDK="10.0.x"
+if [ -f global.json ] && command -v jq >/dev/null 2>&1; then
+  V=$(jq -r '.sdk.version // empty' global.json 2>/dev/null); [ -n "$V" ] && DOTNET_SDK="$(echo "$V" | cut -d. -f1-2).x"
+elif [ "$DOTNET" = 1 ]; then
+  TFM=$(grep -rhoE '<TargetFramework>net[0-9]+\.[0-9]+' --include='*.csproj' . 2>/dev/null | grep -v '/bin/\|/obj/' | head -1 | sed 's/.*net//')
+  [ -n "$TFM" ] && DOTNET_SDK="$TFM.x"
+fi
+NODE_VER="22"
+for F in "${NG_DIR:-.}/.nvmrc" "${NG_DIR:-.}/.node-version" .nvmrc .node-version; do
+  [ -f "$F" ] && { NODE_VER=$(head -1 "$F" | tr -d 'v[:space:]' | cut -d. -f1); break; }
+done
+if [ "$NODE_VER" = "22" ] && [ -n "$NG_DIR" ] && [ -f "$NG_DIR/package.json" ]; then
+  E=$(sed -n 's/.*"node"[[:space:]]*:[[:space:]]*"[^0-9]*\([0-9][0-9]*\).*/\1/p' "$NG_DIR/package.json" | head -1); [ -n "$E" ] && NODE_VER="$E"
+fi
+case "$NODE_VER" in ''|*[!0-9]*) NODE_VER="22" ;; esac
+
+# EF Core migrations may live in another project (e.g. Infrastructure) than the API.
+HAS_MIGRATIONS=0; MIG_PROJ=""
+EF_VER=$(grep -rhoE 'Include="Microsoft\.EntityFrameworkCore[A-Za-z.]*"[[:space:]]+Version="[0-9]+\.[0-9]+\.[0-9]+' --include='*.csproj' . 2>/dev/null \
+  | sed -E 's/.*Version="//' | sort -t. -k1,1nr -k2,2nr -k3,3nr | head -1)
+MIG_DIR=$(find . -maxdepth 6 -type d -name Migrations -not -path '*/bin/*' -not -path '*/obj/*' 2>/dev/null | head -1)
+if [ -n "$MIG_DIR" ] && [ "$DOTNET" = 1 ]; then
+  HAS_MIGRATIONS=1
+  MIG_PROJ=$(find "$(dirname "$MIG_DIR")" -maxdepth 1 -name '*.csproj' 2>/dev/null | head -1 | sed 's#^\./##')
+fi
+
+github_yml() {
+cat <<YML
+# Generated by devpilot (scripts/generate-ci.sh) — the gate ladder, server-side.
+# Require the "devpilot-ci" check on $BASE and main (scripts/protect-branches.sh).
+name: devpilot-ci
+
+on:
+  pull_request:
+    branches: ["$BASE", "main", "release/**"]
+  push:
+    branches: ["$BASE"]
+
+concurrency:
+  group: devpilot-ci-\${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  devpilot-ci:
+    name: devpilot-ci
+    runs-on: $RUNS_ON
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # test-guard diffs against the target branch
+YML
+if [ -n "$NG_DIR" ]; then cat <<YML
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: $NODE_VER$NODE_CACHE
+      - name: npm ci (Angular)
+        working-directory: $NG_DIR
+        run: npm ci
+      - name: lint (Angular)
+        working-directory: $NG_DIR
+        run: npm run lint --if-present
+      - name: build (Angular)
+        working-directory: $NG_DIR
+        run: npm run build --if-present
+      - name: unit tests (Angular · Vitest)
+        run: TEST_MAX_LINES=400 bash scripts/run-tests.sh angular
+YML
+fi
+if [ "$DOTNET" = 1 ]; then cat <<YML
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: $DOTNET_SDK$NUGET_CACHE
+      - name: build (.NET)
+        working-directory: $SLN_DIR
+        run: dotnet build --configuration Release
+$(hook_file before-dotnet-tests.github.yml)
+      - name: tests (.NET · xUnit + Testcontainers SQL Server)
+        working-directory: $SLN_DIR
+$(dotnet_test_env "        ")
+        run: dotnet test --configuration Release --no-build --logger "trx;LogFileName=results.trx"
+$(hook_file after-dotnet-tests.github.yml)
+YML
+fi
+if [ "$PYTHON" = 1 ]; then cat <<YML
+
+      - uses: actions/setup-python@v5$PY_IF
+        with:
+          python-version: "$PY_VER"$PIP_CACHE$PY_VENV
+      - name: pip install (Python)
+        working-directory: $PY_DIR
+        run: |
+          python -m pip install --upgrade pip
+          $PY_INSTALL
+          [ -f requirements-dev.txt ] && pip install -r requirements-dev.txt || true
+          pip install pytest pytest-asyncio httpx$PY_RUFF_PKG
+YML
+[ "$PY_RUFF" = 1 ] && cat <<YML
+      - name: lint (Python · ruff)
+        working-directory: $PY_DIR
+        run: ruff check . && ruff format --check .
+YML
+cat <<YML
+      - name: tests (Python · pytest)
+        run: TEST_MAX_LINES=400 bash scripts/run-tests.sh python
+YML
+fi
+if [ "$HAS_E2E" = 1 ]; then
+[ "$E2E_OWN_PKG" = 1 ] && cat <<YML
+
+      - name: npm ci (e2e)
+        working-directory: $E2E_DIR
+        run: npm ci
+YML
+cat <<YML
+
+      - name: Playwright browsers
+        working-directory: $([ "$E2E_OWN_PKG" = 1 ] && echo "$E2E_DIR" || echo "${NG_DIR:-.}")
+        run: npx playwright install --with-deps chromium
+      - name: UI journeys (Playwright + axe)
+        run: TEST_MAX_LINES=400 bash scripts/run-tests.sh e2e
+YML
+fi
+cat <<'YML'
+
+      - name: test-guard — every changed source file has a covering test
+        if: github.event_name == 'pull_request'
+        run: STRICT=1 bash scripts/test-guard.sh "origin/${{ github.base_ref }}"
+
+      - name: dependency audit — no new high/critical CVEs
+        run: STRICT=1 bash scripts/audit.sh
+
+      - name: version is ahead of the target (parallel deliveries never reuse a version)
+        if: github.event_name == 'pull_request' && github.base_ref != 'main'
+        run: bash scripts/version.sh verify --ref "origin/${{ github.base_ref }}"
+
+      - name: keep logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: devpilot-logs
+          path: .devpilot/logs/
+          if-no-files-found: ignore
+YML
+}
+
+azure_yml() {
+cat <<YML
+# Generated by devpilot (scripts/generate-ci.sh) — the gate ladder, server-side.
+# Azure Repos: PR validation is a branch policy, not a YAML trigger — add this pipeline
+# as "Build validation" on $BASE and main (scripts/protect-branches.sh prints the steps).
+trigger:
+  branches:
+    include: ["$BASE", "main", "release/*"]
+pr: none
+
+pool:
+  vmImage: ubuntu-latest
+
+jobs:
+  - job: devpilot_ci
+    displayName: devpilot-ci
+    timeoutInMinutes: 30
+    steps:
+      - checkout: self
+        fetchDepth: 0
+YML
+if [ -n "$NG_DIR" ]; then cat <<YML
+
+      - task: NodeTool@0
+        inputs:
+          versionSpec: "$NODE_VER.x"
+      - script: npm ci
+        workingDirectory: $NG_DIR
+        displayName: npm ci (Angular)
+      - script: npm run lint --if-present
+        workingDirectory: $NG_DIR
+        displayName: lint (Angular)
+      - script: npm run build --if-present
+        workingDirectory: $NG_DIR
+        displayName: build (Angular)
+      - script: TEST_MAX_LINES=400 bash scripts/run-tests.sh angular
+        displayName: unit tests (Angular · Vitest)
+YML
+fi
+if [ "$DOTNET" = 1 ]; then cat <<YML
+
+      - task: UseDotNet@2
+        inputs:
+          packageType: sdk
+          version: $DOTNET_SDK
+      - script: dotnet build --configuration Release
+        workingDirectory: $SLN_DIR
+        displayName: build (.NET)
+$(hook_file before-dotnet-tests.azure.yml)
+      - script: dotnet test --configuration Release --no-build --logger "trx;LogFileName=results.trx"
+        workingDirectory: $SLN_DIR
+$(dotnet_test_env "        ")
+        displayName: tests (.NET · xUnit + Testcontainers SQL Server)
+$(hook_file after-dotnet-tests.azure.yml)
+      - task: PublishTestResults@2
+        condition: succeededOrFailed()
+        inputs:
+          testResultsFormat: VSTest
+          testResultsFiles: "**/results.trx"
+YML
+fi
+if [ "$PYTHON" = 1 ]; then cat <<YML
+
+      - task: UsePythonVersion@0
+        inputs:
+          versionSpec: "$PY_VER"
+      - script: |
+          python -m pip install --upgrade pip
+          $PY_INSTALL
+          [ -f requirements-dev.txt ] && pip install -r requirements-dev.txt || true
+          pip install pytest pytest-asyncio httpx$PY_RUFF_PKG
+        workingDirectory: $PY_DIR
+        displayName: pip install (Python)
+YML
+[ "$PY_RUFF" = 1 ] && cat <<YML
+      - script: ruff check . && ruff format --check .
+        workingDirectory: $PY_DIR
+        displayName: lint (Python · ruff)
+YML
+cat <<YML
+      - script: TEST_MAX_LINES=400 bash scripts/run-tests.sh python
+        displayName: tests (Python · pytest)
+YML
+fi
+if [ "$HAS_E2E" = 1 ]; then
+[ "$E2E_OWN_PKG" = 1 ] && cat <<YML
+
+      - script: npm ci
+        workingDirectory: $E2E_DIR
+        displayName: npm ci (e2e)
+YML
+cat <<YML
+
+      - script: npx playwright install --with-deps chromium
+        workingDirectory: $([ "$E2E_OWN_PKG" = 1 ] && echo "$E2E_DIR" || echo "${NG_DIR:-.}")
+        displayName: Playwright browsers
+      - script: TEST_MAX_LINES=400 bash scripts/run-tests.sh e2e
+        displayName: UI journeys (Playwright + axe)
+YML
+fi
+cat <<'YML'
+
+      - script: STRICT=1 bash scripts/test-guard.sh "origin/${SYSTEM_PULLREQUEST_TARGETBRANCH#refs/heads/}"
+        condition: eq(variables['Build.Reason'], 'PullRequest')
+        displayName: test-guard — every changed source file has a covering test
+      - script: STRICT=1 bash scripts/audit.sh
+        displayName: dependency audit — no new high/critical CVEs
+      - script: bash scripts/version.sh verify --ref "origin/${SYSTEM_PULLREQUEST_TARGETBRANCH#refs/heads/}"
+        condition: and(eq(variables['Build.Reason'], 'PullRequest'), ne(variables['System.PullRequest.TargetBranch'], 'refs/heads/main'))
+        displayName: version is ahead of the target (parallel deliveries never reuse a version)
+      - task: PublishPipelineArtifact@1
+        condition: failed()
+        inputs:
+          targetPath: .devpilot/logs
+          artifact: devpilot-logs
+YML
+}
+
+# Build steps shared by both CD flavours: out/web (Angular dist) · out/api (dotnet
+# publish, or the Python service source + requirements) · out/db (db-package.sh: migrations.sql, rollback.sql, migrations.txt) — the one artifact promoted.
+cd_build_script() {
+  # One command per line: under `set -e`, a failure inside an `a && b && c` chain does NOT
+  # stop the script — the build would "succeed" and ship without the frontend.
+  echo 'set -euo pipefail'
+  echo 'mkdir -p out'
+  if [ -n "$NG_DIR" ]; then
+    echo "(cd '$NG_DIR' && npm ci)"
+    echo "(cd '$NG_DIR' && npx ng build --configuration production)"
+    echo "mkdir -p out/web"
+    echo "cp -r '$NG_DIR/dist/.' out/web/"
+  fi
+  if [ "$DOTNET" = 1 ]; then
+    echo "dotnet publish ${API_PROJ:+'$API_PROJ' }--configuration Release --output out/api -p:Version=\"\$(bash scripts/version.sh current)\""
+    if [ "$HAS_MIGRATIONS" = 1 ]; then
+      if [ -f .config/dotnet-tools.json ] && grep -q dotnet-ef .config/dotnet-tools.json; then echo 'dotnet tool restore >/dev/null'
+      else echo "dotnet tool update --global dotnet-ef${EF_VER:+ --version $EF_VER} >/dev/null"; fi
+      echo 'export PATH="$PATH:$HOME/.dotnet/tools"'
+      echo "bash scripts/db-package.sh out/db ${MIG_PROJ:+--project '$MIG_PROJ' }${API_PROJ:+--startup '$API_PROJ'}"
+    fi
+  fi
+  if [ "$PYTHON" = 1 ]; then
+    # Source deploy: the Python service + its requirements, minus local-only folders.
+    echo "mkdir -p out/api"
+    echo "tar -C '$PY_DIR' --exclude=.venv --exclude=venv --exclude=__pycache__ --exclude=tests --exclude=.git --exclude=node_modules --exclude=out -cf - . | tar -C out/api -xf -"
+  fi
+  echo 'bash scripts/version.sh current > out/VERSION'
+}
+
+github_cd_yml() {
+cat <<YML
+# Generated by devpilot (scripts/generate-ci.sh) — build once, promote the same artifact.
+#   $BASE → DEV · release/* → SIT → UAT (approval) → PRD (approval) · hotfix/* → SIT → PRD (approval)
+#   Run manually on a tag (e.g. v1.4.0) with an environment → redeploy / roll back that environment.
+# Environments + approvals: bash scripts/setup-environments.sh
+# Per environment: secret DEPLOY_HOOK (or deploy/deploy.sh from scripts/deploy-init.sh + its settings)
+#                  · variables API_URL, FRONTEND_URL
+name: devpilot-cd
+
+on:
+  push:
+    branches: ["$BASE", "release/**", "hotfix/**"]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Deploy this ref (e.g. a v* tag) to one environment"
+        type: choice
+        options: [dev, sit, uat, prd]
+        required: true
+
+concurrency:
+  group: devpilot-cd-\${{ github.ref }}
+  cancel-in-progress: false   # never cancel a deployment half-way
+
+jobs:
+  build:
+    runs-on: $RUNS_ON
+    outputs:
+      version: \${{ steps.version.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # tags: db-package.sh diffs migrations against the previous release
+      - id: version
+        run: echo "version=\$(bash scripts/version.sh current)" >> "\$GITHUB_OUTPUT"
+YML
+[ -n "$NG_DIR" ] && cat <<YML
+      - uses: actions/setup-node@v4
+        with:
+          node-version: $NODE_VER$NODE_CACHE
+YML
+[ "$DOTNET" = 1 ] && cat <<YML
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: $DOTNET_SDK$NUGET_CACHE
+YML
+[ "$PYTHON" = 1 ] && cat <<YML
+      - uses: actions/setup-python@v5$PY_IF
+        with:
+          python-version: "$PY_VER"$PY_VENV
+YML
+cat <<YML
+      - name: build once (web + api + db script)
+        run: |
+$(cd_build_script | sed 's/^/          /')
+      - uses: actions/upload-artifact@v4
+        with:
+          name: app
+          path: out/
+          retention-days: 30
+YML
+  gh_deploy_job dev  "build" \
+    "needs.build.result == 'success' && ((github.event_name == 'push' && github.ref == 'refs/heads/$BASE') || inputs.environment == 'dev')"
+  gh_deploy_job sit  "build" \
+    "needs.build.result == 'success' && ((github.event_name == 'push' && (startsWith(github.ref, 'refs/heads/release/') || startsWith(github.ref, 'refs/heads/hotfix/'))) || inputs.environment == 'sit')"
+  gh_deploy_job uat  "[build, sit]" \
+    "!cancelled() && needs.build.result == 'success' && ((github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/') && needs.sit.result == 'success') || inputs.environment == 'uat')"
+  gh_deploy_job prd  "[build, sit, uat]" \
+    "!cancelled() && needs.build.result == 'success' && ((github.event_name == 'push' && startsWith(github.ref, 'refs/heads/release/') && needs.uat.result == 'success') || (github.event_name == 'push' && startsWith(github.ref, 'refs/heads/hotfix/') && needs.sit.result == 'success') || inputs.environment == 'prd')"
+}
+
+# Settings the deploy templates read (scripts/deploy-init.sh) — passed to every deploy step;
+# unset ones are simply empty. GitHub: environment secret or variable of that name.
+DEPLOY_VARS="AZURE_CLIENT_ID AZURE_CLIENT_SECRET AZURE_TENANT_ID AZURE_SUBSCRIPTION_ID AZURE_RESOURCE_GROUP
+API_APP WEB_APP SLOT SQL_SERVER SQL_DATABASE SQL_USER SQL_PASSWORD SQL_AUTH
+REGISTRY REGISTRY_USER REGISTRY_PASSWORD KUBE_CONFIG KUBE_NAMESPACE
+IIS_SERVER IIS_USER IIS_SSH_KEY IIS_API_PATH IIS_API_POOL IIS_WEB_PATH IIS_WEB_POOL"
+
+gh_deploy_job() {  # gh_deploy_job <env> <needs> <condition>
+  local e="$1" up; up=$(printf '%s' "$1" | tr '[:lower:]' '[:upper:]')
+cat <<YML
+
+  $e:
+    needs: $2
+    if: \${{ $3 }}
+    runs-on: $RUNS_ON
+    environment:
+      name: $e
+      url: \${{ vars.FRONTEND_URL }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: app
+          path: out/
+      - name: deploy v\${{ needs.build.outputs.version }} → $up
+        run: bash scripts/deploy.sh $e out
+        env:
+          DEPLOY_HOOK: \${{ secrets.DEPLOY_HOOK }}
+          ${up}_API_URL: \${{ vars.API_URL }}
+          ${up}_FRONTEND_URL: \${{ vars.FRONTEND_URL }}
+YML
+  local v
+  for v in $DEPLOY_VARS; do printf '          %s: ${{ secrets.%s || vars.%s }}\n' "$v" "$v" "$v"; done
+}
+
+azure_cd_yml() {
+cat <<YML
+# Generated by devpilot (scripts/generate-ci.sh) — build once, promote the same artifact.
+#   $BASE → DEV · release/* → SIT → UAT (approval) → PRD (approval) · hotfix/* → SIT → PRD (approval)
+#   Run manually on a tag with "environment" set → redeploy / roll back that one environment.
+# Environments + approvals + this pipeline: bash scripts/setup-environments.sh
+# Variables (pipeline or library group): DEPLOY_HOOK_<ENV> (secret), <ENV>_API_URL, <ENV>_FRONTEND_URL,
+# and the deploy target's settings per stage, e.g. PRD_API_APP, PRD_SQL_SERVER (scripts/deploy-init.sh)
+trigger:
+  branches:
+    include: ["$BASE", "release/*", "hotfix/*"]
+pr: none
+
+parameters:
+  - name: environment
+    displayName: Deploy only to (manual runs)
+    type: string
+    default: auto
+    values: [auto, dev, sit, uat, prd]
+
+pool:
+  vmImage: ubuntu-latest
+
+stages:
+  - stage: Build
+    jobs:
+      - job: build
+        steps:
+          - checkout: self
+            fetchDepth: 0
+            fetchTags: true
+YML
+[ -n "$NG_DIR" ] && cat <<YML
+          - task: NodeTool@0
+            inputs:
+              versionSpec: "$NODE_VER.x"
+YML
+[ "$DOTNET" = 1 ] && cat <<YML
+          - task: UseDotNet@2
+            inputs:
+              packageType: sdk
+              version: $DOTNET_SDK
+YML
+[ "$PYTHON" = 1 ] && cat <<YML
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: "$PY_VER"
+YML
+cat <<YML
+          - script: |
+$(cd_build_script | sed 's/^/              /')
+            displayName: build once (web + api + db script)
+          - publish: out
+            artifact: app
+YML
+  local AUTO="eq('\${{ parameters.environment }}', 'auto')"
+  local REL="startsWith(variables['Build.SourceBranch'], 'refs/heads/release/')"
+  local HOT="startsWith(variables['Build.SourceBranch'], 'refs/heads/hotfix/')"
+  local OK="in(dependencies.Build.result, 'Succeeded')"
+  az_stage DEV dev "Build" \
+    "and($OK, or(and($AUTO, eq(variables['Build.SourceBranch'], 'refs/heads/$BASE')), eq('\${{ parameters.environment }}', 'dev')))"
+  az_stage SIT sit "Build" \
+    "and($OK, or(and($AUTO, or($REL, $HOT)), eq('\${{ parameters.environment }}', 'sit')))"
+  az_stage UAT uat "[Build, SIT]" \
+    "and($OK, or(and($AUTO, $REL, in(dependencies.SIT.result, 'Succeeded')), eq('\${{ parameters.environment }}', 'uat')))"
+  az_stage PRD prd "[Build, SIT, UAT]" \
+    "and($OK, or(and($AUTO, $REL, in(dependencies.UAT.result, 'Succeeded')), and($AUTO, $HOT, in(dependencies.SIT.result, 'Succeeded')), eq('\${{ parameters.environment }}', 'prd')))"
+}
+
+az_stage() {  # az_stage <STAGE> <env> <dependsOn> <condition>
+cat <<YML
+
+  - stage: $1
+    dependsOn: $3
+    condition: $4
+    jobs:
+      - deployment: deploy_$2
+        displayName: deploy → $1
+        environment: $2
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                - download: current
+                  artifact: app
+                - script: bash scripts/deploy.sh $2 "\$(Pipeline.Workspace)/app"
+                  displayName: deploy + smoke test
+                  env:
+                    DEPLOY_HOOK: \$(DEPLOY_HOOK_$1)
+                    $1_API_URL: \$($1_API_URL)
+                    $1_FRONTEND_URL: \$($1_FRONTEND_URL)
+YML
+  local v
+  for v in $DEPLOY_VARS; do printf '                    %s: $(%s_%s)\n' "$v" "$1" "$v"; done
+}
+
+# write <file> <generator> — each file honours --force independently
+write() {
+  if [ -f "$1" ] && [ "$FORCE" = 0 ]; then
+    echo "ℹ️  $1 already exists — re-generate with: bash scripts/generate-ci.sh --force"
+    return 0
+  fi
+  mkdir -p "$(dirname "$1")"
+  "$2" > "$1"
+  echo "✅ $1 written"
+}
+
+if [ "$HOST" = "azure" ]; then write "$OUT" azure_yml; else write "$OUT" github_yml; fi
+if [ "$CD" = 1 ]; then
+  if [ "$HOST" = "azure" ]; then write "$OUT_CD" azure_cd_yml; else write "$OUT_CD" github_cd_yml; fi
+elif [ "$CD_MODE" = "off" ] && [ -f "$OUT_CD" ]; then
+  echo "⚠️  ci.cd is off but $OUT_CD exists — it is no longer generated; delete it: git rm $OUT_CD"
+fi
+echo "   toolchain: $([ "$PYTHON" = 1 ] && echo "Python $PY_VER" || echo ".NET SDK $DOTNET_SDK") · Node $NODE_VER${EF_VER:+ · dotnet-ef $EF_VER}"
+echo "   runner: $RUNS_ON"
+echo "   host: $HOST · angular: ${NG_DIR:-none} · api: ${API_PROJ:-${PY_DIR:-$BE}}$([ "$DOTNET" = 1 ] && [ "$SLN_DIR" != "." ] && echo " (solution in $SLN_DIR)") · migrations: $([ "$HAS_MIGRATIONS" = 1 ] && echo yes || echo no) · e2e: $([ "$HAS_E2E" = 1 ] && echo yes || { [ "$E2E_MODE" = off ] && echo off || echo no; }) · cd: $([ "$CD" = 1 ] && echo yes || { [ "$CD_MODE" = off ] && echo off || echo no; }) · base: $BASE"
+if [ "$CD" = 1 ]; then echo "   Next: bash scripts/protect-branches.sh (CI required) · bash scripts/setup-environments.sh (CD approvals)"
+else echo "   Next: bash scripts/protect-branches.sh (CI required)"; fi

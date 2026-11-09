@@ -1,0 +1,39 @@
+# ── Local config & secrets (never commit) ───────────────────────────────────
+.devpilot/config.sh
+.devpilot/.scope-lock
+.env
+.env.local
+.env.*.local
+
+# ── Generated / transient task output ────────────────────────────────────────
+
+
+# ── OS / editor junk ─────────────────────────────────────────────────────────
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+Desktop.ini
+*.swp
+*.swo
+*~
+.idea/
+.vscode/
+*.log
+
+# Auto-generated project index — regenerated on session-start + post-merge/
+# post-checkout hooks (scripts/generate-project-index.sh). Tracking it created
+# perpetual "modified" churn (wall-clock timestamp) and modify/modify merge
+# conflicts. It is regenerated everywhere, so it is not version-controlled.
+docs/project-index.md
+docs/index/.state
+docs/index/*.md
+
+# Token-lean test runner logs (scripts/run-tests.sh)
+.devpilot/logs/
+
+# Claude Code: per-user settings and agent worktrees
+.claude/worktrees/
+.claude/settings.local.json

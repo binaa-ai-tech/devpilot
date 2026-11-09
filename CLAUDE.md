@@ -1,0 +1,123 @@
+# DevPilot — AI delivery team (Angular + .NET / Python, Claude Code)
+
+Describe the requirement; the team plans → builds → tests → reviews → merges it.
+The end-to-end SDLC contract (phases, gates, roles) lives in `.devpilot/process.md`.
+
+---
+
+## The 11 commands — one per team role
+
+| Role | Command | Does |
+|------|---------|------|
+| Whole team | `/dp-deliver <requirement\|KEY> [--to sit]` | **End to end** — plan → sprint → build → QA → review → version bump → PR → merge into `develop` → items, Epic & sprint closed (→ SIT). Asks only if no tracker is connected (connect or skip) or on a gray-zone dedup. `/dp-deliver resume` continues after an interruption. |
+| Product Owner / BA | `/dp-plan <requirement\|KEY>` | Dedup against the tracker + the top matches' child tasks, write Epic→Story with testable ACs. No code. |
+| Architect / BA | `/dp-spec <KEY\|slug\|brainstorm\|draft\|review\|resolve\|bootstrap\|drift-report>` | **Elephant-Goldfish** spec design + review: zero-context `egm-*` reviewers must understand and approve the spec before code (PASS / BLOCKED). No code. |
+| Scrum Master | `/dp-sprint` | Group READY Stories into sprints, recommend run order. |
+| Developers | `/dp-build [sprint]` | Angular + .NET / Python agents build a sprint on one branch → one PR → `develop`. |
+| QA | `/dp-test [ui\|perf] [story\|PR\|diff]` | Cases from ACs → unit / integration / Playwright UI tests → run. |
+| Tech Lead | `/dp-pr [PR]` | Apply review comments, drive CI green (bounded), merge per `auto-merge` gates. |
+| DevOps | `/dp-release <sit\|uat\|prd\|rollback> [version]` | Promote DEV→SIT→UAT→PRD, or roll back. PRD is always human-approved. |
+| On-call | `/dp-hotfix <ticket> <slug> <version>` | Emergency fix from the deployed tag + postmortem. |
+| Everyone | `/dp-status [health\|board\|metrics]` | Health · board · throughput. |
+| Admin | `/dp-setup [fix\|tracker\|pipelines\|models\|wizard\|index]` | Repair config, connect + self-test Jira / Azure DevOps / GitHub, set up CI/CD + approvals, switch Claude model profile, refresh index. |
+
+---
+
+## How it works
+
+```
+/dp-deliver "add CSV export"
+  TRACKER → tracker.sh check · not configured → ask once: connect (API key) or continue locally
+  PLAN    → classify · dedup vs tracker.sh search + child items (tracker.sh show) · Epic→Story first
+  SPEC    → Goldfish review of docs/requirements/<slug>.md (M/L Stories) · BLOCKED stops the run
+  SPRINT  → feature: own sprint · bug: active sprint · P0/P1: refused → /dp-hotfix
+  BUILD   → team-dotnet (API · EF Core · OpenAPI) or team-python (FastAPI · agents) ║ team-frontend (Angular · generated client)
+  QA      → Vitest · xUnit + real SQL Server · Playwright journeys + axe
+  REVIEW  → review-checklist · security · performance · test guard (strict)
+  VERSION → version.sh bump from develop (feature → minor · bug → patch)
+  MERGE   → one PR "[vX.Y.Z] …" → develop (auto-merge ladder; GitHub or Azure Repos)
+  CLOSE   → close-delivery.sh: items Done · Epic Done · sprint closed · back on develop
+            (local tracker: items close inside the PR — close-delivery.sh --prepare)
+            --to sit → release/<version> → SIT
+```
+
+**Dedup brain:** `/dp-plan` searches the live tracker (`tracker.sh search`, Done items included)
+and `docs/backlog/index.md`, then opens only the top 1–3 candidates *with their child items*
+(`tracker.sh show`) — an existing Story or Task under a matching Epic is reused, never duplicated.
+Merges are reversible tracker links + one Story with combined ACs.
+
+## Spec review — Elephant-Goldfish
+
+DevPilot vendors Google's Elephant-Goldfish Model in `.devpilot/egm` (Apache-2.0; read
+`.devpilot/egm/DEVPILOT.md`). The main session is the **Elephant** that writes the spec; the
+`egm-*` agents are the **Goldfish** — no history, no `CLAUDE.md` — and must understand the spec
+from the page alone. Rules: `.claude/skills/spec-review/SKILL.md`; switch: `spec_review` in
+`project.config.md`; refresh: `bash scripts/sync-egm.sh`.
+
+EGM artifact directory: docs/specs
+
+## Trackers & git hosts
+
+| | Options | Interface |
+|--|---------|-----------|
+| Work tracker | Jira · Azure DevOps Boards · GitHub Issues · local (`docs/tasks/`) | `scripts/tracker.sh` (backends `jira.sh` · `azdo.sh` · `github.sh`) |
+| Git host | GitHub (`gh` / GitHub MCP) · Azure Repos (`azdo.sh`, auto-complete) | `scripts/git-host.sh` → `open-pr.sh` |
+| Version | `VERSION` · `Directory.Build.props` · `package.json` · `*.csproj` | `scripts/version.sh` |
+| Delivery pipeline | `devpilot-cd`: build once → DEV → SIT → UAT → PRD (approvals on UAT/PRD) | `generate-ci.sh` · `deploy.sh` · `smoke.sh` · `setup-environments.sh` · `db-package.sh` · `deploy-init.sh` (App Service / IIS / Kubernetes) |
+| Release finish | release/hotfix → `main` and → `develop` **through PRs** (merge commits), tag on main | `git-flow.sh release-finish` / `hotfix-finish` (re-runnable) |
+| Release notes | one entry per item in `docs/changes/` → CHANGELOG section at release | `changelog.sh add` / `changelog.sh <version>` |
+| Secrets | `.devpilot/config.sh` · keychain · Azure Key Vault (env vars win) | `devpilot-lib.sh` (`secrets.provider`) |
+| Cost | tokens per session → per work item (Stop/SessionEnd hook) | `usage-hook.sh` → `metrics.sh` |
+
+Never call a backend directly from a command — always `tracker.sh`. Secrets live in the gitignored
+`.devpilot/config.sh`; same-named environment variables override it.
+
+---
+
+## Token discipline
+
+- **Two-tier index** — `docs/project-index.md` is a small bounded **map**; per-file detail lives in
+  `docs/index/*.md` **shards** grepped by `scope.sh`, never loaded into context.
+- **Scope once, reuse everywhere** — `bash scripts/scope.sh --save <slug> "<task>"` saves the
+  ranked files to `docs/tasks/<slug>-scope.md`; later phases reuse it. Read only the top 3–8 files.
+- **Hash-gated freshness** — the index regenerates only when repo content changed. Never broad-scan.
+- **Read-once core** — `core-rules` is preloaded into every agent; stack skills load automatically on matching
+  files (`paths:`), the others only at the step that needs them.
+- **Token-lean tests** — run suites via `bash scripts/run-tests.sh <angular|dotnet|python|e2e|all>`: the
+  full log goes to `.devpilot/logs/`, only failures come back.
+
+---
+
+## Models (Claude only)
+
+Each agent has a role model (`.claude/agents/*.md`); tasks are routed per complexity by
+`scripts/resolve-model.sh`: **power** (Opus) for architectural / cross-cutting / high-risk work,
+**standard** (Sonnet) for normal implementation, **lite** (Haiku) for simple and QA work; the BA writes specs on Sonnet.
+Change with `/dp-setup models <auto|balanced|save>`. Reference: `.devpilot/config/models.md`.
+
+---
+
+## Stack, rules, skills
+
+- **Frontend:** Angular 22+ (21 supported) · **Backend:** ASP.NET Core on .NET 10 (C#) + EF Core + SQL Server, or Python 3.11+
+  (FastAPI / asyncio / LiveKit agents) · **Contract:** OpenAPI → generated Angular client.
+- **Tests:** Vitest (Angular) · xUnit + `WebApplicationFactory` + Testcontainers (.NET) · pytest + httpx (Python) · Playwright (UI/E2E).
+- **Rules:** `.devpilot/rules.md` (router) + `.devpilot/rules/<angular|dotnet|python|sqlserver>.md`.
+- **Skills:** `.claude/skills/<name>/SKILL.md` — native Claude Code skills, hidden from the `/` menu
+  (`user-invocable: false`); index in `.claude/skills/README.md`.
+- **Agents:** `.claude/agents/` — team-ba, team-lead, team-frontend, team-dotnet, team-python, team-qa
+  (spawned by the commands; never called directly).
+
+---
+
+## Docs output per task
+
+| Document | Path |
+|----------|------|
+| Backlog index | `docs/backlog/index.md` |
+| Requirements + Domain Model | `docs/requirements/<slug>.md`, `docs/domain-models/<slug>.md` |
+| Sprint plan | `docs/sprints/plan.md` |
+| Implementation Plan + ADRs | `docs/plans/<slug>.md`, `docs/adrs/` |
+| QA Report | `docs/qa/<slug>.md` |
+| Review Report | `docs/reviews/<slug>.md` |
+| Step log + checkpoint | `docs/tasks/<KEY>.md`, `docs/tasks/<KEY>-checkpoint.json` |

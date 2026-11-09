@@ -1,0 +1,26 @@
+# main accepts pull requests only from develop (owner decision 2026-10-19): features are built and
+# tested on develop (the binaa-chat-dev / afkar-voice-dev Docker stacks on the Mac), then develop is
+# merged into main, which deploys to Cloudflare. A soft rule until the org's plan allows branch
+# protection on private repos. Public repo: GitHub-hosted runner, never the Mac.
+name: main-from-develop
+
+on:
+  pull_request:
+    branches: [main]
+
+permissions: {}
+
+jobs:
+  source-branch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: main accepts pull requests only from develop
+        env:
+          HEAD_REF: ${{ github.head_ref }}
+        run: |
+          if [ "$HEAD_REF" != "develop" ]; then
+            echo "::error::Pull requests into main must come from develop (this one is from $HEAD_REF). Open it against develop instead."
+            exit 1
+          fi
+          echo "from develop: ok"

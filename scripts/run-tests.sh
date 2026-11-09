@@ -1,0 +1,143 @@
+#!/usr/bin/env bash
+# =============================================================================
+# run-tests.sh — token-lean test runner: full log to disk, summary to the agent.
+#
+# Runs the Angular (Vitest), .NET, Python (pytest) and Playwright suites it detects, writes each
+# suite's complete output to .devpilot/logs/, and prints only a PASS/FAIL line
+# plus the failure lines. The skill that governs its use is
+# .claude/skills/token-lean-testing/SKILL.md.
+#
+#   bash scripts/run-tests.sh [angular|dotnet|python|e2e|all]   # default: all
+#   bash scripts/run-tests.sh cmd "<command>"            # wrap any command
+#   bash scripts/run-tests.sh dotnet -- --filter "FullyQualifiedName~Orders"
+#   bash scripts/run-tests.sh python -- -k orders
+#
+# Env: TEST_MAX_LINES (failure lines shown per suite, default 40)
+# Exit: 0 when every suite passed (or none was found), 1 otherwise.
+# =============================================================================
+set -uo pipefail
+
+ROOT="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+cd "$ROOT" || exit 1
+
+MAX_LINES="${TEST_MAX_LINES:-40}"
+LOG_DIR="$ROOT/.devpilot/logs"
+mkdir -p "$LOG_DIR"
+
+MODE="${1:-all}"
+[ $# -gt 0 ] && shift
+CUSTOM_CMD=""
+if [ "$MODE" = "cmd" ]; then
+  CUSTOM_CMD="${1:-}"
+  [ $# -gt 0 ] && shift
+  [ -z "$CUSTOM_CMD" ] && { echo "usage: run-tests.sh cmd \"<command>\"" >&2; exit 2; }
+fi
+[ "${1:-}" = "--" ] && shift
+EXTRA_ARGS=("$@")
+
+# Lines worth an agent's attention: failures, compiler errors, assertion diffs, totals.
+FAIL_PATTERN='FAIL|Fail|✗|×|✘|[Ee]rror|[Ee]xception|Expected|Received|Actual|Assert|expect\(|failed|Tests +[0-9]|Test Files|Passed!|Failed!|Total tests|[0-9]+ (passed|failed|flaky)|^E  |Traceback'
+
+FAILED=0
+RAN=0
+
+# find_dir <maxdepth> <name-glob...> → directory of the first match (repo-relative)
+find_dir() {
+  local depth="$1"; shift
+  local expr=() first=1 n
+  for n in "$@"; do
+    [ $first -eq 0 ] && expr+=(-o)
+    expr+=(-name "$n"); first=0
+  done
+  local hit
+  hit=$(find . -maxdepth "$depth" \( -path ./node_modules -o -path '*/node_modules' -o -path ./.git -o -path '*/.venv' -o -path '*/venv' \) -prune \
+    -o \( "${expr[@]}" \) -print 2>/dev/null | head -1)
+  [ -n "$hit" ] && dirname "$hit"
+  return 0
+}
+
+# run_suite <name> <dir> <command...>
+run_suite() {
+  local name="$1" dir="$2"; shift 2
+  local log="$LOG_DIR/$name.log" code start secs
+  RAN=$((RAN + 1))
+  start=$(date +%s)
+  ( cd "$dir" && "$@" ) >"$log" 2>&1
+  code=$?
+  secs=$(( $(date +%s) - start ))
+  if [ $code -eq 0 ]; then
+    echo "✅ PASS  $name  (${secs}s)  log: ${log#"$ROOT"/}"
+    grep -E 'Tests +[0-9]|Passed!|Total tests|[0-9]+ passed' "$log" | tail -2 | sed 's/^/        /'
+  else
+    FAILED=$((FAILED + 1))
+    echo "❌ FAIL  $name  (exit $code, ${secs}s)  log: ${log#"$ROOT"/}"
+    local hits
+    hits=$(grep -nE "$FAIL_PATTERN" "$log" | head -n "$MAX_LINES")
+    if [ -n "$hits" ]; then
+      printf '%s\n' "$hits" | cut -c1-220 | sed 's/^/        /'
+    else
+      tail -n "$MAX_LINES" "$log" | cut -c1-220 | sed 's/^/        /'
+    fi
+    local total
+    total=$(grep -cE "$FAIL_PATTERN" "$log")
+    [ "$total" -gt "$MAX_LINES" ] && echo "        … $((total - MAX_LINES)) more matching lines in the log"
+  fi
+}
+
+run_angular() {
+  local dir; dir=$(find_dir 3 angular.json)
+  [ -z "$dir" ] && { [ "$MODE" = "angular" ] && echo "⚠️  no angular.json found"; return; }
+  # A workspace without a `test` architect target (e.g. a prerendered site tested with node:test)
+  # runs its package.json `test` script instead of `ng test`.
+  if ! grep -qE '"test"[[:space:]]*:[[:space:]]*\{' "$dir/angular.json" 2>/dev/null; then
+    if [ -f "$dir/package.json" ] && grep -qE '"test"[[:space:]]*:[[:space:]]*"' "$dir/package.json"; then
+      run_suite angular "$dir" npm test --silent -- ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
+    else
+      [ "$MODE" = "angular" ] && echo "⚠️  angular.json has no test target and package.json has no test script"
+    fi
+    return
+  fi
+  run_suite angular "$dir" npx ng test --watch=false ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
+}
+
+run_dotnet() {
+  local dir; dir=$(find_dir 3 '*.sln' '*.slnx')
+  [ -z "$dir" ] && dir=$(find_dir 4 '*Tests.csproj' '*.Tests.csproj')
+  [ -z "$dir" ] && { [ "$MODE" = "dotnet" ] && echo "⚠️  no .sln or test project found"; return; }
+  run_suite dotnet "$dir" dotnet test --nologo --verbosity quiet ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
+}
+
+# Python: the first directory with a pytest config, a conftest.py, or a tests/ folder.
+# Uses the project's virtualenv when one exists next to the code, else `python3`.
+run_python() {
+  local dir; dir=$(find_dir 3 'pytest.ini' 'conftest.py' 'setup.cfg' 'tox.ini')
+  [ -z "$dir" ] && [ -f pyproject.toml ] && grep -q '\[tool.pytest' pyproject.toml && dir="."
+  [ -z "$dir" ] && [ -d tests ] && ls tests/test_*.py >/dev/null 2>&1 && dir="."
+  [ -z "$dir" ] && dir=$(find_dir 4 'test_*.py' '*_test.py')
+  [ -z "$dir" ] && { [ "$MODE" = "python" ] && echo "⚠️  no pytest config, conftest.py or test_*.py found"; return; }
+  local py="python3" v
+  for v in "$dir/.venv" "./.venv" "$dir/venv" "./venv"; do
+    [ -x "$v/bin/python" ] && { py="$v/bin/python"; break; }
+  done
+  run_suite python "$dir" "$py" -m pytest -q -p no:cacheprovider ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
+}
+
+run_e2e() {
+  local dir; dir=$(find_dir 3 'playwright.config.ts' 'playwright.config.js' 'playwright.config.mjs')
+  [ -z "$dir" ] && { [ "$MODE" = "e2e" ] && echo "⚠️  no playwright.config found"; return; }
+  run_suite e2e "$dir" npx playwright test --reporter=line ${EXTRA_ARGS[@]+"${EXTRA_ARGS[@]}"}
+}
+
+case "$MODE" in
+  angular) run_angular ;;
+  dotnet)  run_dotnet ;;
+  python)  run_python ;;
+  e2e)     run_e2e ;;
+  all)     run_dotnet; run_python; run_angular; run_e2e ;;
+  cmd)     run_suite cmd . bash -c "$CUSTOM_CMD" ;;
+  *) echo "usage: run-tests.sh [angular|dotnet|python|e2e|all|cmd \"<command>\"] [-- extra args]" >&2; exit 2 ;;
+esac
+
+[ $RAN -eq 0 ] && echo "ℹ️  no test suites detected"
+[ $FAILED -gt 0 ] && exit 1
+exit 0

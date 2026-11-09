@@ -1,0 +1,37 @@
+name: real-app
+
+# Builds a REAL Angular + ASP.NET Core + EF Core app with the pipelines DevPilot
+# generates (tests/real-app.sh): npm ci · ng build · dotnet publish · EF migration
+# script + rollback · test suites · actionlint. Weekly (toolchains drift) and on
+# PRs that touch the pipeline / packaging scripts.
+on:
+  schedule:
+    - cron: "17 4 * * 1"
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - scripts/generate-ci.sh
+      - scripts/db-package.sh
+      - scripts/run-tests.sh
+      - scripts/version.sh
+      - tests/real-app.sh
+      - .github/workflows/real-app.yml
+
+jobs:
+  real-app:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 10.0.x
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: actionlint
+        run: |
+          curl -sSL https://github.com/rhysd/actionlint/releases/download/v1.7.7/actionlint_1.7.7_linux_amd64.tar.gz \
+            | sudo tar -xz -C /usr/local/bin actionlint
+      - name: build a real Angular + .NET app with DevPilot's pipelines
+        run: bash tests/real-app.sh
