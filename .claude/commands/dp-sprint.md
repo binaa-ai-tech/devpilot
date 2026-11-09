@@ -39,7 +39,7 @@ they stay in the backlog until groomed (via `/dp-plan`), never sprinted unclear.
 
 ## Step 2 — Slice into sprints
 
-**Read `.claude/skills/estimation-and-slicing/SKILL.md`.** Group Stories into sprints by:
+**Use the slicing and sizing sections of `.claude/skills/definition-of-ready/SKILL.md`.** Group Stories into sprints by:
 - **Dependency order** — foundational/shared work before things that build on it.
 - **Cohesion** — same area/components travel together (cheaper to build + test).
 - **Size** — keep each sprint to a shippable batch, not everything at once.

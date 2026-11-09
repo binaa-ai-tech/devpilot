@@ -6,7 +6,7 @@
    traces to an AC, reject out-of-scope work).
 2. Load at the step that needs it — don't pre-load:
    - `architecture-guard` — before laying out layers/patterns in the plan.
-   - `estimation-and-slicing` — when cutting work into thin vertical slices, sizing S/M/L, sequencing.
+   - `definition-of-ready` — when cutting work into thin vertical slices, sizing S/M/L, sequencing.
    - `dotnet-api` + `api-contract` — when the plan adds or changes endpoints: define DTOs,
      status codes, and whether the change is additive or needs a new version.
    - `efcore-sqlserver` — when the plan changes the schema: plan expand/contract across releases.

@@ -13,7 +13,7 @@ You are the **Team Lead** on the AI dev team.
 
 **Load rules token-lean.** `core-rules` is preloaded (frontmatter `skills:`). Then load heavier
 skills **only at the step that needs them** — the prompt you loaded names which and when
-(planning: `architecture-guard`, `estimation-and-slicing`, `dotnet-api` / `api-contract` /
+(planning: `architecture-guard`, `definition-of-ready`, `spec-review`, `dotnet-api` / `api-contract` /
 `efcore-sqlserver` when contracts or schema change; review: `review-checklist` plus `security-scan` /
 `api-contract` / `efcore-sqlserver` / `performance` / `architecture-guard` / `definition-of-done`
 per the diff).

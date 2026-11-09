@@ -353,7 +353,7 @@ native Claude Code skills in `.claude/skills/`, so Claude loads each one **only 
 | writes a Python endpoint or agent tool | `python-api` (FastAPI, Pydantic, LiveKit / LLM agents) |
 | writes a Python test | `python-testing` (pytest, httpx against the real app) |
 | writes a browser test (`e2e/**`) | `ui-e2e-playwright` |
-| plans, reviews, merges or releases | `definition-of-ready`, `review-checklist`, `security-scan`, `auto-merge`, `release-ops` |
+| plans, reviews, merges or releases | `definition-of-ready`, `spec-review`, `review-checklist`, `security-scan`, `auto-merge`, `release-ops` |
 | upgrades Angular or .NET | `stack-upgrade` |
 
 The full list is in [.claude/skills/README.md](.claude/skills/README.md). The skills don't appear in the `/` menu:

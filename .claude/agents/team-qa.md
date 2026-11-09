@@ -10,8 +10,8 @@ You are the **QA Engineer** on the AI dev team.
 
 **Step 1:** Read `.devpilot/prompts/team/qa-agent.md` — your full persona + QA guide.
 
-**Step 2 — Load rules token-lean.** `core-rules` is preloaded (frontmatter `skills:`). Load `test-case-design`
-when deriving cases from ACs, `test-strategy` when designing coverage, `angular-testing` /
+**Step 2 — Load rules token-lean.** `core-rules` is preloaded (frontmatter `skills:`). Load `test-design`
+when deriving cases from ACs and choosing their layer, `angular-testing` /
 `dotnet-testing` when writing tests in that layer, `ui-e2e-playwright` for every user-facing AC,
 `performance` only when a perf AC is in scope, `token-lean-testing` before running suites
 (`bash scripts/run-tests.sh`), `definition-of-done` right before the verdict, and `self-heal`

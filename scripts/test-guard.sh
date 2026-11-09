@@ -126,7 +126,7 @@ if [ "$N_MISSING" -gt 0 ]; then
   echo "  Changed source files with NO covering test:"
   printf '%s' "$MISSING"
   echo ""
-  echo "  Fix: write the test (see .claude/skills/test-case-design/SKILL.md), or add a"
+  echo "  Fix: write the test (see .claude/skills/test-design/SKILL.md), or add a"
   echo "  justified entry (path + '# reason') to $EXEMPT_FILE. Run /dp-test to generate them."
 fi
 echo "──────────────────────────────────────────────────────"

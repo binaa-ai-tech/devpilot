@@ -104,11 +104,16 @@ fetch() {
 }
 
 # Native Claude Code skills shipped by DevPilot (.claude/skills/<name>/SKILL.md).
-DEVPILOT_SKILLS="core-rules definition-of-ready estimation-and-slicing architecture-guard angular-dev angular-testing accessibility dotnet-api efcore-sqlserver dotnet-testing python-api python-testing api-contract test-case-design test-strategy ui-e2e-playwright token-lean-testing test-guard performance review-checklist security-scan definition-of-done auto-merge release-ops self-heal stack-upgrade"
+DEVPILOT_SKILLS="core-rules definition-of-ready architecture-guard angular-dev angular-testing accessibility dotnet-api efcore-sqlserver dotnet-testing python-api python-testing api-contract test-design ui-e2e-playwright token-lean-testing test-guard performance review-checklist security-scan definition-of-done auto-merge release-ops self-heal stack-upgrade"
 install_skills() {
   local n
   for n in $DEVPILOT_SKILLS; do fetch ".claude/skills/$n/SKILL.md" ".claude/skills/$n/SKILL.md"; done
   fetch ".claude/skills/README.md" ".claude/skills/README.md"
+  # v6.0 merged test-strategy + test-case-design → test-design and estimation-and-slicing →
+  # definition-of-ready. Remove DevPilot's old copies; a team-edited folder with extra files stays.
+  for n in test-strategy test-case-design estimation-and-slicing; do
+    rm -f ".claude/skills/$n/SKILL.md"; rmdir ".claude/skills/$n" 2>/dev/null || true
+  done
   # Before v5.5 skills lived in .devpilot/skills/*.md — remove DevPilot's copies there
   # (code-review.md is now review-checklist), keep anything the team added.
   if [ -d .devpilot/skills ]; then

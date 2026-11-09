@@ -706,7 +706,7 @@ rm -rf "$D"
 
 echo "== testing & auto-merge wiring (round 4) =="
 # New skills exist, are indexed, and the installer ships them (update + fresh lists).
-for SK in test-case-design ui-e2e-playwright performance auto-merge token-lean-testing \
+for SK in test-design ui-e2e-playwright performance auto-merge token-lean-testing \
           angular-dev angular-testing dotnet-api dotnet-testing efcore-sqlserver api-contract release-ops; do
   [ -f "$REPO/.claude/skills/$SK/SKILL.md" ] && ok "skill $SK exists" || no "skill $SK exists"
   assert_contains "$(cat "$REPO/.claude/skills/README.md")" "\`$SK\`" "skills index lists $SK"
@@ -724,7 +724,7 @@ n=$(grep -c '\.devpilot/process\.md' "$REPO/install.sh"); n=${n:-0}
 assert_eq "$([ "$n" -ge 2 ] && echo ok)" "ok" "installer fetches process.md (update + fresh)"
 assert_contains "$(cat "$REPO/CLAUDE.md")" ".devpilot/process.md" "CLAUDE.md points at the process contract"
 # QA agent derives cases before code; the build merge step honors the gate ladder.
-assert_contains "$(cat "$REPO/.devpilot/prompts/team/qa-agent.md")" "test-case-design" "qa-agent loads test-case-design"
+assert_contains "$(cat "$REPO/.devpilot/prompts/team/qa-agent.md")" "test-design" "qa-agent loads test-design"
 assert_contains "$(cat "$REPO/.claude/commands/dp-build.md")" "auto-merge" "dp-build merge step cites the gate ladder"
 
 echo "== setup wizard: model assignment + guide (round 5) =="
