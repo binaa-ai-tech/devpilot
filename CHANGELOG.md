@@ -39,9 +39,18 @@ section becomes the GitHub Release notes when the `vx.y.z` tag is pushed
 - **Skills merged (26 → 25):** `test-strategy` + `test-case-design` → **`test-design`**;
   `estimation-and-slicing` → **`definition-of-ready`**. References updated everywhere.
 
+### Removed
+- **Skills `test-strategy`, `test-case-design`, `estimation-and-slicing`** — merged (see Changed).
+- **`.devpilot/prompts/6-env-diff.md`** — a paste-to-Claude leftover referenced by a wrong path;
+  its SQL Server "works in A, fails in B" checklist is now a section of the `self-heal` skill.
+- Empty `docs/*/.gitkeep` placeholders in DevPilot's own repo (the installer creates those folders).
+- EGM's plugin-user docs (FAQ, getting started, privacy, release notes) from the vendored copy;
+  `index.md` links to them upstream.
+
 ### Upgrade
 `bash install.sh --update` installs `/dp-spec`, `.devpilot/egm` and the `egm-*` agents, and removes
-DevPilot's copies of the three merged skills (a folder with your own extra files is kept). Re-apply
+DevPilot's copies of the three merged skills (a folder with your own extra files is kept) and
+`.devpilot/prompts/6-env-diff.md`. Re-apply
 your model profile so the agents pick up the new ids: `/dp-setup models <auto|balanced|save>`.
 `spec_review` defaults to `auto` when absent. Needs Claude Code 2.1.271+ for spec review.
 
