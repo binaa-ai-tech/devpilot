@@ -559,6 +559,17 @@ assert_contains "$OUT" "missing: 2" "the override list replaces the default one"
 ( cd "$D" && bash "$REPO/install.sh" --update >/dev/null 2>&1; [ -f scripts/test-guard.exempt ] ) && ok "install.sh --update keeps scripts/test-guard.exempt" || no "install.sh --update keeps scripts/test-guard.exempt"
 rm -rf "$D"
 
+# --update only refreshes an existing install, and never runs inside DevPilot's own repo
+P=$(mktemp -d); mkdir -p "$P/real-project"
+ERR=$( cd "$P" && bash "$REPO/install.sh" --update 2>&1 >/dev/null ); RC=$?
+assert_code "$RC" "1" "install.sh --update refuses a folder without project.config.md"
+assert_contains "$ERR" "not a DevPilot project" "the refusal says why"
+assert_eq "$(ls -A "$P" | tr '\n' ' ')" "real-project " "the refused --update writes nothing"
+rm -rf "$P"
+ERR=$( cd "$REPO" && bash ./install.sh --update 2>&1 >/dev/null ); RC=$?
+assert_code "$RC" "1" "install.sh refuses to run inside the DevPilot repo"
+assert_contains "$ERR" "DevPilot repo itself" "the refusal points to the project instead"
+
 echo "== two-tier index + scope cache (token-lean) =="
 D=$(mktemp -d); git -C "$D" init -q; git -C "$D" config user.email t@t.t; git -C "$D" config user.name t; git -C "$D" config commit.gpgsign false
 mkdir -p "$D/scripts" "$D/src/app/header" "$D/src/orders"
