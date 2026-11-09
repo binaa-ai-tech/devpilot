@@ -16,8 +16,8 @@ All are `user-invocable: false` — the `/` menu shows only the `/dp-*` commands
 ## Planning / PM (BA / Team Lead — `/dp-plan`, `/dp-sprint`)
 | Skill | Purpose |
 |-------|---------|
-| `definition-of-ready` | Entry gate — a Story enters a sprint only when clear, testable, sized, deduped. |
-| `estimation-and-slicing` | Cut work into thin, shippable vertical slices; size & sequence. |
+| `definition-of-ready` | Entry gate (clear, testable, sized, deduped, spec reviewed) + thin vertical slicing, sizing & sequencing. |
+| `spec-review` | Elephant-Goldfish: the spec must survive zero-context reviewers before code (`/dp-spec`). |
 | `architecture-guard` | Keep changes in the right layer (Controller→Service→Repository; smart/dumb components). |
 
 ## Angular (Frontend Developer)
@@ -44,8 +44,7 @@ All are `user-invocable: false` — the `/` menu shows only the `/dp-*` commands
 ## Testing & QA (QA Engineer, `/dp-test`)
 | Skill | Purpose |
 |-------|---------|
-| `test-case-design` | Derive test cases from ACs (boundaries, negatives, traceability) before code. |
-| `test-strategy` | Which pyramid layer proves what; mutation mindset. |
+| `test-design` | Derive cases from ACs (boundaries, negatives, traceability), pick the pyramid layer, mutation mindset. |
 | `ui-e2e-playwright` | Full UI testing: journeys, auth once, API seeding, axe a11y, visual + mobile, traces. |
 | `token-lean-testing` | Run suites via `scripts/run-tests.sh` — full log on disk, only failures in context. |
 | `test-guard` | Enforcement gate — no changed source file ships without a test (`scripts/test-guard.sh`). |

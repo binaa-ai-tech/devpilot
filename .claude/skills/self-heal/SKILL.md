@@ -25,8 +25,25 @@ Debugging is a search, not a guess. Find the root cause before touching code.
    one line on the PR/ticket. Remove temporary debug logging before committing.
 
 Heuristics: "worked before" → diff against the last good state · "works locally, fails in env X"
-→ config/data/schema, not logic (`prompts/6-env-diff.md`) · intermittent → ordering,
+→ config/data/schema, not logic (SQL Server: the checklist below) · intermittent → ordering,
 concurrency, time, or shared state. Three dead hypotheses → escalate with what you ruled out.
+
+### Works in env A, fails in env B (SQL Server)
+Don't edit stored-procedure code until a lower layer is ruled out. Collect A vs B:
+1. Exact error in B (full text, line number) and `SELECT @@VERSION` in both.
+2. SET options: `XACT_ABORT`, `ANSI_NULLS`, `ANSI_PADDING`, `ANSI_WARNINGS`,
+   `CONCAT_NULL_YIELDS_NULL`, `QUOTED_IDENTIFIER`, `NUMERIC_ROUNDABORT`, `ARITHABORT`.
+3. Default schema of the executing principal, and the database compatibility level.
+4. Triggers on every table the procedure touches:
+   `SELECT name, is_disabled FROM sys.triggers WHERE parent_id IN (OBJECT_ID('…'), …)`.
+5. Permissions of the executing principal (roles, explicit grants, schema ownership).
+6. Recent changes in B: deployments, restored database, rotated logins.
+
+Then rank the likely causes (top 3) and fix at the **lowest** layer: schema → trigger →
+config / permission → procedure code last, with the reason. Validate in B without redeploying
+the procedure (re-run the failing call after the fix), and add the check that would have
+caught it (schema diff, SET-option assertion) so the class of bug can't recur. Missing data →
+state the assumption and continue; don't stop to ask.
 
 ---
 

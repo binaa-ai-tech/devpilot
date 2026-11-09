@@ -1,6 +1,8 @@
 # .NET / C# Rules
 > APPLIES ONLY IF `project.config.md → stack.backend = dotnet`.
 
+- Target .NET 10 (LTS). .NET 8/9 are out of support since 10 Nov 2026 — upgrade via `.claude/skills/stack-upgrade/SKILL.md`.
+
 - Clean architecture: Controller → Service/Handler → Repository → Entity. Never skip a layer.
 - Prefer CQRS handlers (`*Command`, `*Query`, `*Handler`) where the project already uses them.
 - DTOs at the boundary — never expose entities directly from controllers.

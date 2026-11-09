@@ -1,4 +1,4 @@
-# Angular (21+) Rules
+# Angular (22+, 21 supported) Rules
 > APPLIES ONLY IF `project.config.md → stack.frontend = angular`.
 
 ### Subscriptions

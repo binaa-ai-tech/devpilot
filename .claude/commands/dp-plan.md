@@ -108,6 +108,23 @@ the FULL requirements (all ACs, scope, technical notes, repo + branch convention
 
 ---
 
+## Step 4b — Goldfish spec review (Elephant-Goldfish)
+
+```bash
+SPEC_REVIEW=$(grep '^spec_review:' project.config.md | head -1 | awk '{print $2}' | tr -d '"'); SPEC_REVIEW=${SPEC_REVIEW:-auto}
+```
+Run it when `.claude/skills/spec-review/SKILL.md` says this item qualifies (`auto`: M/L Stories,
+or anything touching auth, money, PII or a public API contract; `always`: every Story; `off`:
+never). Otherwise `SPEC_VERDICT=skipped`.
+
+Follow **`/dp-spec` Step 1 in autonomous mode** on `docs/requirements/<SLUG>.md`: zero-context
+`egm-*` reviewers, stages 5–8, at most `spec_review_rounds` FIX / CONTEST rounds, verdict in
+`docs/specs/<SLUG>/review.md`. Fixes land in the requirements doc **before** the brief is
+written to the tracker — so refresh `docs/tasks/<SLUG>-brief.md` if the ACs changed.
+`SPEC_VERDICT=BLOCKED` → the DoR verdict becomes **needs grooming** (open Blockers listed).
+
+---
+
 ## Step 5 — Write to the tracker (per the Step 3 verdict)
 
 ```bash
@@ -140,7 +157,7 @@ New items: refresh the brief with the real key, set it as the description, and l
 ```bash
 bash scripts/tracker.sh describe "$KEY" "$BRIEF"
 bash scripts/tracker.sh comment "$KEY" "📋 Planned [$START_TIME] · Verdict: <VERDICT> · Intent: $INTENT
-ACs: $AC_COUNT · Scope: <layers> · DoR: <ready|needs grooming> · Spec: <docs/requirements|docs/bugs>/$SLUG.md"
+ACs: $AC_COUNT · Scope: <layers> · DoR: <ready|needs grooming> · Spec review: <PASS|BLOCKED|skipped> · Spec: <docs/requirements|docs/bugs>/$SLUG.md"
 ```
 **Break the Story into layer tasks** (not for Bugs) — one child per layer in scope, so the board
 shows who is doing what and later dedup can match at task level. Idempotent: an existing `[BE]` /
@@ -177,6 +194,7 @@ bash scripts/generate-backlog-index.sh
     Checked:   <n> candidates · <m> child items (e.g. ADO-40 › ADO-41, ADO-42)
 📌  Item:      <KEY>  (Epic: <EPIC_KEY>) → To Do   <url>
 📄  Spec:      docs/requirements/<SLUG>.md
+🐟  Review:    <PASS | BLOCKED | skipped>  → docs/specs/<SLUG>/review.md
 ✅  ACs:       <AC_COUNT>   ·   Scope: <...>
 
 ▶  Next:  /dp-sprint   ·   or everything at once: /dp-deliver <KEY>

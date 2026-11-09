@@ -81,7 +81,7 @@ usage() {
     fi
     printf '  %-14s %-28s %12s %10s %12s %11s %9s\n' "$k" "$m" "$i" "$o" "$cr" "$cw" "$cost"
   done <<< "$rows"
-  [ "$priced" = 0 ] && echo "  (cost: add prices to project.config.md → pricing, e.g.  claude-sonnet-5: \"<in>/<out>\")"
+  [ "$priced" = 0 ] && echo "  (cost: add prices to project.config.md → pricing, e.g.  claude-sonnet-5-5: \"<in>/<out>\")"
 }
 
 case "$MODE" in

@@ -32,14 +32,15 @@ sprint a duplicate. A sprint may mix types — e.g. 10 requirements + 4 issues +
 one valid sprint.
 
 **Readiness gate.** Apply `.claude/skills/definition-of-ready/SKILL.md`: only Stories that are
-**ready** may enter a sprint. List any `needs grooming` Stories separately with what's missing —
+**ready** may enter a sprint — for Stories that qualify for a spec review, that includes a
+**PASS** in `docs/specs/<slug>/review.md`. List any `needs grooming` Stories separately with what's missing —
 they stay in the backlog until groomed (via `/dp-plan`), never sprinted unclear.
 
 ---
 
 ## Step 2 — Slice into sprints
 
-**Read `.claude/skills/estimation-and-slicing/SKILL.md`.** Group Stories into sprints by:
+**Use the slicing and sizing sections of `.claude/skills/definition-of-ready/SKILL.md`.** Group Stories into sprints by:
 - **Dependency order** — foundational/shared work before things that build on it.
 - **Cohesion** — same area/components travel together (cheaper to build + test).
 - **Size** — keep each sprint to a shippable batch, not everything at once.

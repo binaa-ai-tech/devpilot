@@ -302,16 +302,16 @@ unset FAKE_LOG; rm -rf "$D" "$FK"
 
 echo "== usage-hook.sh + metrics (cost per delivery) =="
 D=$(sandbox); TR="$D/t.jsonl"; mkdir -p "$D/t/subagents"
-for _ in 1 2 3; do echo '{"type":"assistant","message":{"id":"m1","model":"claude-sonnet-5","usage":{"input_tokens":100,"output_tokens":1000000,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}' >> "$TR"; done
+for _ in 1 2 3; do echo '{"type":"assistant","message":{"id":"m1","model":"claude-sonnet-5-5","usage":{"input_tokens":100,"output_tokens":1000000,"cache_read_input_tokens":0,"cache_creation_input_tokens":0}}}' >> "$TR"; done
 echo '{"type":"user","message":{"content":"hi"}}' >> "$TR"
-echo '{"type":"assistant","message":{"id":"s1","model":"claude-haiku-4-5-20251001","usage":{"input_tokens":5,"output_tokens":7}}}' > "$D/t/subagents/agent-1.jsonl"
+echo '{"type":"assistant","message":{"id":"s1","model":"claude-haiku-5-5","usage":{"input_tokens":5,"output_tokens":7}}}' > "$D/t/subagents/agent-1.jsonl"
 ( cd "$D" && git commit -q --allow-empty -m base && git checkout -q -b feature/ado-345-csv \
   && printf '{"session_id":"s-1","transcript_path":"%s","hook_event_name":"SessionEnd","cwd":"%s"}' "$TR" "$D" | bash scripts/usage-hook.sh )
 U="$D/.devpilot/logs/usage/s-1.json"
 assert_eq "$(jq -r .key "$U" 2>/dev/null)" "ADO-345" "usage attributed to the branch's work item"
-assert_eq "$(jq -r '.models[] | select(.model=="claude-sonnet-5") | .output' "$U" 2>/dev/null)" "1000000" "a message repeated in the transcript is counted once"
+assert_eq "$(jq -r '.models[] | select(.model=="claude-sonnet-5-5") | .output' "$U" 2>/dev/null)" "1000000" "a message repeated in the transcript is counted once"
 assert_eq "$(jq -r '.models[] | select(.model|startswith("claude-haiku")) | .output' "$U" 2>/dev/null)" "7" "subagent usage included"
-printf 'pricing:\n  claude-sonnet-5: "3/15"\n' >> "$D/project.config.md"
+printf 'pricing:\n  claude-sonnet-5-5: "3/15"\n' >> "$D/project.config.md"
 assert_contains "$(cd "$D" && bash scripts/metrics.sh usage)" '$15.00' "metrics prices output tokens per model"
 assert_contains "$(cat "$REPO/.claude/settings.json")" "usage-hook.sh" "usage hook registered (Stop + SessionEnd)"
 rm -rf "$D"
@@ -619,6 +619,11 @@ echo "== doctor.sh / status.sh / metrics.sh / audit.sh run cleanly =="
 D=$(sandbox)
 set +e
 ( cd "$D" && bash scripts/doctor.sh >/dev/null 2>&1 ); assert_code "$?" "0" "doctor exits 0 on a sane sandbox"
+mkdir -p "$D/src/Api" && echo '<Project><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>' > "$D/src/Api/Api.csproj"
+assert_contains "$( cd "$D" && bash scripts/doctor.sh 2>&1 )" "net8.0 is out of support" "doctor flags an out-of-support .NET target"
+sed -i.bak 's/net8.0/net10.0/' "$D/src/Api/Api.csproj" && rm -f "$D/src/Api/Api.csproj.bak"
+assert_eq "$( cd "$D" && bash scripts/doctor.sh 2>&1 | grep -c 'out of support' )" "0" "doctor is quiet on net10.0"
+rm -rf "$D/src"
 ( cd "$D" && bash scripts/status.sh >/dev/null 2>&1 ); assert_code "$?" "0" "status runs"
 ( cd "$D" && bash scripts/metrics.sh >/dev/null 2>&1 ); assert_code "$?" "0" "metrics runs"
 ( cd "$D" && bash scripts/audit.sh >/dev/null 2>&1 ); assert_code "$?" "0" "audit runs (no manifest)"
@@ -661,8 +666,10 @@ echo "== model-profiles.sh =="
 MP="$REPO/scripts/model-profiles.sh"
 # claude profile → tier mapping
 assert_contains "$(bash "$MP" claude-map auto)"     "POWER=claude-opus-5-5"   "claude auto uses Opus for power"
-assert_contains "$(bash "$MP" claude-map balanced)" "POWER=claude-sonnet-5" "claude balanced caps power at Sonnet"
-assert_contains "$(bash "$MP" claude-map save)"     "STANDARD=claude-haiku-4-5-20251001" "claude save defaults standard to Haiku"
+assert_contains "$(bash "$MP" claude-map balanced)" "POWER=claude-sonnet-5-5" "claude balanced caps power at Sonnet"
+assert_contains "$(bash "$MP" claude-map save)"     "STANDARD=claude-haiku-5-5" "claude save defaults standard to Haiku"
+assert_contains "$(bash "$MP" claude-map auto)"     "BA=claude-sonnet-5-5"     "claude auto runs the BA (spec author) on Sonnet"
+assert_contains "$(bash "$MP" claude-map save)"     "BA=claude-haiku-5-5"      "claude save keeps the BA on Haiku"
 assert_code "$(bash "$MP" claude-map bogus >/dev/null 2>&1; echo $?)" "1" "claude-map rejects an unknown profile"
 # non-Claude engines are gone
 assert_code "$(bash "$MP" opencode-map recommended >/dev/null 2>&1; echo $?)" "1" "opencode support removed"
@@ -676,8 +683,8 @@ assert_eq "$(grep -c 'coding_profile:' "$D/project.config.md")" "1" "apply is id
 assert_eq "$(grep -cE '^[[:space:]]+model_mode:' "$D/project.config.md")" "1" "apply keeps one model_mode line"
 assert_contains "$(cat "$D/project.config.md")" "coding_profile: save" "apply records the profile"
 assert_contains "$(cat "$D/project.config.md")" "model_mode: recommended" "apply records model_mode recommended"
-assert_contains "$(grep '^model:' "$D/.claude/agents/team-lead.md")" "claude-haiku-4-5-20251001" "apply syncs agent frontmatter (save → Haiku lead)"
-assert_contains "$(grep '^model:' "$D/.claude/agents/team-frontend.md")" "claude-haiku-4-5-20251001" "apply syncs dev agents to the standard tier (save → Haiku FE)"
+assert_contains "$(grep '^model:' "$D/.claude/agents/team-lead.md")" "claude-haiku-5-5" "apply syncs agent frontmatter (save → Haiku lead)"
+assert_contains "$(grep '^model:' "$D/.claude/agents/team-frontend.md")" "claude-haiku-5-5" "apply syncs dev agents to the standard tier (save → Haiku FE)"
 # single-model mode: one model everywhere (tiers + every agent + model_mode)
 ( cd "$D" && bash scripts/model-profiles.sh single claude test-model-x >/dev/null 2>&1 )
 assert_contains "$(cat "$D/project.config.md")" "model_mode: single" "single records model_mode"
@@ -687,8 +694,8 @@ assert_contains "$(grep '^model:' "$D/.claude/agents/team-ba.md")" "test-model-x
 assert_eq "$(grep -c '"test-model-x"' "$D/project.config.md")" "3" "single sets all three claude tiers"
 ( cd "$D" && bash scripts/model-profiles.sh apply claude save >/dev/null 2>&1 )   # back to a profile
 # sync-agents re-applies frontmatter from project.config.md (the --update repair path)
-( cd "$D" && sed -i.bak 's/^model: .*/model: claude-sonnet-5/' .claude/agents/team-lead.md && rm -f .claude/agents/team-lead.md.bak && bash scripts/model-profiles.sh sync-agents >/dev/null 2>&1 )
-assert_contains "$(grep '^model:' "$D/.claude/agents/team-lead.md")" "claude-haiku-4-5-20251001" "sync-agents restores frontmatter from config"
+( cd "$D" && sed -i.bak 's/^model: .*/model: claude-sonnet-5-5/' .claude/agents/team-lead.md && rm -f .claude/agents/team-lead.md.bak && bash scripts/model-profiles.sh sync-agents >/dev/null 2>&1 )
+assert_contains "$(grep '^model:' "$D/.claude/agents/team-lead.md")" "claude-haiku-5-5" "sync-agents restores frontmatter from config"
 # switching profile keeps a single coding_profile line
 ( cd "$D" && bash scripts/model-profiles.sh apply balanced >/dev/null 2>&1 )
 assert_eq "$(grep -c 'coding_profile:' "$D/project.config.md")" "1" "profile switch keeps one coding_profile line"
@@ -699,7 +706,7 @@ rm -rf "$D"
 
 echo "== testing & auto-merge wiring (round 4) =="
 # New skills exist, are indexed, and the installer ships them (update + fresh lists).
-for SK in test-case-design ui-e2e-playwright performance auto-merge token-lean-testing \
+for SK in test-design ui-e2e-playwright performance auto-merge token-lean-testing \
           angular-dev angular-testing dotnet-api dotnet-testing efcore-sqlserver api-contract release-ops; do
   [ -f "$REPO/.claude/skills/$SK/SKILL.md" ] && ok "skill $SK exists" || no "skill $SK exists"
   assert_contains "$(cat "$REPO/.claude/skills/README.md")" "\`$SK\`" "skills index lists $SK"
@@ -717,7 +724,7 @@ n=$(grep -c '\.devpilot/process\.md' "$REPO/install.sh"); n=${n:-0}
 assert_eq "$([ "$n" -ge 2 ] && echo ok)" "ok" "installer fetches process.md (update + fresh)"
 assert_contains "$(cat "$REPO/CLAUDE.md")" ".devpilot/process.md" "CLAUDE.md points at the process contract"
 # QA agent derives cases before code; the build merge step honors the gate ladder.
-assert_contains "$(cat "$REPO/.devpilot/prompts/team/qa-agent.md")" "test-case-design" "qa-agent loads test-case-design"
+assert_contains "$(cat "$REPO/.devpilot/prompts/team/qa-agent.md")" "test-design" "qa-agent loads test-design"
 assert_contains "$(cat "$REPO/.claude/commands/dp-build.md")" "auto-merge" "dp-build merge step cites the gate ladder"
 
 echo "== setup wizard: model assignment + guide (round 5) =="
@@ -823,7 +830,7 @@ for ref in $(grep -rhoE '\.claude/skills/[a-z0-9-]+/SKILL\.md' "$REPO/.claude" "
   [ -f "$REPO/$ref" ] || MISSING="$MISSING $ref"
 done
 assert_eq "${MISSING:-none}" "none" "no dangling skill references"
-OLDREF=$(grep -rlE '\.devpilot/skills|[a-z-]+-(dev|testing|guard|rules|ops|heal|scan|merge|contract|sqlserver|api|design|strategy|playwright|slicing|ready|done)\.md' "$REPO/.claude" "$REPO/.devpilot" "$REPO/scripts" "$REPO/CLAUDE.md" "$REPO/docs" 2>/dev/null | tr '\n' ' ')
+OLDREF=$(grep -rlE '\.devpilot/skills|[a-z-]+-(dev|testing|guard|rules|ops|heal|scan|merge|contract|sqlserver|api|design|strategy|playwright|slicing|ready|done)\.md' "$REPO/.claude" "$REPO/.devpilot" "$REPO/scripts" "$REPO/CLAUDE.md" "$REPO/docs" 2>/dev/null | grep -v '/\.devpilot/egm/' | tr '\n' ' ')
 # (README.md is exempt: its upgrade notes name the old layout on purpose.)
 assert_eq "${OLDREF:-none}" "none" "no references to the old .devpilot/skills/*.md layout"
 # Installer list == skills on disk; every skill is a valid native Claude Code skill.
@@ -841,23 +848,72 @@ for d in "$SK"/*/; do
   case " $BUNDLED " in *" $n "*) no "skill $n shadows a bundled Claude Code skill" ;; *) ok "skill $n: no clash with bundled skills" ;; esac
 done
 for A in "$REPO"/.claude/agents/*.md; do
-  assert_contains "$(awk 'NR==1{next} /^---$/{exit} {print}' "$A")" "  - core-rules" "$(basename "$A"): preloads core-rules"
+  FM=$(awk 'NR==1{next} /^---$/{exit} {print}' "$A")
+  case "$(basename "$A")" in
+    egm-synthesizer.md|egm-bootstrap-orchestrator.md) # EGM orchestrators: spawn reviewers, write reports
+      assert_contains "$FM" "Agent" "$(basename "$A"): EGM orchestrator can spawn reviewers"
+      assert_eq "$(grep -c 'CLAUDE_PLUGIN_ROOT' "$A")" "0" "$(basename "$A"): plugin paths rewritten to .devpilot/egm" ;;
+    egm-*) # Goldfish reviewers: zero context by design — no core-rules, no CLAUDE.md, read-only
+      assert_contains "$FM" "omitClaudeMd: true" "$(basename "$A"): Goldfish reviewer omits CLAUDE.md"
+      assert_eq "$(grep -cE '^tools:.*(Write|Edit|Bash)' <<<"$FM")" "0" "$(basename "$A"): Goldfish reviewer cannot write or run commands"
+      assert_eq "$(grep -c 'CLAUDE_PLUGIN_ROOT' "$A")" "0" "$(basename "$A"): plugin paths rewritten to .devpilot/egm" ;;
+    *) assert_contains "$FM" "  - core-rules" "$(basename "$A"): preloads core-rules" ;;
+  esac
 done
 assert_eq "$([ -f "$REPO/.claude/agents/team-backend.md" ] && echo present || echo gone)" "gone" "generic backend agent retired"
 assert_contains "$(cat "$REPO/.claude/commands/dp-build.md")" '"team-dotnet"' "dp-build routes backend work to team-dotnet"
 assert_contains "$(cat "$REPO/.claude/commands/dp-test.md")" "ui-e2e-playwright" "dp-test drives Playwright UI testing"
 
+echo "== Elephant-Goldfish spec review (v6) =="
+EGM="$REPO/.devpilot/egm"
+for f in LICENSE UPSTREAM MANIFEST DEVPILOT.md skills/egm-review/SKILL.md skills/egm-resolve/SKILL.md resources/document_standards/feature-spec-standard.md; do
+  [ -f "$EGM/$f" ] && ok "egm: $f present" || no "egm: $f present"
+done
+assert_contains "$(cat "$EGM/LICENSE")" "Apache License" "egm: Apache-2.0 license ships with the vendored copy"
+MISSING=""; while IFS= read -r f; do [ -f "$REPO/$f" ] || MISSING="$MISSING $f"; done < "$EGM/MANIFEST"
+assert_eq "${MISSING:-none}" "none" "egm: every MANIFEST file exists"
+ONDISK=$( { find "$EGM" -type f ! -name MANIFEST; ls "$REPO"/.claude/agents/egm-*.md; } | sed "s#^$REPO/##" | sort | tr '\n' ' ')
+assert_eq "$(sort "$EGM/MANIFEST" | tr '\n' ' ')" "$ONDISK" "egm: MANIFEST matches the vendored files (re-run scripts/sync-egm.sh)"
+LEFT=$(grep -rlE 'CLAUDE_PLUGIN_ROOT|/egm:egm-' "$EGM" "$REPO"/.claude/agents/egm-*.md | grep -vE '/docs/claude\.md$|/egm/README\.md$|/egm/DEVPILOT\.md$' | tr '\n' ' ')
+assert_eq "${LEFT:-none}" "none" "egm: plugin paths rewritten for the project install"
+for p in $(grep -hoE '\.devpilot/egm/[A-Za-z0-9_./-]+\.md' "$REPO"/.claude/agents/egm-*.md "$REPO/.claude/commands/dp-spec.md" "$REPO/.claude/skills/spec-review/SKILL.md" | sort -u); do
+  [ -f "$REPO/$p" ] && ok "egm path resolves: $p" || no "egm path resolves: $p"
+done
+for S in "$EGM"/skills/*/SKILL.md; do
+  assert_contains "$(sed -n '1,14p' "$S")" ".devpilot/egm/DEVPILOT.md" "$(basename "$(dirname "$S")"): points at DevPilot's integration notes"
+done
+assert_contains "$(cat "$REPO/.claude/commands/dp-plan.md")" "spec-review" "dp-plan runs the Goldfish review"
+assert_contains "$(cat "$REPO/.claude/commands/dp-deliver.md")" "BLOCKED" "dp-deliver stops on a BLOCKED spec"
+assert_contains "$(cat "$REPO/project.config.md")" "spec_review: auto" "config ships spec_review"
+assert_contains "$(sed -n '/^merge_policy: \$MERGE_POLICY/,/^## Versioning/p' "$REPO/install.sh")" "spec_review: auto" "installer writes spec_review"
+assert_contains "$(cat "$REPO/CLAUDE.md")" "EGM artifact directory: docs/specs" "EGM artifacts default to docs/specs"
+# sync-egm.sh is idempotent against a local EGM checkout shaped like upstream
+D=$(sandbox); U=$(mktemp -d); mkdir -p "$U/distributions/claude/.claude-plugin/agents" "$U/distributions/claude/skills/egm-review" \
+  "$U/distributions/claude/agents" "$U/distributions/claude/resources" "$U/distributions/claude/docs"
+( cd "$U/distributions/claude" && echo "Apache License" > LICENSE && echo readme > README.md && echo '{ "version": "9.9.9" }' > .claude-plugin/plugin.json \
+  && printf -- '---\nname: egm-design\ntools: [Read]\nomitClaudeMd: true\n---\nRead `${CLAUDE_PLUGIN_ROOT}/agents/design_critic.md`.\n' > .claude-plugin/agents/design_critic.md \
+  && echo persona > agents/design_critic.md && echo std > resources/s.md && echo doc > docs/claude.md \
+  && printf -- '---\nname: egm-review\n---\nRun `/egm:egm-resolve` with egm:egm-design; read ${CLAUDE_PLUGIN_ROOT}/agents/x.md\n' > skills/egm-review/SKILL.md )
+mkdir -p "$D/.devpilot/egm" "$D/.claude/agents" && echo mine > "$D/.devpilot/egm/DEVPILOT.md"
+( cd "$D" && git init -q && bash scripts/sync-egm.sh --from "$U" >/dev/null 2>&1 && bash scripts/sync-egm.sh --from "$U" >/dev/null 2>&1 ); assert_code "$?" "0" "sync-egm.sh runs twice from a local checkout"
+assert_contains "$(cat "$D/.claude/agents/egm-design.md")" ".devpilot/egm/agents/design_critic.md" "sync rewrites adapter paths"
+assert_contains "$(cat "$D/.devpilot/egm/skills/egm-review/SKILL.md")" "/dp-spec resolve" "sync maps /egm: commands to /dp-spec"
+assert_contains "$(cat "$D/.devpilot/egm/skills/egm-review/SKILL.md")" "with egm-design;" "sync drops the plugin namespace from agent names"
+assert_eq "$(cat "$D/.devpilot/egm/DEVPILOT.md")" "mine" "sync never overwrites DevPilot's DEVPILOT.md"
+assert_eq "$(grep -c 'DEVPILOT.md' "$D/.devpilot/egm/skills/egm-review/SKILL.md")" "1" "sync adds the DevPilot note once (idempotent)"
+rm -rf "$D" "$U"
+
 echo "== Claude-only + role-based commands (v5) =="
-CMDS_EXPECTED="dp-build dp-deliver dp-hotfix dp-plan dp-pr dp-release dp-setup dp-sprint dp-status dp-test"
+CMDS_EXPECTED="dp-build dp-deliver dp-hotfix dp-plan dp-pr dp-release dp-setup dp-spec dp-sprint dp-status dp-test"
 CMDS_ACTUAL=$(ls "$REPO/.claude/commands" | sed 's/\.md$//' | sort | tr '\n' ' ' | sed 's/ $//')
-assert_eq "$CMDS_ACTUAL" "$CMDS_EXPECTED" "exactly the 10 role commands ship"
+assert_eq "$CMDS_ACTUAL" "$CMDS_EXPECTED" "exactly the 11 role commands ship"
 for C in $CMDS_EXPECTED; do
   assert_contains "$(sed -n '/^  CMDS="/p' "$REPO/install.sh")" "$C.md" "installer --update ships $C"
 done
 for f in .opencode AGENTS.md scripts/resolve-engine.sh scripts/run-mode.sh scripts/run-command.sh scripts/ceo.sh; do
   assert_eq "$([ -e "$REPO/$f" ] && echo present || echo gone)" "gone" "$f removed"
 done
-LEAK=$(grep -rliE 'opencode|antigravity|github-copilot' "$REPO/.claude" "$REPO/.devpilot" "$REPO/CLAUDE.md" "$REPO/project.config.md" 2>/dev/null | tr '\n' ' ')
+LEAK=$(grep -rliE 'opencode|antigravity|github-copilot' "$REPO/.claude" "$REPO/.devpilot" "$REPO/CLAUDE.md" "$REPO/project.config.md" 2>/dev/null | grep -v '/\.devpilot/egm/' | tr '\n' ' ')
 assert_eq "${LEAK:-none}" "none" "no non-Claude engine references in commands, skills, or config"
 OLD=$(grep -rlE '/ceo\b|/dp-config\b|/dp-autofix|/dp-review-fix|/dp-rollback' "$REPO/.claude" "$REPO/.devpilot" "$REPO/scripts" "$REPO/CLAUDE.md" "$REPO/docs/setup-guide.md" 2>/dev/null | tr '\n' ' ')
 assert_eq "${OLD:-none}" "none" "no retired command names outside the README upgrade table"

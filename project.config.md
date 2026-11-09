@@ -41,6 +41,13 @@ git_host: auto
 
 merge_policy: auto               # auto | pr-only
 
+## Spec review — Elephant-Goldfish (Google's EGM, vendored in .devpilot/egm)
+# Before code, the requirements doc must survive zero-context reviewer agents (/dp-spec).
+# auto   — M/L Stories, plus anything touching auth, money, PII or a public API contract
+# always — every Story      off — never (the DoR "spec reviewed" item is skipped)
+spec_review: auto
+spec_review_rounds: 2            # FIX / CONTEST rounds before a spec is BLOCKED
+
 ## Versioning
 # Every /dp-deliver PR bumps the version on base_branch (feature → minor, bug → patch),
 # computed from base_branch's current version so parallel PRs never collide.
@@ -94,27 +101,27 @@ model_policy:
 coding_models:
   claude:
     power:    "claude-opus-5-5"
-    standard: "claude-sonnet-5"
-    lite:     "claude-haiku-4-5-20251001"
+    standard: "claude-sonnet-5-5"
+    lite:     "claude-haiku-5-5"
 
 ## Agent role models — synced into .claude/agents/*.md frontmatter by
 ## scripts/model-profiles.sh (apply | single | sync-agents).
 
 models:
   ba:
-    tier1: claude-haiku-4-5-20251001
+    tier1: claude-sonnet-5-5
 
   team_lead:
-    tier1: claude-sonnet-5
+    tier1: claude-sonnet-5-5
 
   qa:
-    tier1: claude-haiku-4-5-20251001
+    tier1: claude-haiku-5-5
 
   frontend_dev:
-    tier1: claude-sonnet-5
+    tier1: claude-sonnet-5-5
 
   backend_dev:
-    tier1: claude-sonnet-5
+    tier1: claude-sonnet-5-5
 
 ## Usage limits
 # When a run hits a Claude usage limit it checkpoints to docs/tasks/<KEY>-checkpoint.json
@@ -126,5 +133,5 @@ models:
 
 pricing:
   claude-opus-5-5: ""
-  claude-sonnet-5: ""
-  claude-haiku-4-5-20251001: ""
+  claude-sonnet-5-5: ""
+  claude-haiku-5-5: ""

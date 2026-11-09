@@ -7,8 +7,8 @@ user-invocable: false
 # Test Guard — no untested change ships
 
 **Highly recommended — load before every commit of implementation work and at
-every merge gate.** `test-strategy` says what to test; `test-case-design`
-says how to derive the cases; this is the *enforcement*: a mechanical check that
+every merge gate.** `test-design` says what to test and how to derive the
+cases; this is the *enforcement*: a mechanical check that
 every changed source file has a covering test, run by `scripts/test-guard.sh`.
 
 ## When to run
@@ -24,7 +24,7 @@ A changed source file is covered when a test file references it by name
 (`foo.ts → foo.spec.ts`, `Foo.cs → FooTests.cs`, `foo.py → test_foo.py`,
 `foo.go → foo_test.go`, `Foo.java → FooTest.java`). The guard checks existence
 and reference, not quality — pairing it with the mutation mindset
-(`test-strategy`) is what makes the coverage real.
+(`test-design`) is what makes the coverage real.
 
 ## Exemptions — explicit, never silent
 The guard auto-exempts migrations, generated code, type-only files, config,

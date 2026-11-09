@@ -104,17 +104,39 @@ fetch() {
 }
 
 # Native Claude Code skills shipped by DevPilot (.claude/skills/<name>/SKILL.md).
-DEVPILOT_SKILLS="core-rules definition-of-ready estimation-and-slicing architecture-guard angular-dev angular-testing accessibility dotnet-api efcore-sqlserver dotnet-testing python-api python-testing api-contract test-case-design test-strategy ui-e2e-playwright token-lean-testing test-guard performance review-checklist security-scan definition-of-done auto-merge release-ops self-heal stack-upgrade"
+DEVPILOT_SKILLS="core-rules definition-of-ready spec-review architecture-guard angular-dev angular-testing accessibility dotnet-api efcore-sqlserver dotnet-testing python-api python-testing api-contract test-design ui-e2e-playwright token-lean-testing test-guard performance review-checklist security-scan definition-of-done auto-merge release-ops self-heal stack-upgrade"
 install_skills() {
   local n
   for n in $DEVPILOT_SKILLS; do fetch ".claude/skills/$n/SKILL.md" ".claude/skills/$n/SKILL.md"; done
   fetch ".claude/skills/README.md" ".claude/skills/README.md"
+  # v6.0 merged test-strategy + test-case-design → test-design and estimation-and-slicing →
+  # definition-of-ready. Remove DevPilot's old copies; a team-edited folder with extra files stays.
+  for n in test-strategy test-case-design estimation-and-slicing; do
+    rm -f ".claude/skills/$n/SKILL.md"; rmdir ".claude/skills/$n" 2>/dev/null || true
+  done
   # Before v5.5 skills lived in .devpilot/skills/*.md — remove DevPilot's copies there
   # (code-review.md is now review-checklist), keep anything the team added.
   if [ -d .devpilot/skills ]; then
     for n in $DEVPILOT_SKILLS code-review README; do rm -f ".devpilot/skills/$n.md"; done
     rmdir .devpilot/skills 2>/dev/null || true
   fi
+}
+
+# Elephant-Goldfish Model (Google, Apache-2.0), vendored in .devpilot/egm — its MANIFEST lists
+# every file, including the egm-* reviewer agents. Files from the previous MANIFEST are removed
+# first so an upstream rename never leaves a stale persona behind.
+install_egm() {
+  local f
+  if [ -f .devpilot/egm/MANIFEST ]; then
+    while IFS= read -r f; do
+      case "$f" in .devpilot/egm/*|.claude/agents/egm-*.md) rm -f "$f" ;; esac
+    done < .devpilot/egm/MANIFEST
+  fi
+  fetch ".devpilot/egm/MANIFEST" ".devpilot/egm/MANIFEST"
+  [ -f .devpilot/egm/MANIFEST ] || return 0
+  while IFS= read -r f; do
+    case "$f" in .devpilot/egm/*|.claude/agents/egm-*.md) fetch "$f" "$f" ;; esac
+  done < .devpilot/egm/MANIFEST
 }
 
 # Report any skipped files. Returns non-zero if the install is incomplete.
@@ -173,9 +195,9 @@ run_update() {
   RULE_SNIPPETS="angular.md dotnet.md python.md sqlserver.md"
   PROMPT_TEAM="ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md python-agent.md qa-agent.md"
   TEMPLATE_TEAM="requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md bug-report.md item-brief.md"
-  CMDS="dp-deliver.md dp-plan.md dp-sprint.md dp-build.md dp-test.md dp-pr.md dp-release.md dp-hotfix.md dp-status.md dp-setup.md"
+  CMDS="dp-deliver.md dp-plan.md dp-spec.md dp-sprint.md dp-build.md dp-test.md dp-pr.md dp-release.md dp-hotfix.md dp-status.md dp-setup.md"
   AGENTS_LIST="team-lead.md team-ba.md team-frontend.md team-dotnet.md team-python.md team-qa.md"
-  SCRIPTS="git-flow.sh resolve-model.sh model-profiles.sh checkpoint.sh devpilot-config.sh devpilot-lib.sh tracker.sh jira.sh azdo.sh github.sh git-host.sh version.sh close-delivery.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy.sh smoke.sh setup-environments.sh db-package.sh usage-hook.sh deploy-init.sh generate-project-index.sh generate-backlog-index.sh md-to-adf.sh"
+  SCRIPTS="git-flow.sh resolve-model.sh model-profiles.sh checkpoint.sh devpilot-config.sh devpilot-lib.sh tracker.sh jira.sh azdo.sh github.sh git-host.sh version.sh close-delivery.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy.sh smoke.sh setup-environments.sh db-package.sh usage-hook.sh deploy-init.sh generate-project-index.sh generate-backlog-index.sh md-to-adf.sh sync-egm.sh"
 
   info "Refreshing .devpilot/rules..."
   fetch ".devpilot/rules.md" ".devpilot/rules.md"
@@ -183,12 +205,13 @@ run_update() {
   fetch "docs/setup-guide.md" "docs/setup-guide.md"
   for f in $RULE_SNIPPETS;   do fetch ".devpilot/rules/$f"        ".devpilot/rules/$f";        done
   for f in $PROMPT_TEAM;     do fetch ".devpilot/prompts/team/$f" ".devpilot/prompts/team/$f"; done
-  fetch ".devpilot/prompts/6-env-diff.md" ".devpilot/prompts/6-env-diff.md"
+  rm -f .devpilot/prompts/6-env-diff.md   # v6.0: folded into the self-heal skill
   for f in $TEMPLATE_TEAM;   do fetch ".devpilot/templates/team/$f" ".devpilot/templates/team/$f"; done
   fetch ".devpilot/templates/changelog-entry.md" ".devpilot/templates/changelog-entry.md"
   mkdir -p .devpilot/templates/deploy
   for f in appservice.sh iis.sh kubernetes.sh db.sh; do fetch ".devpilot/templates/deploy/$f" ".devpilot/templates/deploy/$f"; done
   install_skills
+  install_egm
   fetch ".devpilot/config/models.md" ".devpilot/config/models.md"
 
   info "Refreshing .claude/..."
@@ -391,25 +414,25 @@ fi
 section "STEP 4/6 · Claude model assignment"
 
 # NOTE: profile mappings mirror scripts/model-profiles.sh — keep them in sync.
-CL_OPUS="claude-opus-5-5"; CL_SONNET="claude-sonnet-5"; CL_HAIKU="claude-haiku-4-5-20251001"
+CL_OPUS="claude-opus-5-5"; CL_SONNET="claude-sonnet-5-5"; CL_HAIKU="claude-haiku-5-5"
 
 CL_POWER="$CL_OPUS"; CL_STANDARD="$CL_SONNET"; CL_LITE="$CL_HAIKU"
 CODING_PROFILE="auto"
 MODEL_MODE="recommended"
 
 # Role models — follow the choices below.
-T1_BA="$CL_HAIKU"; T1_LEAD="$CL_SONNET"; T1_QA="$CL_HAIKU"
+T1_BA="$CL_SONNET"; T1_LEAD="$CL_SONNET"; T1_QA="$CL_HAIKU"
 # Dev agent role models (synced into .claude/agents/*.md frontmatter in STEP 12)
 T1_FE_DEV="$CL_SONNET"; T1_BE_DEV="$CL_SONNET"
 # Map a Claude profile → coding tiers + orchestrator tier1 (mirrors model-profiles.sh).
 claude_profile_apply() {
   case "$1" in
     balanced) CL_POWER="$CL_SONNET"; CL_STANDARD="$CL_SONNET"; CL_LITE="$CL_HAIKU"
-              T1_BA="$CL_HAIKU"; T1_LEAD="$CL_SONNET"; T1_QA="$CL_HAIKU" ;;
+              T1_BA="$CL_SONNET"; T1_LEAD="$CL_SONNET"; T1_QA="$CL_HAIKU" ;;
     save)     CL_POWER="$CL_SONNET"; CL_STANDARD="$CL_HAIKU"; CL_LITE="$CL_HAIKU"
               T1_BA="$CL_HAIKU"; T1_LEAD="$CL_HAIKU"; T1_QA="$CL_HAIKU" ;;
     *)        CL_POWER="$CL_OPUS"; CL_STANDARD="$CL_SONNET"; CL_LITE="$CL_HAIKU"
-              T1_BA="$CL_HAIKU"; T1_LEAD="$CL_SONNET"; T1_QA="$CL_HAIKU" ;;
+              T1_BA="$CL_SONNET"; T1_LEAD="$CL_SONNET"; T1_QA="$CL_HAIKU" ;;
   esac
   T1_FE_DEV="$CL_STANDARD"; T1_BE_DEV="$CL_STANDARD"
 }
@@ -418,7 +441,7 @@ claude_profile_apply() {
 claude_model_menu() {
   echo "    [1] Sonnet — strong all-round coder (recommended for most roles)"
   echo "    [2] Opus   — highest quality, most tokens (architecture / hard problems)"
-  echo "    [3] Haiku  — fastest & cheapest (light tasks: BA, QA, simple changes)"
+  echo "    [3] Haiku  — fastest & cheapest (light tasks: QA, simple changes)"
   echo "    [4] other  — type a model id"
 }
 pick_claude_model() {
@@ -487,7 +510,7 @@ else
   echo "  Pick a Claude model per role:"
   echo ""
   claude_model_menu
-  pick_claude_model "BA (requirements, dedup)     " "$CL_HAIKU";  T1_BA="$PICKED_MODEL"
+  pick_claude_model "BA (requirements, dedup)     " "$CL_SONNET";  T1_BA="$PICKED_MODEL"
   pick_claude_model "Team Lead (plans, review)    " "$CL_SONNET"; T1_LEAD="$PICKED_MODEL"
   pick_claude_model "QA (test design, verdict)    " "$CL_HAIKU";  T1_QA="$PICKED_MODEL"
   pick_claude_model "Frontend developer (Angular) " "$CL_SONNET"; T1_FE_DEV="$PICKED_MODEL"
@@ -745,7 +768,6 @@ for f in angular.md dotnet.md python.md sqlserver.md; do
   fetch ".devpilot/rules/$f" ".devpilot/rules/$f"
 done
 
-fetch ".devpilot/prompts/6-env-diff.md" ".devpilot/prompts/6-env-diff.md"
 
 for f in ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md python-agent.md qa-agent.md; do
   fetch ".devpilot/prompts/team/$f" ".devpilot/prompts/team/$f"
@@ -763,12 +785,13 @@ for f in appservice.sh iis.sh kubernetes.sh db.sh; do
 done
 
 install_skills
+install_egm
 
 fetch ".devpilot/config/models.md" ".devpilot/config/models.md"
 
 # .claude/ — Claude Code commands + agent definitions
 info "Installing .claude/..."
-for f in dp-deliver.md dp-plan.md dp-sprint.md dp-build.md dp-test.md dp-pr.md \
+for f in dp-deliver.md dp-plan.md dp-spec.md dp-sprint.md dp-build.md dp-test.md dp-pr.md \
          dp-release.md dp-hotfix.md dp-status.md dp-setup.md; do
   fetch ".claude/commands/$f" ".claude/commands/$f"
 done
@@ -800,7 +823,7 @@ for f in git-flow.sh resolve-model.sh model-profiles.sh checkpoint.sh \
           open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh \
           doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh \
           deploy.sh smoke.sh setup-environments.sh db-package.sh usage-hook.sh deploy-init.sh \
-          generate-project-index.sh generate-backlog-index.sh md-to-adf.sh; do
+          generate-project-index.sh generate-backlog-index.sh md-to-adf.sh sync-egm.sh; do
   fetch "scripts/$f" "scripts/$f"
   chmod +x "scripts/$f" 2>/dev/null || true
 done
@@ -867,6 +890,13 @@ secrets:
 
 merge_policy: $MERGE_POLICY
 
+## Spec review — Elephant-Goldfish (Google's EGM, vendored in .devpilot/egm)
+# Before code, the requirements doc must survive zero-context reviewer agents (/dp-spec).
+# auto   — M/L Stories, plus anything touching auth, money, PII or a public API contract
+# always — every Story      off — never (the DoR "spec reviewed" item is skipped)
+spec_review: auto
+spec_review_rounds: 2            # FIX / CONTEST rounds before a spec is BLOCKED
+
 ## Versioning — every /dp-deliver PR bumps the version (feature → minor, bug → patch)
 
 versioning:
@@ -875,8 +905,8 @@ versioning:
 ## Pricing — optional: USD per million tokens "input/output" → cost per delivery in /dp-status metrics
 pricing:
   claude-opus-5-5: ""
-  claude-sonnet-5: ""
-  claude-haiku-4-5-20251001: ""
+  claude-sonnet-5-5: ""
+  claude-haiku-5-5: ""
 
 ## CI runner — label for the generated GitHub workflows' runs-on
 # ubuntu-latest (GitHub-hosted, counts against the plan's minutes) or a self-hosted runner label

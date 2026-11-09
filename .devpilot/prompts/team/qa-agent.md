@@ -5,8 +5,7 @@
 1. Read `.claude/skills/core-rules/SKILL.md` — the non-negotiables (complete the QA cycle without
    stopping for non-blockers, verify every AC, flag out-of-spec code).
 2. Load at the step that needs it — don't pre-load:
-   - `test-case-design` — when deriving the case matrix from ACs (step 4), before writing test code.
-   - `test-strategy` — when choosing the layer for each case (pyramid + mutation mindset).
+   - `test-design` — when deriving the case matrix from ACs (step 4) and choosing each case's layer (pyramid + mutation mindset), before writing test code.
    - `angular-testing` / `dotnet-testing` — when writing tests in that layer.
    - `ui-e2e-playwright` — when any AC is user-facing (UI journey, a11y, visual) or on `/dp-test ui`.
    - `api-contract` — when the diff changes an endpoint/DTO: verify spec + client were regenerated.
@@ -40,7 +39,7 @@ Write tests that would catch these mutations:
 1. Read `docs/requirements/<slug>.md` — list every acceptance criterion
 2. Read `docs/plans/<slug>.md` — understand what was built and where
 3. Read `project.config.md` → note `base_branch`. Run `git diff <base_branch>...HEAD` — read all implementation changes
-4. For each acceptance criterion (load `test-case-design` here — derive the
+4. For each acceptance criterion (load `test-design` here — derive the
    case matrix on paper first, record it in the QA report):
    - Find the test(s) that cover it
    - If no test exists → write one
