@@ -136,6 +136,21 @@ command -v jq  >/dev/null 2>&1 && ok "jq" || warn "jq not found — tracker and 
 NOTEXEC=$(find scripts -name '*.sh' ! -perm -u+x 2>/dev/null | wc -l | tr -d ' ')
 [ "${NOTEXEC:-0}" = "0" ] && ok "all scripts executable" || warn "$NOTEXEC script(s) not executable — run: chmod +x scripts/*.sh"
 
+# Elephant-Goldfish spec review — vendored files present, Claude Code new enough for zero-context reviewers
+if [ -f .devpilot/egm/MANIFEST ]; then
+  EGM_MISSING=0
+  while IFS= read -r f; do [ -f "$f" ] || EGM_MISSING=$((EGM_MISSING + 1)); done < .devpilot/egm/MANIFEST
+  if [ "$EGM_MISSING" = 0 ]; then ok "Elephant-Goldfish spec review ($(sed -n 's/^plugin_version: //p' .devpilot/egm/UPSTREAM 2>/dev/null)) installed"
+  else warn "$EGM_MISSING Elephant-Goldfish file(s) missing — re-run: bash install.sh --update"; fi
+  CC_VER=$(claude --version 2>/dev/null | grep -oE '[0-9]+\.[0-9]+\.[0-9]+' | head -1)
+  if [ -n "$CC_VER" ] && [ "$(echo "$CC_VER 2.1.271" | awk '{split($1,a,".");split($2,b,".");for(i=1;i<=3;i++){if(a[i]+0<b[i]+0){print "old";exit}if(a[i]+0>b[i]+0)break}}')" = "old" ]; then
+    warn "Claude Code $CC_VER ignores omitClaudeMd — spec reviewers would see CLAUDE.md (not zero-context). Update to 2.1.271+: claude update"
+  fi
+else
+  SR=$(grep '^spec_review:' project.config.md 2>/dev/null | awk '{print $2}')
+  [ "${SR:-auto}" = "off" ] || warn "spec_review=${SR:-auto} but .devpilot/egm is missing — re-run: bash install.sh --update (or set spec_review: off)"
+fi
+
 # .NET support window — 8 and 9 lost security fixes on 2026-11-10
 OLD_TFM=$(grep -rhoE '<TargetFrameworks?>[^<]*net(8|9)\.0' --include='*.csproj' --include='Directory.Build.props' --exclude-dir=bin --exclude-dir=obj --exclude-dir=node_modules . 2>/dev/null | grep -oE 'net(8|9)\.0' | sort -u | tr '\n' ' ')
 if [ -n "$OLD_TFM" ]; then warn ".NET ${OLD_TFM% } is out of support (since 2026-11-10) — plan the move to net10.0: /dp-deliver \"upgrade to .NET 10\" (stack-upgrade skill)"; fi

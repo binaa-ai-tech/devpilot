@@ -116,6 +116,7 @@
       "Bash(bash scripts/protect-branches.sh *)",
       "Bash(bash scripts/rollback.sh *)",
       "Bash(bash scripts/setup-environments.sh *)",
+      "Bash(bash scripts/sync-egm.sh *)",
       "Bash(bash scripts/update-org.sh *)",
       "Bash(CONFIRM=1 bash scripts/deploy.sh *)",
       "Bash(git push --force *)",

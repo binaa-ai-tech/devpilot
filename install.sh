@@ -104,7 +104,7 @@ fetch() {
 }
 
 # Native Claude Code skills shipped by DevPilot (.claude/skills/<name>/SKILL.md).
-DEVPILOT_SKILLS="core-rules definition-of-ready architecture-guard angular-dev angular-testing accessibility dotnet-api efcore-sqlserver dotnet-testing python-api python-testing api-contract test-design ui-e2e-playwright token-lean-testing test-guard performance review-checklist security-scan definition-of-done auto-merge release-ops self-heal stack-upgrade"
+DEVPILOT_SKILLS="core-rules definition-of-ready spec-review architecture-guard angular-dev angular-testing accessibility dotnet-api efcore-sqlserver dotnet-testing python-api python-testing api-contract test-design ui-e2e-playwright token-lean-testing test-guard performance review-checklist security-scan definition-of-done auto-merge release-ops self-heal stack-upgrade"
 install_skills() {
   local n
   for n in $DEVPILOT_SKILLS; do fetch ".claude/skills/$n/SKILL.md" ".claude/skills/$n/SKILL.md"; done
@@ -120,6 +120,23 @@ install_skills() {
     for n in $DEVPILOT_SKILLS code-review README; do rm -f ".devpilot/skills/$n.md"; done
     rmdir .devpilot/skills 2>/dev/null || true
   fi
+}
+
+# Elephant-Goldfish Model (Google, Apache-2.0), vendored in .devpilot/egm — its MANIFEST lists
+# every file, including the egm-* reviewer agents. Files from the previous MANIFEST are removed
+# first so an upstream rename never leaves a stale persona behind.
+install_egm() {
+  local f
+  if [ -f .devpilot/egm/MANIFEST ]; then
+    while IFS= read -r f; do
+      case "$f" in .devpilot/egm/*|.claude/agents/egm-*.md) rm -f "$f" ;; esac
+    done < .devpilot/egm/MANIFEST
+  fi
+  fetch ".devpilot/egm/MANIFEST" ".devpilot/egm/MANIFEST"
+  [ -f .devpilot/egm/MANIFEST ] || return 0
+  while IFS= read -r f; do
+    case "$f" in .devpilot/egm/*|.claude/agents/egm-*.md) fetch "$f" "$f" ;; esac
+  done < .devpilot/egm/MANIFEST
 }
 
 # Report any skipped files. Returns non-zero if the install is incomplete.
@@ -178,9 +195,9 @@ run_update() {
   RULE_SNIPPETS="angular.md dotnet.md python.md sqlserver.md"
   PROMPT_TEAM="ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md python-agent.md qa-agent.md"
   TEMPLATE_TEAM="requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md bug-report.md item-brief.md"
-  CMDS="dp-deliver.md dp-plan.md dp-sprint.md dp-build.md dp-test.md dp-pr.md dp-release.md dp-hotfix.md dp-status.md dp-setup.md"
+  CMDS="dp-deliver.md dp-plan.md dp-spec.md dp-sprint.md dp-build.md dp-test.md dp-pr.md dp-release.md dp-hotfix.md dp-status.md dp-setup.md"
   AGENTS_LIST="team-lead.md team-ba.md team-frontend.md team-dotnet.md team-python.md team-qa.md"
-  SCRIPTS="git-flow.sh resolve-model.sh model-profiles.sh checkpoint.sh devpilot-config.sh devpilot-lib.sh tracker.sh jira.sh azdo.sh github.sh git-host.sh version.sh close-delivery.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy.sh smoke.sh setup-environments.sh db-package.sh usage-hook.sh deploy-init.sh generate-project-index.sh generate-backlog-index.sh md-to-adf.sh"
+  SCRIPTS="git-flow.sh resolve-model.sh model-profiles.sh checkpoint.sh devpilot-config.sh devpilot-lib.sh tracker.sh jira.sh azdo.sh github.sh git-host.sh version.sh close-delivery.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy.sh smoke.sh setup-environments.sh db-package.sh usage-hook.sh deploy-init.sh generate-project-index.sh generate-backlog-index.sh md-to-adf.sh sync-egm.sh"
 
   info "Refreshing .devpilot/rules..."
   fetch ".devpilot/rules.md" ".devpilot/rules.md"
@@ -194,6 +211,7 @@ run_update() {
   mkdir -p .devpilot/templates/deploy
   for f in appservice.sh iis.sh kubernetes.sh db.sh; do fetch ".devpilot/templates/deploy/$f" ".devpilot/templates/deploy/$f"; done
   install_skills
+  install_egm
   fetch ".devpilot/config/models.md" ".devpilot/config/models.md"
 
   info "Refreshing .claude/..."
@@ -768,12 +786,13 @@ for f in appservice.sh iis.sh kubernetes.sh db.sh; do
 done
 
 install_skills
+install_egm
 
 fetch ".devpilot/config/models.md" ".devpilot/config/models.md"
 
 # .claude/ — Claude Code commands + agent definitions
 info "Installing .claude/..."
-for f in dp-deliver.md dp-plan.md dp-sprint.md dp-build.md dp-test.md dp-pr.md \
+for f in dp-deliver.md dp-plan.md dp-spec.md dp-sprint.md dp-build.md dp-test.md dp-pr.md \
          dp-release.md dp-hotfix.md dp-status.md dp-setup.md; do
   fetch ".claude/commands/$f" ".claude/commands/$f"
 done
@@ -805,7 +824,7 @@ for f in git-flow.sh resolve-model.sh model-profiles.sh checkpoint.sh \
           open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh \
           doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh \
           deploy.sh smoke.sh setup-environments.sh db-package.sh usage-hook.sh deploy-init.sh \
-          generate-project-index.sh generate-backlog-index.sh md-to-adf.sh; do
+          generate-project-index.sh generate-backlog-index.sh md-to-adf.sh sync-egm.sh; do
   fetch "scripts/$f" "scripts/$f"
   chmod +x "scripts/$f" 2>/dev/null || true
 done
@@ -871,6 +890,13 @@ secrets:
 # pr-only — devpilot opens the PR and stops; a human merges it
 
 merge_policy: $MERGE_POLICY
+
+## Spec review — Elephant-Goldfish (Google's EGM, vendored in .devpilot/egm)
+# Before code, the requirements doc must survive zero-context reviewer agents (/dp-spec).
+# auto   — M/L Stories, plus anything touching auth, money, PII or a public API contract
+# always — every Story      off — never (the DoR "spec reviewed" item is skipped)
+spec_review: auto
+spec_review_rounds: 2            # FIX / CONTEST rounds before a spec is BLOCKED
 
 ## Versioning — every /dp-deliver PR bumps the version (feature → minor, bug → patch)
 

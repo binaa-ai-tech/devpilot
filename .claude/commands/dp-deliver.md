@@ -83,9 +83,12 @@ Execute **`/dp-plan` Steps 1–6** on `$TASK`:
 - **dedup against the live tracker** (`tracker.sh search`) and the backlog index, then
   **open the top 1–3 candidates with `tracker.sh show`** — their description AND their child
   items (existing Stories/Tasks under them) — so no work is created twice
-- write the spec to git + the item(s) into the tracker
+- write the spec to git, run the **Goldfish spec review** when it qualifies (Step 4b,
+  autonomous — `spec-review` skill), then write the item(s) into the tracker
 
-**Stop only** for a gray-band dedup verdict (ask, then continue), or when the request is
+**Stop only** for a gray-band dedup verdict (ask, then continue), a spec review that ends
+**BLOCKED** (report the open Blockers and `docs/specs/<SLUG>/review.md`; the Story stays
+*needs grooming* — building an unreviewable spec wastes the whole run), or when the request is
 **already delivered / in flight** — a matching item is Done, or has an open branch/PR — in which
 case report the existing key + link and end the run (nothing to build).
 
@@ -147,6 +150,7 @@ After a **confirmed** merge: `/dp-release sit` — it releases the version devel
 🤖  /dp-deliver — planned → built → tested → reviewed → merged
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 🧭  Dedup:    <NEW | FOLD-IN into KEY | RELATED to EPIC>
+🐟  Spec:     Goldfish review <PASS | skipped>  → docs/specs/<slug>/review.md
 📌  Items:    <KEYS> → Done   ·  Epic: <EPIC_KEY> <Done | open (n left)>
 🗂  Sprint:   <SPRINT_ID> <closed | open (n left)>
 🔖  Version:  v<X.Y.Z>  (<minor|patch>)

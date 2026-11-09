@@ -41,6 +41,13 @@ git_host: auto
 
 merge_policy: auto               # auto | pr-only
 
+## Spec review — Elephant-Goldfish (Google's EGM, vendored in .devpilot/egm)
+# Before code, the requirements doc must survive zero-context reviewer agents (/dp-spec).
+# auto   — M/L Stories, plus anything touching auth, money, PII or a public API contract
+# always — every Story      off — never (the DoR "spec reviewed" item is skipped)
+spec_review: auto
+spec_review_rounds: 2            # FIX / CONTEST rounds before a spec is BLOCKED
+
 ## Versioning
 # Every /dp-deliver PR bumps the version on base_branch (feature → minor, bug → patch),
 # computed from base_branch's current version so parallel PRs never collide.

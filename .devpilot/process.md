@@ -14,7 +14,7 @@ INTAKE → READY → SPRINT → BUILD → VERIFY → MERGE → RELEASE → OPERA
 | # | Phase | Driven by | Exit gate (must hold to advance) |
 |---|-------|-----------|----------------------------------|
 | 1 | **Intake** | `/dp-plan` (or `/dp-deliver`) | Item is classified, **deduped** against the live tracker (`tracker.sh search`) and the child items of the top matches (`tracker.sh show`), and written as Epic→Story (or one Bug) with a self-contained brief. **Hard-gated by `scripts/tracker.sh assert-key`** — no branch/code until a key exists. |
-| 2 | **Ready** | BA | `definition-of-ready` — clear, testable ACs; sized & sliced; spec passed the Goldfish review (`/dp-spec`, `spec-review`); no open questions. |
+| 2 | **Ready** | BA · `/dp-spec` | `definition-of-ready` — clear, testable ACs; sized & sliced; no open questions; M/L Stories (per `spec_review`) passed the Elephant-Goldfish review — zero-context `egm-*` reviewers, no open 🔴 in `docs/specs/<slug>/review.md` (`spec-review`). |
 | 3 | **Sprint** | `/dp-sprint` | Only READY Stories enter; sprint has a goal and a recommended run order. |
 | 4 | **Build** | `/dp-build` | One branch per sprint; each layer agent edits only its layer (its prompt; `scope-guard.sh <layer>` reports cross-layer changes, `.devpilot/.scope-lock` enforces one layer on demand); every commit conventional, build never left red (`core-rules`). |
 | 5 | **Verify** | QA agent, `/dp-test` | Test cases derived per AC and pyramid respected (`test-design`: Vitest · xUnit + real SQL Server · Playwright UI journeys per `ui-e2e-playwright`); suites run token-lean via `scripts/run-tests.sh`; perf budgets proven when in scope (`performance`); QA verdict **PASS** per Story. |

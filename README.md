@@ -6,14 +6,15 @@
 
 You write what you need in one sentence. DevPilot plans it, writes the code, tests it, reviews it, and merges it.
 
-[![Version](https://img.shields.io/badge/version-5.9.0-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-6.0.0-blue.svg)](VERSION)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Runs on](https://img.shields.io/badge/runs%20on-Claude%20Code-7c3aed.svg)](#what-you-need)
 [![Stack](https://img.shields.io/badge/stack-Angular%20%7C%20.NET%20%7C%20Python%20%7C%20SQL%20Server-orange.svg)](#what-you-need)
 [![Trackers](https://img.shields.io/badge/trackers-Jira%20%7C%20Azure%20DevOps%20%7C%20GitHub-0052cc.svg)](#connect-jira-azure-devops-or-github)
 
-**New in 5.5:** the team's know-how is now native Claude Code skills that load by themselves when needed,
-refreshed with the latest official Angular and .NET guidance. [What changed →](CHANGELOG.md)
+**New in 6.0:** Elephant-Goldfish spec review — fresh reviewers with no memory must understand a spec
+before any code is written (`/dp-spec`). Plus .NET 10 and Angular 22 defaults and Claude Sonnet 5.5 / Haiku 5.5.
+[What changed →](CHANGELOG.md)
 
 </div>
 
@@ -29,7 +30,7 @@ refreshed with the latest official Angular and .NET guidance. [What changed →]
 
 That one command does what a full team does:
 
-1. **Plans**: writes the user story and acceptance criteria, and checks your tracker (Jira, Azure DevOps or GitHub Issues), including existing child tasks, so nothing is created twice.
+1. **Plans**: writes the user story and acceptance criteria, and checks your tracker (Jira, Azure DevOps or GitHub Issues), including existing child tasks, so nothing is created twice. Medium and large stories then face **Elephant-Goldfish** reviewers: fresh AI agents with no memory of the conversation must understand the spec from the page alone, or it gets fixed before any code.
 2. **Builds**: a .NET (or Python) developer agent writes the API and database changes; an Angular developer agent writes the UI.
 3. **Tests**: writes and runs unit tests, API tests on a real SQL Server, and browser (UI) tests.
 4. **Reviews**: checks code quality, security, performance, and missing tests.
@@ -44,7 +45,7 @@ Production is never touched without your approval.
 ## Contents
 
 1. [Install](#1-install)
-2. [The 10 commands](#2-the-10-commands)
+2. [The 11 commands](#2-the-11-commands)
 3. [Common tasks: what to type](#3-common-tasks-what-to-type)
 4. [What happens when you run /dp-deliver](#4-what-happens-when-you-run-dp-deliver)
 5. [Testing](#5-testing)
@@ -89,7 +90,7 @@ More detail on every installer question: [docs/setup-guide.md](docs/setup-guide.
 
 ---
 
-## 2. The 10 commands
+## 2. The 11 commands
 
 Each command matches a role in a normal development team.
 
@@ -97,6 +98,7 @@ Each command matches a role in a normal development team.
 |---------|-----------|--------------|
 | `/dp-deliver "…"` | The whole team | **Everything, end to end**: plan → code → test → review → merge. Use this most of the time. |
 | `/dp-plan "…"` | Product Owner / BA | Turns a requirement into user stories with acceptance criteria. **Writes no code.** |
+| `/dp-spec <story>` | Architect / BA | Checks the spec with **Elephant-Goldfish**: fresh AI reviewers that never saw your conversation must understand and approve it before any code. Also designs new features (`brainstorm`, `draft`) and documents an existing codebase (`bootstrap`, `drift-report`). |
 | `/dp-sprint` | Scrum Master | Groups the planned stories into sprints and tells you which sprint to build first. |
 | `/dp-build [sprint]` | Developers | Writes the code for a whole sprint on one branch and opens one pull request. |
 | `/dp-test [ui\|perf] <story>` | QA | Writes the missing tests and runs them. `ui` = full browser testing. `perf` = load testing. |
@@ -120,6 +122,9 @@ You never call the AI agents directly. The commands start them for you.
 | Build a ticket that already exists | `/dp-deliver PROJ-12` (Jira) · `/dp-deliver ADO-345` (Azure DevOps) · `/dp-deliver GH-7` |
 | Connect Jira / Azure DevOps / GitHub | `/dp-setup tracker` |
 | Review the plan before any code is written | `/dp-plan "…"` → check the stories → `/dp-sprint` → `/dp-build` |
+| Stress-test a spec with fresh reviewers | `/dp-spec PROJ-12` (runs automatically for medium and large stories) |
+| Design a big feature before planning it | `/dp-spec brainstorm "…"` → `/dp-spec draft` → `/dp-plan "…"` |
+| Write design docs for an existing codebase | `/dp-spec bootstrap` · later `/dp-spec drift-report` to catch stale docs |
 | Plan many ideas, then build them together | run `/dp-plan` several times → `/dp-sprint` → `/dp-build sprint-1` |
 | Add missing tests to a story | `/dp-test PROJ-12` |
 | Test the whole UI in a browser | `/dp-test ui PROJ-12` |
@@ -144,6 +149,8 @@ You never call the AI agents directly. The commands start them for you.
    ├─ 1. PLAN     Writes the story + acceptance criteria. Searches the tracker for duplicates and
    │              opens the closest matches' child tasks. Creates Epic → Story BEFORE any code,
    │              plus one task per layer: [BE] · [FE] · [DB] · [QA].
+   │              Medium/large stories: zero-context reviewers check the spec (Elephant-Goldfish);
+   │              Blockers are fixed in the spec, or the run stops with the reasons.
    ├─ 2. SPRINT   New feature → its own sprint.  Bug → the current sprint.
    │              Critical production bug (P0/P1) → stops and tells you to use /dp-hotfix.
    ├─ 3. DESIGN   Tech Lead lists the files to change, the API shape, and which tests are needed.
@@ -158,7 +165,7 @@ You never call the AI agents directly. The commands start them for you.
    └─ 10. DEPLOY  (only with --to sit) creates release/1.5.0 and deploys to SIT
 ```
 
-**When does it stop and ask you?** Only twice, and only when needed: (1) the first time, if no tracker is connected, and (2) when it can't tell whether your request duplicates an existing ticket. Everything else is automatic.
+**When does it stop and ask you?** Only when needed: (1) the first time, if no tracker is connected, (2) when it can't tell whether your request duplicates an existing ticket, and (3) when the spec review still finds Blockers after its fix rounds — the report says what the spec is missing. Everything else is automatic.
 
 **Where can I see what it did?**
 
@@ -166,6 +173,7 @@ You never call the AI agents directly. The commands start them for you.
 |------|-------|
 | Step-by-step log of the task | `docs/tasks/<TICKET>.md` |
 | Requirements and acceptance criteria | `docs/requirements/<name>.md` |
+| Spec review (Elephant-Goldfish) | `docs/specs/<name>/review.md` |
 | Technical plan | `docs/plans/<name>.md` |
 | Test results | `docs/qa/<name>.md` |
 | Code review | the pull request description |
@@ -251,6 +259,7 @@ Without them, each step prints what to click instead.
 
 Code is merged only when all of these pass. The AI never skips them.
 
+- ✅ Medium and large stories passed the Elephant-Goldfish spec review before any code (`docs/specs/<name>/review.md`).
 - ✅ Every acceptance criterion has a test.
 - ✅ Every changed source file has a test (`scripts/test-guard.sh`).
 - ✅ All tests pass, and the build is green.
@@ -281,6 +290,7 @@ tracker:
   when_unconfigured: ask      # ask = offer to connect, else continue without | skip = never ask
 git_host: auto                # auto (from your git remote) | github | azure
 merge_policy: auto            # auto = DevPilot merges green PRs | pr-only = a person merges
+spec_review: auto             # auto = medium/large stories | always | off  (Elephant-Goldfish)
 versioning:
   bump: auto                  # auto = every /dp-deliver bumps the version | off
 language: en                  # language for requirement and test documents (code stays English)
@@ -340,12 +350,12 @@ Azure Repos uses the same `AZDO_PAT`.
 
 ## 9. What the team knows (skills)
 
-The agents follow **26 skills**: short playbooks written for Angular + ASP.NET Core + SQL Server, plus Python (FastAPI / asyncio agents). They are
+The agents follow **25 skills**: short playbooks written for Angular + ASP.NET Core + SQL Server, plus Python (FastAPI / asyncio agents). They are
 native Claude Code skills in `.claude/skills/`, so Claude loads each one **only when it's needed**:
 
 | When Claude… | It loads |
 |--------------|----------|
-| edits an Angular component, service or route | `angular-dev` (Angular 21 and 22+ rules), `accessibility` |
+| edits an Angular component, service or route | `angular-dev` (Angular 22+, 21 supported), `accessibility` |
 | writes an Angular test (`*.spec.ts`) | `angular-testing` (Vitest) |
 | edits an API endpoint or `Program.cs` | `dotnet-api` (built-in OpenAPI, validation, ProblemDetails) |
 | edits a migration, `DbContext` or repository | `efcore-sqlserver` (safe migrations, fast queries) |
@@ -354,11 +364,25 @@ native Claude Code skills in `.claude/skills/`, so Claude loads each one **only 
 | writes a Python test | `python-testing` (pytest, httpx against the real app) |
 | writes a browser test (`e2e/**`) | `ui-e2e-playwright` |
 | plans, reviews, merges or releases | `definition-of-ready`, `spec-review`, `review-checklist`, `security-scan`, `auto-merge`, `release-ops` |
-| upgrades Angular or .NET | `stack-upgrade` |
+| derives test cases or picks a test layer | `test-design` |
+| upgrades Angular or .NET | `stack-upgrade` (.NET 8/9 → 10) |
 
 The full list is in [.claude/skills/README.md](.claude/skills/README.md). The skills don't appear in the `/` menu:
-you only use the 10 `/dp-*` commands. Your team can edit a skill to match its own conventions; `--update`
+you only use the 11 `/dp-*` commands. Your team can edit a skill to match its own conventions; `--update`
 replaces DevPilot's skills with the new version, so keep your own rules in a skill with a different name.
+
+### Elephant-Goldfish spec review
+
+DevPilot includes Google's [Elephant-Goldfish Model](https://github.com/google/elephant-goldfish-model)
+(Apache-2.0), installed in `.devpilot/egm`. The idea: the agent that writes a spec (the **Elephant**)
+knows too much to judge it. So DevPilot hands the spec to fresh reviewer agents (the **Goldfish**)
+that never saw your conversation and can't read `CLAUDE.md`. They check the big picture, test
+whether they understood it, attack the design, and ask whether a developer could build from it.
+If they can't understand the spec from the page alone, the implementing agent won't either.
+
+`/dp-plan` and `/dp-deliver` run it for medium and large stories; Blockers are fixed in the spec
+(at most 2 rounds) or the story stays *needs grooming*. Run it yourself with `/dp-spec <story>`.
+Needs Claude Code 2.1.271 or later. Refresh to a newer EGM release with `bash scripts/sync-egm.sh`.
 
 ---
 
@@ -395,11 +419,21 @@ replaces DevPilot's skills with the new version, so keep your own rules in a ski
 | A pull request has red CI | `/dp-pr <PR number>` |
 | Test guard blocks a file that really needs no test | Explain why in the pull request description. Don't turn the check off. |
 | `gh` is not installed | Install it and run `gh auth login`, or use Claude Code on the web. |
+| A story stays *needs grooming* after the spec review | Open `docs/specs/<name>/review.md`, fill in what the Blockers ask for in `docs/requirements/<name>.md`, then run `/dp-spec <story>` again. |
+| Spec review is too slow or costly for a project | Set `spec_review: off` (or keep `auto`, which skips small stories). |
 | Health check mentions a legacy `engines:` block | Delete that block from `project.config.md` (left over from version 4). |
 
 ---
 
 ## Upgrading
+
+**From 5.9:** run `bash install.sh --update`. New: `/dp-spec` and the Elephant-Goldfish files in
+`.devpilot/egm` plus `egm-*` reviewer agents. `test-strategy` and `test-case-design` merge into
+`test-design`, and `estimation-and-slicing` merges into `definition-of-ready`; DevPilot's old copies
+are removed. Models move to Sonnet 5.5 / Haiku 5.5 and the BA now runs on Sonnet (re-apply your
+profile with `/dp-setup models <profile>`). Add `spec_review: auto` to `project.config.md`, or leave it
+out (auto is the default). If your app still targets .NET 8 or 9 (out of support since 10 Nov 2026),
+`/dp-status health` now flags it.
 
 **From 5.4:** run `bash install.sh --update`. Skills move from `.devpilot/skills/*.md` to native Claude Code
 skills in `.claude/skills/<name>/SKILL.md`, and `code-review` is renamed `review-checklist` so it no longer
@@ -430,12 +464,14 @@ and `versioning` from the [Configuration](#8-configuration) example.
 <summary>How DevPilot is built</summary>
 
 ```
-.claude/commands/   the 10 /dp-* commands
+.claude/commands/   the 11 /dp-* commands
 .claude/agents/     team-ba · team-lead · team-frontend (Angular) · team-dotnet (.NET) · team-python (Python) · team-qa
-.claude/skills/    24 native Claude Code skills: stack skills load on matching files,
+                    + egm-* zero-context spec reviewers (vendored from Elephant-Goldfish)
+.claude/skills/    25 native Claude Code skills: stack skills load on matching files,
                     the rest when a command or agent needs them (index: .claude/skills/README.md)
 .devpilot/rules/    coding rules for angular, dotnet, sqlserver
 .devpilot/process.md  the full delivery process: phases, gates, roles
+.devpilot/egm/      Google's Elephant-Goldfish Model (Apache-2.0) — refresh with scripts/sync-egm.sh
 scripts/            tracker.sh (+ jira.sh · azdo.sh · github.sh) · open-pr.sh · version.sh · close-delivery.sh
                     · git flow · tests · CI · deploy · health check
 tests/run.sh        test suite for the scripts · tests/e2e.sh end-to-end delivery simulation
@@ -466,3 +502,6 @@ then push the tag (`git tag v5.5.0 && git push origin v5.5.0`), or run the `rele
 ## License
 
 [MIT](LICENSE). Free to use in any project, commercial or not.
+
+`.devpilot/egm/` and `.claude/agents/egm-*.md` are Google's Elephant-Goldfish Model, Copyright Google LLC,
+used under the [Apache License 2.0](.devpilot/egm/LICENSE); `.devpilot/egm/UPSTREAM` records the version.

@@ -34,6 +34,10 @@ Story keys come from `docs/sprints/plan.md` (or from `/dp-deliver`). For each, r
 
 Note each Story's intent (feature / enhancement / bug …) → `INTENTS`.
 
+**Spec-review guard.** A Story that qualifies for review (`spec-review` skill) but has no
+`docs/specs/<slug>/review.md` with **PASS** was planned before reviews existed or skipped them:
+run `/dp-spec <KEY>` (autonomous) for it now. BLOCKED → drop it from this sprint and report it.
+
 ---
 
 ## Step 2 — One branch for the whole sprint
@@ -62,6 +66,11 @@ Layer tasks follow the work: `[BE]`/`[DB]` → In Progress when `team-dotnet` / 
 refresh `docs/plans/<slug>.md` from the requirements. **Reuse the saved scope**
 (`docs/tasks/<slug>-scope.md`); only if missing: `bash scripts/scope.sh --save <slug> "<summary>"`.
 Decide the layers each Story touches (frontend / backend / DB).
+
+**L Stories** (or `spec_review: always`): run EGM's **implementation-readiness** stage on the plan
+before any code — `.devpilot/egm/skills/egm-review/SKILL.md` with `Step: 9` on
+`docs/plans/<slug>.md`, artifact directory `docs/specs/<slug>/`. Fix its 🔴 Blockers in the plan
+once; anything still open goes into the implementation prompt as a known risk.
 
 ---
 

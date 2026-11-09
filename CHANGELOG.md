@@ -4,6 +4,47 @@ All notable changes to DevPilot. Versions follow [SemVer](https://semver.org); e
 section becomes the GitHub Release notes when the `vx.y.z` tag is pushed
 (`.github/workflows/release.yml`).
 
+## [6.0.0] — 2026-11-09
+
+### Added
+- **Elephant-Goldfish spec review.** DevPilot now ships Google's
+  [Elephant-Goldfish Model](https://github.com/google/elephant-goldfish-model) (Apache-2.0) in
+  `.devpilot/egm`, with its reviewer personas as `egm-*` agents. The session that writes a spec (the
+  Elephant) can't judge it, so zero-context reviewers (the Goldfish: no history, no `CLAUDE.md`,
+  read-only) must understand and approve it from the page alone: zoom-out, comprehension, design
+  critic and implementation readiness.
+  - **`/dp-spec <KEY|slug>`** reviews a Story's requirements doc and ends in PASS / BLOCKED
+    (`docs/specs/<slug>/review.md`). `/dp-spec brainstorm | draft | review | resolve | bootstrap |
+    drift-report` runs any EGM skill interactively — including design docs for an existing codebase
+    and drift between docs and code.
+  - **`/dp-plan` and `/dp-deliver`** run it automatically (new Step 4b) for M/L Stories and anything
+    touching auth, money, PII or a public API: Blockers are fixed in the spec (at most
+    `spec_review_rounds`, default 2), otherwise the Story stays *needs grooming* and the run stops.
+    `/dp-build` runs EGM's implementation-readiness stage on the plan of L Stories.
+  - **`spec_review: auto | always | off`** in `project.config.md` (default `auto`).
+  - New native skill **`spec-review`**; `definition-of-ready` gains a "spec reviewed" item.
+  - **`scripts/sync-egm.sh`** refreshes the vendored copy from upstream (`--ref`, `--from`) and
+    records the version in `.devpilot/egm/UPSTREAM`.
+- `doctor.sh` checks the EGM files, warns when Claude Code is older than 2.1.271 (reviewers would
+  see `CLAUDE.md`), and warns when a project still targets **.NET 8 or 9**.
+
+### Changed
+- **Models:** `claude-sonnet-5` → `claude-sonnet-5-5`, `claude-haiku-4-5-20251001` →
+  `claude-haiku-5-5`. The **BA runs on Sonnet** in the `auto` and `balanced` profiles: it now writes
+  the spec the Goldfish attack (`save` keeps Haiku). The role table lists the Python agent.
+- **.NET 10 is the target.** .NET 8 and 9 reach end of support on 2026-11-10; `dotnet-api`,
+  `stack-upgrade` and the rules treat them as legacy (one supported hop to net10.0). Built-in
+  OpenAPI is the default for every new project.
+- **Angular 22 is the default** (21 still supported); Angular majors are yearly from 22.
+- **Skills merged (26 → 25):** `test-strategy` + `test-case-design` → **`test-design`**;
+  `estimation-and-slicing` → **`definition-of-ready`**. References updated everywhere.
+
+### Upgrade
+`bash install.sh --update` installs `/dp-spec`, `.devpilot/egm` and the `egm-*` agents, and removes
+DevPilot's copies of the three merged skills (a folder with your own extra files is kept). Re-apply
+your model profile so the agents pick up the new ids: `/dp-setup models <auto|balanced|save>`.
+`spec_review` defaults to `auto` when absent. Needs Claude Code 2.1.271+ for spec review.
+
 ## [5.9.0] — 2026-10-12
 
 ### Added

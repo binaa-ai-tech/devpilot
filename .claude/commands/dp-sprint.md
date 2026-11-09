@@ -32,7 +32,8 @@ sprint a duplicate. A sprint may mix types — e.g. 10 requirements + 4 issues +
 one valid sprint.
 
 **Readiness gate.** Apply `.claude/skills/definition-of-ready/SKILL.md`: only Stories that are
-**ready** may enter a sprint. List any `needs grooming` Stories separately with what's missing —
+**ready** may enter a sprint — for Stories that qualify for a spec review, that includes a
+**PASS** in `docs/specs/<slug>/review.md`. List any `needs grooming` Stories separately with what's missing —
 they stay in the backlog until groomed (via `/dp-plan`), never sprinted unclear.
 
 ---

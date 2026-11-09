@@ -5,12 +5,13 @@ The end-to-end SDLC contract (phases, gates, roles) lives in `.devpilot/process.
 
 ---
 
-## The 10 commands — one per team role
+## The 11 commands — one per team role
 
 | Role | Command | Does |
 |------|---------|------|
 | Whole team | `/dp-deliver <requirement\|KEY> [--to sit]` | **End to end** — plan → sprint → build → QA → review → version bump → PR → merge into `develop` → items, Epic & sprint closed (→ SIT). Asks only if no tracker is connected (connect or skip) or on a gray-zone dedup. `/dp-deliver resume` continues after an interruption. |
 | Product Owner / BA | `/dp-plan <requirement\|KEY>` | Dedup against the tracker + the top matches' child tasks, write Epic→Story with testable ACs. No code. |
+| Architect / BA | `/dp-spec <KEY\|slug\|brainstorm\|draft\|review\|resolve\|bootstrap\|drift-report>` | **Elephant-Goldfish** spec design + review: zero-context `egm-*` reviewers must understand and approve the spec before code (PASS / BLOCKED). No code. |
 | Scrum Master | `/dp-sprint` | Group READY Stories into sprints, recommend run order. |
 | Developers | `/dp-build [sprint]` | Angular + .NET / Python agents build a sprint on one branch → one PR → `develop`. |
 | QA | `/dp-test [ui\|perf] [story\|PR\|diff]` | Cases from ACs → unit / integration / Playwright UI tests → run. |
@@ -28,6 +29,7 @@ The end-to-end SDLC contract (phases, gates, roles) lives in `.devpilot/process.
 /dp-deliver "add CSV export"
   TRACKER → tracker.sh check · not configured → ask once: connect (API key) or continue locally
   PLAN    → classify · dedup vs tracker.sh search + child items (tracker.sh show) · Epic→Story first
+  SPEC    → Goldfish review of docs/requirements/<slug>.md (M/L Stories) · BLOCKED stops the run
   SPRINT  → feature: own sprint · bug: active sprint · P0/P1: refused → /dp-hotfix
   BUILD   → team-dotnet (API · EF Core · OpenAPI) or team-python (FastAPI · agents) ║ team-frontend (Angular · generated client)
   QA      → Vitest · xUnit + real SQL Server · Playwright journeys + axe
@@ -43,6 +45,16 @@ The end-to-end SDLC contract (phases, gates, roles) lives in `.devpilot/process.
 and `docs/backlog/index.md`, then opens only the top 1–3 candidates *with their child items*
 (`tracker.sh show`) — an existing Story or Task under a matching Epic is reused, never duplicated.
 Merges are reversible tracker links + one Story with combined ACs.
+
+## Spec review — Elephant-Goldfish
+
+DevPilot vendors Google's Elephant-Goldfish Model in `.devpilot/egm` (Apache-2.0; read
+`.devpilot/egm/DEVPILOT.md`). The main session is the **Elephant** that writes the spec; the
+`egm-*` agents are the **Goldfish** — no history, no `CLAUDE.md` — and must understand the spec
+from the page alone. Rules: `.claude/skills/spec-review/SKILL.md`; switch: `spec_review` in
+`project.config.md`; refresh: `bash scripts/sync-egm.sh`.
+
+EGM artifact directory: docs/specs
 
 ## Trackers & git hosts
 
