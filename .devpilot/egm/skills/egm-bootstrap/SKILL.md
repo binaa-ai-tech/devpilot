@@ -5,7 +5,7 @@ disable-model-invocation: true
 description: Bootstrap directory README.md files across a repository subtree.
 ---
 
-> **DevPilot:** vendored from google/elephant-goldfish-model@5382b17 (Apache-2.0). Read `.devpilot/egm/DEVPILOT.md` first — it overrides `docs/claude.md` where they differ. EGM root: `.devpilot/egm`.
+> **DevPilot:** vendored from google/elephant-goldfish-model@b7d9e27 (Apache-2.0). Read `.devpilot/egm/DEVPILOT.md` first — it overrides `docs/claude.md` where they differ. EGM root: `.devpilot/egm`.
 
 # EGM Peanuts and Hay Bootstrap (`egm-bootstrap`)
 
@@ -132,9 +132,11 @@ If your harness has no subagent tool, run the scout steps inline.
     *   *Source Code Files*: Files matching recognized source code, schema, and
         contract extensions:
         - Systems & Compiled: `.c`, `.cc`, `.cpp`, `.cxx`, `.h`, `.hh`, `.hpp`,
-          `.rs`, `.go`, `.zig`, `.lean`
-        - Managed & Enterprise: `.java`, `.kt`, `.scala`, `.cs`, `.fs`
-        - Scripting & Dynamic: `.py`, `.rb`, `.php`, `.lua`, `.sh`, `.bash`
+          `.rs`, `.go`, `.zig`, `.lean`, `.f`, `.f90`, `.f95`, `.f03`, `.f08`,
+          `.hs`
+        - Managed & Enterprise: `.java`, `.kt`, `.scala`, `.cs`, `.fs`, `.vb`
+        - Scripting & Dynamic: `.py`, `.rb`, `.php`, `.lua`, `.sh`, `.bash`,
+          `.ps1`, `.psm1`, `.psd1`, `.r`, `.R`, `.ex`, `.exs`
         - Web & Mobile: `.ts`, `.tsx`, `.js`, `.jsx`, `.mjs`, `.cjs`, `.swift`,
           `.m`, `.dart`
         - Data & Schemas / IDLs: `.sql`, `.proto`, `.graphql`, `.gql`,
