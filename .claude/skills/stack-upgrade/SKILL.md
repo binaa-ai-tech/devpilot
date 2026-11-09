@@ -1,7 +1,7 @@
 ---
 name: stack-upgrade
 description: "Upgrade the Angular, .NET, EF Core or test-framework version of a DevPilot project as one planned, reversible change: one hop at a time, official migration tooling, pipelines updated with it."
-when_to_use: "When a Story or Task is a framework or SDK upgrade (Angular major, net8.0 -> net10.0, EF Core major, xUnit v2 -> v3), or a build breaks after an SDK update."
+when_to_use: "When a Story or Task is a framework or SDK upgrade (Angular major, net8.0/net9.0 -> net10.0, EF Core major, xUnit v2 -> v3), or a build breaks after an SDK update."
 user-invocable: false
 ---
 # Stack Upgrade — move one version at a time, prove it, ship it alone
@@ -10,11 +10,14 @@ An upgrade is its own work item and its own PR — never folded into a feature. 
 a user can see, so its proof is: same tests, same results, on the new version.
 
 ## Plan
-- **One hop at a time.** Angular one major per step (20 → 21 → 22); .NET one TFM per step
-  (net8.0 → net9.0 → net10.0), fixing each hop's breaking changes before the next.
+- **One hop at a time.** Angular one major per step (20 → 21 → 22); majors are yearly from 22
+  on. .NET goes straight to the target LTS (net8.0 or net9.0 → net10.0 is one supported hop),
+  but work through every skipped version's breaking-change list before editing.
 - **Frontend and backend upgrade in separate commits** (the `[FE]` / `[BE]` layer tasks), so a
   failure points at one side.
-- Prefer LTS for .NET (8, 10). Preview SDKs never go to `develop`.
+- Target LTS for .NET: **10**. .NET 8 and 9 have been out of support since 10 Nov 2026 (no
+  security fixes) — treat moving off them as security work, not a nice-to-have. .NET 11 is
+  STS; adopt it only for a feature you need. Preview SDKs never go to `develop`.
 - List the breaking changes that apply before editing: the official migration guide per hop,
   filtered to what the project uses (ASP.NET Core, EF Core, OpenAPI, auth, containers).
   Microsoft's `dotnet/skills` plugin (`dotnet-upgrade`: `migrate-dotnet8-to-dotnet9`,

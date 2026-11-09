@@ -136,6 +136,10 @@ command -v jq  >/dev/null 2>&1 && ok "jq" || warn "jq not found — tracker and 
 NOTEXEC=$(find scripts -name '*.sh' ! -perm -u+x 2>/dev/null | wc -l | tr -d ' ')
 [ "${NOTEXEC:-0}" = "0" ] && ok "all scripts executable" || warn "$NOTEXEC script(s) not executable — run: chmod +x scripts/*.sh"
 
+# .NET support window — 8 and 9 lost security fixes on 2026-11-10
+OLD_TFM=$(grep -rhoE '<TargetFrameworks?>[^<]*net(8|9)\.0' --include='*.csproj' --include='Directory.Build.props' --exclude-dir=bin --exclude-dir=obj --exclude-dir=node_modules . 2>/dev/null | grep -oE 'net(8|9)\.0' | sort -u | tr '\n' ' ')
+if [ -n "$OLD_TFM" ]; then warn ".NET ${OLD_TFM% } is out of support (since 2026-11-10) — plan the move to net10.0: /dp-deliver \"upgrade to .NET 10\" (stack-upgrade skill)"; fi
+
 # Project index
 [ -f docs/project-index.md ] && ok "project index present" || warn "no project index — run: bash scripts/generate-project-index.sh"
 

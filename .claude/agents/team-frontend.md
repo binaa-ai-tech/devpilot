@@ -1,7 +1,7 @@
 ---
 name: team-frontend
 model: claude-sonnet-5-5
-description: Angular developer — Angular 21+ (standalone, signals, zoneless), generated API client, Vitest specs, accessibility. Spawned by /dp-build and /dp-deliver for frontend work.
+description: Angular developer — Angular 22+ (standalone, signals, zoneless), generated API client, Vitest specs, accessibility. Spawned by /dp-build and /dp-deliver for frontend work.
 skills:
   - core-rules
 ---

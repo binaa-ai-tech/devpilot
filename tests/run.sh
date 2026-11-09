@@ -619,6 +619,11 @@ echo "== doctor.sh / status.sh / metrics.sh / audit.sh run cleanly =="
 D=$(sandbox)
 set +e
 ( cd "$D" && bash scripts/doctor.sh >/dev/null 2>&1 ); assert_code "$?" "0" "doctor exits 0 on a sane sandbox"
+mkdir -p "$D/src/Api" && echo '<Project><PropertyGroup><TargetFramework>net8.0</TargetFramework></PropertyGroup></Project>' > "$D/src/Api/Api.csproj"
+assert_contains "$( cd "$D" && bash scripts/doctor.sh 2>&1 )" "net8.0 is out of support" "doctor flags an out-of-support .NET target"
+sed -i.bak 's/net8.0/net10.0/' "$D/src/Api/Api.csproj" && rm -f "$D/src/Api/Api.csproj.bak"
+assert_eq "$( cd "$D" && bash scripts/doctor.sh 2>&1 | grep -c 'out of support' )" "0" "doctor is quiet on net10.0"
+rm -rf "$D/src"
 ( cd "$D" && bash scripts/status.sh >/dev/null 2>&1 ); assert_code "$?" "0" "status runs"
 ( cd "$D" && bash scripts/metrics.sh >/dev/null 2>&1 ); assert_code "$?" "0" "metrics runs"
 ( cd "$D" && bash scripts/audit.sh >/dev/null 2>&1 ); assert_code "$?" "0" "audit runs (no manifest)"

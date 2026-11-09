@@ -1,6 +1,6 @@
 ---
 name: angular-dev
-description: "How to write Angular 21+ feature code: standalone, signals, zoneless-safe components, HTTP services + functional interceptors, lazy routes, typed or signal forms, i18n."
+description: "How to write Angular 22+ feature code (21 supported): standalone, signals, zoneless-safe components, HTTP services + functional interceptors, lazy routes, typed or signal forms, i18n."
 when_to_use: "Before writing or changing Angular components, services, routes or forms."
 paths:
   - "**/*.component.ts"
@@ -15,11 +15,12 @@ user-invocable: false
 # Angular Development — modern, signal-first, zoneless-ready
 
 Load this **before writing Angular feature code** (components, services, routes, forms, HTTP).
-`rules/angular.md` holds the one-line non-negotiables; this is the how. Targets Angular 21+ —
+`rules/angular.md` holds the one-line non-negotiables; this is the how. Targets Angular 22 (the
+current major; Angular moved to yearly majors, so 23 is due mid-2027) and still supports 21 —
 check `@angular/core` in `package.json` and follow the **version notes** below.
 
 ## Version notes
-| | Angular 21 | Angular 22+ |
+| | Angular 21 (legacy) | Angular 22+ (default) |
 |--|--|--|
 | Change detection | set `changeDetection: ChangeDetectionStrategy.OnPush` | OnPush is the default — don't set it |
 | Standalone | default since v20 — never write `standalone: true` | same |

@@ -14,7 +14,9 @@ user-invocable: false
 # .NET API Development — ASP.NET Core Web APIs that are safe to depend on
 
 Load this **before adding or changing an ASP.NET Core endpoint, contract, or cross-cutting
-concern.** Targets .NET 8 and 10 (LTS), with notes where 9+/10+ differ. `rules/dotnet.md` holds the
+concern.** Targets **.NET 10 (LTS, supported to Nov 2028)**. .NET 8 and 9 reached end of support on
+10 Nov 2026: on such a project write code that also compiles on 10, and raise a `stack-upgrade`
+task. .NET 11 (STS) is fine where the project already targets it. `rules/dotnet.md` holds the
 one-liners; this is the how.
 An API is a promise: once a client depends on it, careless changes break it silently.
 
@@ -52,9 +54,9 @@ An API is a promise: once a client depends on it, careless changes break it sile
 - Deeper checklist: `security-scan`.
 
 ## Contract
-- OpenAPI is generated from code and is a **deliverable**. On .NET 9+ use the built-in
+- OpenAPI is generated from code and is a **deliverable**. Use the built-in
   `Microsoft.AspNetCore.OpenApi` (`AddOpenApi()` + `MapOpenApi()`); **never add Swashbuckle to a
-  .NET 9+ project** (keep it where it already exists, or on .NET 8). Endpoints carry
+  new project** (keep it where it already exists; replacing it is its own change). Endpoints carry
   `.WithName` / `.WithSummary` / `.Produces<T>` metadata. It is a deliverable — see `api-contract` for committing it and generating the Angular client.
 - **Additive only** inside a version (new optional fields, new endpoints). A rename, removal,
   type change, or tighter validation is **breaking** → new version (`Asp.Versioning`) or a new

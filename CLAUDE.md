@@ -87,7 +87,7 @@ Change with `/dp-setup models <auto|balanced|save>`. Reference: `.devpilot/confi
 
 ## Stack, rules, skills
 
-- **Frontend:** Angular 21+ · **Backend:** ASP.NET Core (C#) + EF Core + SQL Server, or Python 3.11+
+- **Frontend:** Angular 22+ (21 supported) · **Backend:** ASP.NET Core on .NET 10 (C#) + EF Core + SQL Server, or Python 3.11+
   (FastAPI / asyncio / LiveKit agents) · **Contract:** OpenAPI → generated Angular client.
 - **Tests:** Vitest (Angular) · xUnit + `WebApplicationFactory` + Testcontainers (.NET) · pytest + httpx (Python) · Playwright (UI/E2E).
 - **Rules:** `.devpilot/rules.md` (router) + `.devpilot/rules/<angular|dotnet|python|sqlserver>.md`.
