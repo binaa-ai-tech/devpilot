@@ -205,7 +205,7 @@ run_update() {
   fetch "docs/setup-guide.md" "docs/setup-guide.md"
   for f in $RULE_SNIPPETS;   do fetch ".devpilot/rules/$f"        ".devpilot/rules/$f";        done
   for f in $PROMPT_TEAM;     do fetch ".devpilot/prompts/team/$f" ".devpilot/prompts/team/$f"; done
-  fetch ".devpilot/prompts/6-env-diff.md" ".devpilot/prompts/6-env-diff.md"
+  rm -f .devpilot/prompts/6-env-diff.md   # v6.0: folded into the self-heal skill
   for f in $TEMPLATE_TEAM;   do fetch ".devpilot/templates/team/$f" ".devpilot/templates/team/$f"; done
   fetch ".devpilot/templates/changelog-entry.md" ".devpilot/templates/changelog-entry.md"
   mkdir -p .devpilot/templates/deploy
@@ -768,7 +768,6 @@ for f in angular.md dotnet.md python.md sqlserver.md; do
   fetch ".devpilot/rules/$f" ".devpilot/rules/$f"
 done
 
-fetch ".devpilot/prompts/6-env-diff.md" ".devpilot/prompts/6-env-diff.md"
 
 for f in ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md python-agent.md qa-agent.md; do
   fetch ".devpilot/prompts/team/$f" ".devpilot/prompts/team/$f"

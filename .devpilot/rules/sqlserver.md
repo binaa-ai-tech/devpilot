@@ -22,7 +22,7 @@
 - Diff schema between environments before any release.
 
 ### Cross-environment failures
-- Works in dev but fails in UAT/prod → do NOT edit SP code first. Diagnose with `prompts/6-env-diff.md`; fix at schema/trigger/server-config level when possible.
+- Works in dev but fails in UAT/prod → do NOT edit SP code first. Diagnose with the "Works in env A, fails in env B" checklist in `.claude/skills/self-heal/SKILL.md`; fix at schema/trigger/server-config level when possible.
 
 ### Naming
 - Tables `PascalCase` (plural where natural). SPs `usp_<verb>_<noun>` (or project prefix, e.g. `asp_`).
