@@ -4,7 +4,7 @@
 
 | Location | Purpose |
 | --- | --- |
-| [Getting started](getting_started.md) and [FAQ](faq.md) | Installation and everyday use. |
+| [Getting started](https://github.com/google/elephant-goldfish-model/blob/main/docs/getting_started.md) and [FAQ](https://github.com/google/elephant-goldfish-model/blob/main/docs/faq.md) | Installation and everyday use. |
 | [Harnesses](harnesses.md), [Claude](claude.md), and [Codex](codex.md) | Host-specific installation and execution. |
 | [Design documents](https://github.com/google/elephant-goldfish-model/blob/main/docs/designs/README.md) | Architecture, workflow rationale, and implementation plans. |
 | [Shared runtime resources](../resources/README.md) | Authoritative execution rules and review standards. |
@@ -92,10 +92,10 @@ their strengths and weaknesses.
 
 ## Documentation & Guides
 
-*   [Getting Started](getting_started.md): Installation and core workflow.
+*   [Getting Started](https://github.com/google/elephant-goldfish-model/blob/main/docs/getting_started.md): Installation and core workflow.
 *   [Codex](codex.md): Plugin installation and native workflow verification.
 *   [Claude Code](claude.md): Plugin resources and isolated reviewers.
-*   [Frequently Asked Questions (FAQ)](faq.md): Common questions and answers.
+*   [Frequently Asked Questions (FAQ)](https://github.com/google/elephant-goldfish-model/blob/main/docs/faq.md): Common questions and answers.
 *   [Framework Architecture](https://github.com/google/elephant-goldfish-model/blob/main/docs/designs/architecture.md): Detailed component
     design and lifecycle.
 *   [Contributing Guidelines](https://github.com/google/elephant-goldfish-model/blob/main/CONTRIBUTING.md): How to contribute new skills,

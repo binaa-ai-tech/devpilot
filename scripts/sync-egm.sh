@@ -8,7 +8,7 @@
 #   bash scripts/sync-egm.sh --from <dir>    # an existing local checkout (offline)
 #
 # What it does (idempotent — re-run it to pick up upstream fixes):
-#   distributions/claude/{skills,agents,resources,docs,LICENSE,README.md} → .devpilot/egm/
+#   distributions/claude/{skills,agents,resources,LICENSE,README.md} + the docs the skills link → .devpilot/egm/
 #   distributions/claude/.claude-plugin/agents/*.md (Claude adapters)    → .claude/agents/egm-*.md
 # and rewrites plugin paths for a project install:
 #   ${CLAUDE_PLUGIN_ROOT}  → .devpilot/egm        /egm:egm-<skill> → /dp-spec <skill>
@@ -74,7 +74,15 @@ cp "$SRC/LICENSE" "$DEST/LICENSE"
 cp "$SRC/README.md" "$DEST/README.md"
 cp -R "$SRC/agents" "$SRC/resources" "$DEST/"
 mkdir -p "$DEST/docs"
-find "$SRC/docs" -maxdepth 1 -type f -name '*.md' -exec cp {} "$DEST/docs/" \;
+# Only the docs the skills link to; FAQ, getting-started, privacy and release notes are for
+# plugin users and nothing here references them. index.md keeps upstream links to those pages.
+for doc in claude codex harnesses index; do
+  if [ -f "$SRC/docs/$doc.md" ]; then cp "$SRC/docs/$doc.md" "$DEST/docs/"; fi
+done
+# Links to pages not vendored point upstream instead of to missing files.
+for f in "$DEST"/docs/*.md; do
+  sed -i.bak -E 's#\]\((faq|getting_started|privacy|releases)\.md\)#](https://github.com/google/elephant-goldfish-model/blob/main/docs/\1.md)#g' "$f" && rm -f "$f.bak"
+done
 for d in "$SRC"/skills/egm-*/; do
   n="$(basename "$d")"
   mkdir -p "$DEST/skills/$n"
