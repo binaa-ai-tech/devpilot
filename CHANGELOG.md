@@ -4,6 +4,24 @@ All notable changes to DevPilot. Versions follow [SemVer](https://semver.org); e
 section becomes the GitHub Release notes when the `vx.y.z` tag is pushed
 (`.github/workflows/release.yml`).
 
+## [6.2.0] — 2026-11-18
+
+### Added
+- **The commit gate checks that a `Verified:` claim is true.** The commit-msg hook recomputes the
+  working-tree fingerprint and requires every check named in `Verified:` (`tests`, `verify`,
+  `code-review`) to have passed on exactly the tree being committed. `observe` logs a false claim;
+  `enforce` blocks it, and `Unverified-Reason:` does not excuse it — the honest trailer is
+  `Verified: none`. A `docs/` edit after the checks still counts.
+- **DevPilot runs its own commit gate.** The DevPilot repo enforces it (`commit_gate: enforce` in its
+  own config; projects still get `observe`), `tests/run.sh` stamps `Verified: tests` when the suite
+  passes, and CI reports PR commits that skipped the hook (report only).
+
+### Fixed
+- **`Verified:` trailers in the commands were not trailers.** The version, docs and changelog commits
+  in `/dp-build`, `/dp-pr`, `/dp-spec`, `/dp-setup`, `/dp-hotfix` and `/dp-release` wrote
+  `Verified: none` as a separate `-m` paragraph, and git reads trailers only from the last paragraph.
+  They now use `git commit --trailer`. The hook says when `Verified:` is outside the trailer block.
+
 ## [6.1.1] — 2026-11-17
 
 ### Changed
