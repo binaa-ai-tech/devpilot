@@ -23,6 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0   # the Verified-trailer report reads the PR's commits
 
       - name: shellcheck (scripts)
         run: |
@@ -38,6 +40,28 @@ jobs:
 
       - name: run test suite
         run: bash tests/run.sh
+
+      # DevPilot's own commits carry a `Verified:` trailer (scripts/commit-gate.sh). The local
+      # commit-msg hook enforces it; this reports commits that skipped the hook. Report only.
+      - name: Verified trailers (report only)
+        if: github.event_name == 'pull_request'
+        env:
+          BASE: ${{ github.event.pull_request.base.sha }}
+          HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          missing=0; unexplained=0; total=0
+          for c in $(git rev-list --no-merges "$BASE..$HEAD"); do
+            total=$((total + 1))
+            msg=$(git log -1 --format=%B "$c"); subject=$(git log -1 --format=%s "$c")
+            v=$(printf '%s\n' "$msg" | git interpret-trailers --parse | grep -i '^Verified:' | tail -1 | sed 's/^[^:]*:[[:space:]]*//')
+            r=$(printf '%s\n' "$msg" | git interpret-trailers --parse | grep -i '^Unverified-Reason:' | tail -1)
+            if [ -z "$v" ]; then
+              missing=$((missing + 1)); echo "::warning title=No Verified trailer::${c:0:7} $subject"
+            elif [ "$(printf '%s' "$v" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')" = none ] && [ -z "$r" ]; then
+              unexplained=$((unexplained + 1)); echo "::warning title=Verified: none without a reason::${c:0:7} $subject"
+            fi
+          done
+          echo "Verified trailers: $total commit(s) · $missing without a trailer · $unexplained 'none' without a reason" | tee -a "$GITHUB_STEP_SUMMARY"
 
   # ── End to end on a sample Angular + .NET repo (no AI needed) ─────────────────
   # Installs DevPilot, runs the scripted /dp-deliver + /dp-release path (tracker,

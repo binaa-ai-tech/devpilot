@@ -522,6 +522,10 @@ It runs weekly in CI (`.github/workflows/real-app.yml`).
 
 **Contributing:** use [Conventional Commits](https://www.conventionalcommits.org), keep one change per commit, and run
 `bash tests/run.sh` and `bash tests/e2e.sh` before pushing. Every change goes to `main` through a pull request.
+DevPilot runs its own commit gate in `enforce` mode: install the hook once (`bash scripts/install-git-hooks.sh`),
+and end each commit with the trailer `bash scripts/commit-gate.sh stamp` prints. `Verified: tests` means
+`bash tests/run.sh` passed on exactly that tree; otherwise write `Verified: none` plus `Unverified-Reason: <why>`.
+CI reports PR commits without a trailer.
 
 **Releasing DevPilot:** bump `VERSION` and the README badge, add the version's section to `CHANGELOG.md`, merge,
 then push the tag (`git tag v5.5.0 && git push origin v5.5.0`), or run the `release` workflow by hand on `main`

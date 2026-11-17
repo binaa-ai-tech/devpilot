@@ -1552,6 +1552,14 @@ assert_code "$RC" "1" "enforce: a failed test run does not back Verified: tests"
 OUT=$(printf 'docs(a): docs only after tests\n\nVerified: tests\n' | ( cd "$D" && echo "$RANDOM" >> src/a.ts && bash scripts/commit-gate.sh mark tests && echo note > docs/n.md && git add -A && git -c commit.gpgsign=false commit -q -F - ) 2>&1); RC=$?
 assert_code "$RC" "0" "a docs/ change after the tests keeps the claim backed"
 ( cd "$D" && rm -rf .git/devpilot )
+# trailers only count in the message's last paragraph: separate -m flags break them, --trailer doesn't
+OUT=$( cd "$D" && echo "$RANDOM" >> src/a.ts && git add -A && git -c commit.gpgsign=false commit -q -m "chore(a): bump" -m "Verified: tests" -m "Co-Authored-By: X <x@y.z>" 2>&1 ); RC=$?
+assert_code "$RC" "1" "enforce: Verified: in its own paragraph before Co-Authored-By is not a trailer"
+assert_contains "$OUT" "not in the trailer block" "the block explains where trailers must go"
+( cd "$D" && rm -rf .git/devpilot && git reset -q )
+OUT=$( cd "$D" && echo "$RANDOM" >> src/a.ts && git add -A && git -c commit.gpgsign=false commit -q -m "chore(a): bump" --trailer "Verified: none" --trailer "Unverified-Reason: version only" --trailer "Co-Authored-By: X <x@y.z>" 2>&1 ); RC=$?
+assert_code "$RC" "0" "enforce: --trailer puts Verified: in the trailer block (with Co-Authored-By)"
+( cd "$D" && rm -rf .git/devpilot )
 unset COMMIT_GATE
 OUT=$(printf 'feat(a): observe false claim\n\nVerified: verify\n' | cm); RC=$?
 assert_code "$RC" "0" "observe: a false claim is not blocked"
@@ -1581,6 +1589,11 @@ assert_contains "$(cat "$REPO/scripts/run-tests.sh")" "commit-gate.sh\" mark tes
 assert_contains "$(cat "$REPO/scripts/verify.sh")" "commit-gate.sh\" mark verify" "verify.sh stamps a verify run"
 assert_contains "$(cat "$REPO/README.md")" "git log --grep '^Verified: none'" "README shows how to list unverified changes"
 assert_contains "$(cat "$REPO/.claude/skills/core-rules/SKILL.md")" "commit-gate.sh stamp" "core-rules: commits carry the stamp"
+assert_eq "$(grep -rlE -- '-m "Verified' "$REPO/.claude/commands" "$REPO/scripts" | wc -l | tr -d ' ')" "0" "no command writes Verified: as a separate -m paragraph"
+assert_contains "$(cat "$REPO/.claude/commands/dp-build.md")" '--trailer "Verified: none"' "commands write trailers with --trailer"
+assert_contains "$(tail -5 "$REPO/tests/run.sh")" "commit-gate.sh mark tests" "DevPilot's own suite stamps Verified: tests"
+assert_contains "$(cat "$REPO/project.config.md")" "commit_gate: enforce" "DevPilot's own repo enforces the commit gate"
+assert_contains "$(cat "$REPO/.github/workflows/ci.yml")" "Verified trailers (report only)" "CI reports PR commits without a Verified: trailer"
 
 echo "== review-metrics.sh — review the reviewers =="
 D=$(sandbox)
@@ -1638,4 +1651,6 @@ assert_contains "$(cat "$REPO/README.md")" "version-$V-blue" "README badge shows
 
 echo ""
 echo "── Results: $PASS passed, $FAIL failed ──"
+# Verification stamp for DevPilot's own commits: `Verified: tests` means this suite passed on the tree.
+( cd "$REPO" && bash scripts/commit-gate.sh mark tests "$([ "$FAIL" -eq 0 ] && echo pass || echo fail)" ) 2>/dev/null || true
 [ "$FAIL" -eq 0 ]
