@@ -59,8 +59,14 @@ jobs:
   # ── macOS: the default /bin/bash there is 3.2 (2007) and the tools are BSD ────
   # Every `bash` call in the tests resolves to /bin/bash, so anything DevPilot runs
   # on a developer's Mac is exercised here.
+  #
+  # Runs on the org's self-hosted Mac (runner group devpilot-public, label devpilot-ci):
+  # hosted macOS runners were often unavailable and cancelled the job. The repo is public,
+  # so the job never runs code from a fork — only pushes and PRs from branches of this
+  # repo (fork PRs skip it, and their workflows need approval anyway).
   macos:
-    runs-on: macos-latest
+    if: github.event_name == 'push' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: [self-hosted, macOS, ARM64, devpilot-ci]
     needs: test
     timeout-minutes: 20
     steps:
