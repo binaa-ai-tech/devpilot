@@ -2,7 +2,8 @@ name: real-app
 
 # Builds a REAL Angular + ASP.NET Core + EF Core app with the pipelines DevPilot
 # generates (tests/real-app.sh): npm ci · ng build · dotnet publish · EF migration
-# script + rollback · test suites · actionlint. Weekly (toolchains drift) and on
+# script + rollback · test suites · actionlint · verify (scripts/verify.sh drives Playwright
+# journeys in Chromium against the running app, 3 runs in a row). Weekly (toolchains drift) and on
 # PRs that touch the pipeline / packaging scripts.
 on:
   schedule:
@@ -14,6 +15,7 @@ on:
       - scripts/db-package.sh
       - scripts/run-tests.sh
       - scripts/version.sh
+      - scripts/verify.sh
       - tests/real-app.sh
       - .github/workflows/real-app.yml
 
