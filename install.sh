@@ -111,7 +111,7 @@ fetch() {
 }
 
 # Native Claude Code skills shipped by DevPilot (.claude/skills/<name>/SKILL.md).
-DEVPILOT_SKILLS="core-rules definition-of-ready spec-review architecture-guard angular-dev angular-testing accessibility dotnet-api efcore-sqlserver dotnet-testing python-api python-testing api-contract test-design ui-e2e-playwright token-lean-testing test-guard performance review-checklist security-scan definition-of-done auto-merge release-ops self-heal stack-upgrade"
+DEVPILOT_SKILLS="core-rules definition-of-ready spec-review architecture-guard angular-dev angular-testing accessibility dotnet-api efcore-sqlserver dotnet-testing python-api python-testing api-contract test-design ui-e2e-playwright token-lean-testing test-guard verify-change performance review-checklist security-scan definition-of-done auto-merge release-ops self-heal stack-upgrade"
 install_skills() {
   local n
   for n in $DEVPILOT_SKILLS; do fetch ".claude/skills/$n/SKILL.md" ".claude/skills/$n/SKILL.md"; done
@@ -204,7 +204,7 @@ run_update() {
   TEMPLATE_TEAM="requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md bug-report.md item-brief.md"
   CMDS="dp-deliver.md dp-plan.md dp-spec.md dp-sprint.md dp-build.md dp-test.md dp-pr.md dp-release.md dp-hotfix.md dp-status.md dp-setup.md"
   AGENTS_LIST="team-lead.md team-ba.md team-frontend.md team-dotnet.md team-python.md team-qa.md"
-  SCRIPTS="git-flow.sh resolve-model.sh model-profiles.sh checkpoint.sh devpilot-config.sh devpilot-lib.sh tracker.sh jira.sh azdo.sh github.sh git-host.sh version.sh close-delivery.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy.sh smoke.sh setup-environments.sh db-package.sh usage-hook.sh deploy-init.sh generate-project-index.sh generate-backlog-index.sh md-to-adf.sh sync-egm.sh"
+  SCRIPTS="git-flow.sh resolve-model.sh model-profiles.sh checkpoint.sh devpilot-config.sh devpilot-lib.sh tracker.sh jira.sh azdo.sh github.sh git-host.sh version.sh close-delivery.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy.sh smoke.sh setup-environments.sh db-package.sh usage-hook.sh deploy-init.sh generate-project-index.sh generate-backlog-index.sh md-to-adf.sh sync-egm.sh verify.sh"
 
   info "Refreshing .devpilot/rules..."
   fetch ".devpilot/rules.md" ".devpilot/rules.md"
@@ -769,6 +769,14 @@ UAT_API_URL=""
 PRD_FRONTEND_URL=""
 PRD_API_URL=""
 
+# ── Verify — run the change locally (scripts/verify.sh; skill: verify-change) ─
+# Start commands and the URLs to wait for. Leave a pair blank if the project has no such layer.
+VERIFY_FE_CMD=""                       # e.g. npm --prefix web start
+VERIFY_FE_URL=""                       # e.g. http://localhost:4200
+VERIFY_API_CMD=""                      # e.g. dotnet run --project src/Api --urls http://localhost:5080
+VERIFY_API_HEALTH=""                   # e.g. http://localhost:5080/health
+VERIFY_TIMEOUT="120"                   # seconds to wait for the services to answer
+
 # ── Notifications (best-effort; scripts/notify.sh) ──────────────────────────
 NOTIFY_WEBHOOK=""                      # Slack/Teams/Discord-compatible webhook URL
 NOTIFY_EMAIL="your-email@example.com"  # used when a local 'mail' command exists
@@ -838,7 +846,7 @@ for f in git-flow.sh resolve-model.sh model-profiles.sh checkpoint.sh \
           open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh \
           doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh \
           deploy.sh smoke.sh setup-environments.sh db-package.sh usage-hook.sh deploy-init.sh \
-          generate-project-index.sh generate-backlog-index.sh md-to-adf.sh sync-egm.sh; do
+          generate-project-index.sh generate-backlog-index.sh md-to-adf.sh sync-egm.sh verify.sh; do
   fetch "scripts/$f" "scripts/$f"
   chmod +x "scripts/$f" 2>/dev/null || true
 done

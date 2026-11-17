@@ -39,6 +39,13 @@ MERGE_POLICY=$(grep '^merge_policy:' project.config.md | head -1 | awk '{print $
 Fetch the PR (table above), check out its head branch, and read the machine line in its body:
 `<!-- devpilot: keys="…" sprint="…" version="…" -->` → `KEYS`, `SPRINT`, `VERSION` (Step 4).
 
+**Verify gate — no evidence, no PR.** For each key: `bash scripts/verify.sh gate <KEY>`. It passes
+only with a `docs/tasks/<KEY>-evidence/verify-report.md` that says PASS, or one that records a
+written reason the change has no runtime surface (docs-only, CI, tooling). On ❌: run
+`bash scripts/verify.sh run <KEY>` on the PR branch (`.claude/skills/verify-change/SKILL.md`), commit the
+evidence, and only then continue. Never open, mark ready, or merge a PR while the gate is red —
+report why instead. A PR DevPilot didn't open has no key: use the ticket in its title/branch.
+
 If any **never-auto-merge** condition in `auto-merge` holds (release/`main` target, unvetted
 migrations, secrets/auth config in the diff), still fix CI and comments but stop before merging
 and say why.
@@ -70,7 +77,8 @@ For each unresolved thread:
 3. **Root-cause and fix** per `.claude/skills/self-heal/SKILL.md` — no skipped tests, no weakened
    assertions, no suppressed errors. "Flaky" is not a root cause.
 4. **Local ladder before pushing** — `bash scripts/run-tests.sh all`,
-   `STRICT=1 bash scripts/test-guard.sh`, `bash scripts/audit.sh`. Push only a locally green
+   `STRICT=1 bash scripts/test-guard.sh`, `bash scripts/audit.sh`, and — when the fix touched
+   runtime code — `bash scripts/verify.sh run <KEY>` again (the old report proves the old code). Push only a locally green
    commit: `fix(ci): <what>`.
 5. Wait for CI on the new head; green → Step 3, red → next cycle.
 
@@ -100,6 +108,6 @@ No machine line (a PR DevPilot didn't open)? Take keys from the title/branch; sk
 🔀 /dp-pr — PR <n> → <BASE_BRANCH>  (<github | azure>)
 Review:       <n> threads — <fixed> fixed · <answered> answered
 CI cycles:    <0–3>  ·  Fixes: <commit list or "none needed">
-Gate ladder:  build ✅ · tests ✅ · audit ✅ · review ✅ · QA ✅ · CI ✅
+Gate ladder:  build ✅ · tests ✅ · audit ✅ · review ✅ · QA ✅ · verify ✅ · CI ✅
 Outcome:      MERGED v<VERSION> · items Done · sprint <closed|open> | READY (pr-only) | ESCALATED (<why>)
 ```

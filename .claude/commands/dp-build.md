@@ -107,12 +107,30 @@ BLOCKED → `bash scripts/notify.sh blocked "QA BLOCKED in $SPRINT: <keys + reas
 
 ---
 
+## Step 5b — Verify: run the change (before the final commit)
+
+Tests passing is not the proof — the running app is (`.claude/skills/verify-change/SKILL.md`). Per Story:
+```bash
+bash scripts/verify.sh run "$KEY"     # start app → journeys the diff touches (docs/feature-map.md) → evidence → stop
+```
+- Exit 3 → there was no feature map; a `DRAFT — needs owner review` one was written. Fill the
+  entries this sprint touches, re-run, and flag the draft in the PR body.
+- ❌ FAIL → `self-heal` (3 attempts: fix the code or the journey, never the map's `Expected`),
+  then escalate. Never continue to Step 6 on a failing report.
+- No runtime surface (docs / CI / tooling only) → the script records it, or
+  `bash scripts/verify.sh skip "$KEY" "<reason>"`.
+
+Commit the evidence with the work: `git add docs/tasks/*-evidence docs/feature-map.md`.
+
+---
+
 ## Step 6 — Review gate + version bump + one PR → develop
 
 **Review (Team Lead):** `.claude/skills/review-checklist/SKILL.md`, `security-scan` over auth/input
 changes, `definition-of-done` — never open around a 🔴 BLOCKER. Then:
 ```bash
 STRICT=1 bash scripts/test-guard.sh
+for KEY in <STORY_KEYS>; do bash scripts/verify.sh gate "$KEY" || exit 1; done   # no passing verify report → no PR
 ```
 
 **Version** (skip when `BUMP=off`) — bumped **from develop's current version**, so two PRs in
@@ -138,6 +156,9 @@ git commit -m "chore(release): bump version to $VERSION"
 - [<KEY>](<tracker.sh url KEY>) — <title>   (one line per Story; add `<tracker.sh ref KEY>`)
 ### QA
 <verdict table from docs/qa/<SPRINT_SLUG>.md> · Review: docs/reviews/<slug>.md
+### Verify
+<the Result line + journey table of each docs/tasks/<KEY>-evidence/verify-report.md, or the written
+"no runtime surface" reason> · feature map: <reviewed | ⚠️ DRAFT — needs owner review>
 <!-- devpilot: keys="<STORY_KEYS>" sprint="<SPRINT>" version="<VERSION>" -->
 ```
 The last line lets `/dp-pr` finish the job (close items + sprint) on a later run.
@@ -192,6 +213,7 @@ the items In Progress: `bash scripts/notify.sh blocked "PR open, not merged — 
 🔀  PR:       <PR_URL>  (squash-merged, branch deleted)
 ⏱  Time:     <START_TIME> → <END_TIME>
 📁  QA:       docs/qa/<SPRINT_SLUG>.md
+🔎  Verify:   <n> journey(s) ✅ → docs/tasks/<KEY>-evidence/verify-report.md  (or: no runtime surface)
 📍  Now on:   <BASE_BRANCH> (pulled)
 ──────────────────────────────────────────────────────
 🚀  Promote when ready:  /dp-release sit → uat → prd

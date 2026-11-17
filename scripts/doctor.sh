@@ -167,6 +167,20 @@ fi
 OLD_TFM=$(grep -rhoE '<TargetFrameworks?>[^<]*net(8|9)\.0' --include='*.csproj' --include='Directory.Build.props' --exclude-dir=bin --exclude-dir=obj --exclude-dir=node_modules . 2>/dev/null | grep -oE 'net(8|9)\.0' | sort -u | tr '\n' ' ')
 if [ -n "$OLD_TFM" ]; then warn ".NET ${OLD_TFM% } is out of support (since 2026-11-10) — plan the move to net10.0: /dp-deliver \"upgrade to .NET 10\" (stack-upgrade skill)"; fi
 
+# Verify — can the change be run locally? (scripts/verify.sh, skill verify-change)
+if [ -f scripts/verify.sh ] && [ -f .claude/skills/verify-change/SKILL.md ]; then
+  VCFG=$(bash scripts/verify.sh config 2>/dev/null)
+  if printf '%s\n' "$VCFG" | grep -qE '^VERIFY_(FE_URL|API_HEALTH)=.'; then ok "verify configured (start commands + health URLs)"
+  else warn "verify not configured — set verify_fe_cmd / verify_fe_url / verify_api_cmd / verify_api_health: bash scripts/devpilot-config.sh set verify_fe_url=http://localhost:4200"; fi
+  case "$VCFG" in
+    *"(present)"*) ok "feature map present (docs/feature-map.md)" ;;
+    *"(draft)"*)   warn "docs/feature-map.md is still a DRAFT — an owner should review it" ;;
+    *)             warn "no docs/feature-map.md — draft one: bash scripts/verify.sh map-draft" ;;
+  esac
+else
+  warn "verify script or verify-change skill missing — re-run: bash install.sh --update"
+fi
+
 # Project index
 [ -f docs/project-index.md ] && ok "project index present" || warn "no project index — run: bash scripts/generate-project-index.sh"
 

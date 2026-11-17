@@ -50,7 +50,11 @@ state the assumption and continue; don't stop to ask.
 ## Part 1 — Build / Lint / Test Recovery (3-attempt protocol)
 
 When a build, lint, or test command fails (run suites via `bash scripts/run-tests.sh` —
-`token-lean-testing` — and read only the failure lines):
+`token-lean-testing` — and read only the failure lines) — **or `bash scripts/verify.sh run` reports
+❌ FAIL / UNSTABLE** (`verify-change`): read `docs/tasks/<KEY>-evidence/<feature>/journey.log` and the
+service logs in `.devpilot/logs/verify-*.log`, then follow the same three attempts. A verify
+failure is fixed in the code, the journey's locators, or the start-up config — never by editing
+the feature map's `Expected` result or the report.
 
 ### Attempt 1 — Diagnose
 1. Read the COMPLETE error output. Do not skim.
@@ -78,7 +82,7 @@ When a build, lint, or test command fails (run suites via `bash scripts/run-test
 
 Command: `<exact failing command>`
 Error:
-<paste the full error output>
+<paste the full error output — for verify: the failing journey lines of verify-report.md>
 
 Root cause hypothesis: <your best diagnosis>
 

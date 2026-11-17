@@ -29,6 +29,7 @@ Key files / components: <from the plan, if known>
 ## Definition of Done
 - All acceptance criteria implemented and covered by tests (happy path + one edge/error each).
 - Build + tests green; no `any`/dead code/secrets; in-scope files only.
+- Verify passed with evidence attached: `bash scripts/verify.sh run <KEY>` → `docs/tasks/<KEY>-evidence/` (`verify-change`).
 - Review gate passed (`review-checklist`, `security-scan` on auth/input). See `.claude/skills/definition-of-done/SKILL.md`.
 
 ## Tracking

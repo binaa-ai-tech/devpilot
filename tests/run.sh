@@ -1232,6 +1232,133 @@ fi
 assert_eq "$(grep -c 'Redis\|env:' "$Y" 2>/dev/null)" "0" "no hooks → no extra steps and no env block"
 rm -rf "$D"
 
+echo "== verify.sh — run the change, keep the evidence =="
+D=$(sandbox)
+( cd "$D" && mkdir -p bin web/src/app/orders web/src/app/invoices .devpilot docs/requirements \
+  && echo x > web/src/app/orders/orders.component.ts && printf '# Requirements: Export orders\n' > docs/requirements/export.md \
+  && printf "export const routes = [{ path: 'orders', component: X }, { path: '**', redirectTo: '' }];\n" > web/src/app/app.routes.ts \
+  && git add -A && git commit -qm base && git branch -M develop && git checkout -qb feature/x )
+# curl stand-in: the "service" answers only once its start command created $D/up
+printf '#!/usr/bin/env bash\n[ -f "%s/up" ] && printf 200 || printf 000\n' "$D" > "$D/bin/curl"
+# journey runner stand-in: F-01 observes its expected result and leaves a screenshot; anything else fails
+cat > "$D/bin/fake-e2e" <<'EOF'
+#!/usr/bin/env bash
+j=""; while [ $# -gt 0 ]; do [ "$1" = "--grep" ] && j="$2"; shift; done
+case "$j" in
+  "@F-01") echo png > "$VERIFY_EVIDENCE_DIR/orders.png"; echo "TypeError: x" > "$VERIFY_EVIDENCE_DIR/console-errors.log"; exit 0 ;;
+  "@noshot") exit 0 ;;
+  *) exit 1 ;;
+esac
+EOF
+chmod +x "$D/bin/curl" "$D/bin/fake-e2e"
+VP="$D/bin:$PATH"
+assert_code "$(cd "$D" && bash scripts/verify.sh bogus >/dev/null 2>&1; echo $?)" "2" "verify: unknown command → usage (rc 2)"
+assert_code "$(cd "$D" && bash scripts/verify.sh run >/dev/null 2>&1; echo $?)" "2" "verify run without a key → rc 2"
+assert_code "$(cd "$D" && bash scripts/verify.sh run 'MSK 1;rm' >/dev/null 2>&1; echo $?)" "2" "verify rejects a key with shell characters"
+assert_code "$(cd "$D" && bash scripts/verify.sh run MSK-1 --repeat x >/dev/null 2>&1; echo $?)" "2" "verify --repeat needs a number"
+assert_code "$(cd "$D" && bash scripts/verify.sh skip MSK-1 >/dev/null 2>&1; echo $?)" "2" "verify skip without a reason is refused"
+assert_code "$(cd "$D" && bash scripts/verify.sh gate MSK-1 >/dev/null 2>&1; echo $?)" "1" "verify gate: no report → blocked"
+OUT=$(cd "$D" && VERIFY_FE_URL=http://env:1 bash scripts/verify.sh config)
+assert_contains "$OUT" "VERIFY_FE_URL=http://env:1" "verify config: environment variable is read"
+assert_contains "$OUT" "VERIFY_TIMEOUT=120" "verify config: timeout defaults to 120s"
+assert_contains "$OUT" "--retries=0" "verify config: journeys run with retries 0 by default"
+( cd "$D" && printf "VERIFY_FE_URL='http://file:2'\nVERIFY_API_HEALTH='http://file:3/health'\n" > .devpilot/config.sh )
+OUT=$(cd "$D" && bash scripts/verify.sh config)
+assert_contains "$OUT" "VERIFY_API_HEALTH=http://file:3/health" "verify config: .devpilot/config.sh is read through devpilot-config.sh"
+assert_contains "$(cd "$D" && VERIFY_FE_URL=http://env:1 bash scripts/verify.sh config)" "VERIFY_FE_URL=http://env:1" "verify config: environment wins over config.sh"
+assert_code "$(cd "$D" && VERIFY_TIMEOUT=soon bash scripts/verify.sh config >/dev/null 2>&1; echo $?)" "2" "verify config: a non-numeric timeout is rejected"
+rm -f "$D/.devpilot/config.sh"
+OUT=$(cd "$D" && PATH="$VP" bash scripts/verify.sh run MSK-1 2>&1); RC=$?
+assert_code "$RC" "3" "verify run with no feature map → writes a draft and stops (rc 3)"
+MAPTXT=$(cat "$D/docs/feature-map.md")
+assert_contains "$MAPTXT" "DRAFT — needs owner review" "the generated feature map is marked DRAFT"
+assert_contains "$MAPTXT" "· Export orders" "draft map has an entry per requirements doc"
+assert_contains "$MAPTXT" "- Route: /orders" "draft map has an entry per Angular route"
+assert_eq "$(grep -c '\*\*$' <<<"$(grep '^- Route:' "$D/docs/feature-map.md")")" "0" "draft map skips the wildcard route"
+assert_contains "$(cd "$D" && bash scripts/verify.sh config)" "(draft)" "verify config reports the map as a draft"
+cat > "$D/docs/feature-map.md" <<'EOF'
+# Feature map
+## F-01 · Export orders as CSV
+- Route: /orders
+- Files: web/src/app/orders/*, api/Controllers/Orders*
+- Expected: CSV downloads | toast "Export ready"
+## F-02 · Invoices
+- Files: web/src/app/invoices/*
+- Expected: the invoice opens
+## F-03 · Reports
+- Files: web/src/app/reports/*
+- Expected: the chart renders
+- Journey: @noshot
+EOF
+OUT=$(cd "$D" && PATH="$VP" bash scripts/verify.sh run MSK-1 2>&1); RC=$?
+assert_code "$RC" "0" "docs-only diff → verify records no runtime surface"
+assert_contains "$(cat "$D/docs/tasks/MSK-1-evidence/verify-report.md")" "Result: ⏭ NO RUNTIME SURFACE" "the report says why nothing ran"
+assert_code "$(cd "$D" && bash scripts/verify.sh gate MSK-1 >/dev/null 2>&1; echo $?)" "0" "gate accepts a written no-runtime-surface reason"
+( cd "$D" && echo y >> web/src/app/orders/orders.component.ts )
+assert_eq "$(cd "$D" && bash scripts/verify.sh features 2>/dev/null | cut -f1 | tr '\n' ' ')" "F-01 " "only the features the diff touches are selected"
+assert_eq "$(cd "$D" && bash scripts/verify.sh features --all 2>/dev/null | wc -l | tr -d ' ')" "3" "--all selects every feature"
+OUT=$(cd "$D" && PATH="$VP" bash scripts/verify.sh run MSK-1 2>&1); RC=$?
+assert_code "$RC" "2" "runtime change but verify not configured → rc 2"
+assert_contains "$OUT" "verify_fe_url" "the not-configured message names the keys to set"
+SVC="echo \$\$ > $D/pid; touch $D/up; exec sleep 300"
+OUT=$(cd "$D" && PATH="$VP" VERIFY_FE_URL=http://localhost:4200 VERIFY_FE_CMD="$SVC" VERIFY_E2E_CMD="$D/bin/fake-e2e" VERIFY_E2E_DIR=. VERIFY_TIMEOUT=15 \
+  bash scripts/verify.sh run MSK-1 --repeat 3 2>&1); RC=$?
+assert_code "$RC" "0" "verify run: service started, journey passed 3× in a row"
+REP=$(cat "$D/docs/tasks/MSK-1-evidence/verify-report.md")
+assert_contains "$REP" "Result: ✅ PASS" "report ends with the PASS verdict"
+assert_contains "$REP" "Runs: 3 (identical)" "three runs gave identical results"
+assert_contains "$REP" '| F-01 · Export orders as CSV | `@F-01` | CSV downloads / toast "Export ready" | ✅ pass | 1 screenshot(s) · 1 console error(s) · 0 failed request(s) |' "one pass/fail line per journey with its expected result and evidence"
+[ -f "$D/docs/tasks/MSK-1-evidence/F-01/orders.png" ] && ok "screenshot saved under docs/tasks/<KEY>-evidence/<feature>/" || no "screenshot saved under docs/tasks/<KEY>-evidence/<feature>/"
+[ -f "$D/docs/tasks/MSK-1-evidence/F-01/journey.log" ] && ok "journey log kept as evidence" || no "journey log kept as evidence"
+if kill -0 "$(cat "$D/pid" 2>/dev/null)" 2>/dev/null; then no "the started service is stopped after a pass"; else ok "the started service is stopped after a pass"; fi
+assert_code "$(cd "$D" && bash scripts/verify.sh gate MSK-1 >/dev/null 2>&1; echo $?)" "0" "gate passes on a PASS report"
+# an already-running service is reused and left alone
+OUT=$(cd "$D" && PATH="$VP" VERIFY_FE_URL=http://localhost:4200 VERIFY_FE_CMD="echo started > $D/second" VERIFY_E2E_CMD="$D/bin/fake-e2e" VERIFY_E2E_DIR=. bash scripts/verify.sh run MSK-1 2>&1)
+assert_contains "$OUT" "reused" "a service that already answers is reused"
+[ -f "$D/second" ] && no "a reused service is not started twice" || ok "a reused service is not started twice"
+rm -f "$D/up"
+# a failing journey: report FAIL, gate red, service still stopped
+( cd "$D" && echo z > web/src/app/invoices/list.component.ts )
+OUT=$(cd "$D" && PATH="$VP" VERIFY_FE_URL=http://localhost:4200 VERIFY_FE_CMD="$SVC" VERIFY_E2E_CMD="$D/bin/fake-e2e" VERIFY_E2E_DIR=. VERIFY_TIMEOUT=15 bash scripts/verify.sh run MSK-1 2>&1); RC=$?
+assert_code "$RC" "1" "a journey whose expected result is not observed fails the run"
+assert_contains "$(cat "$D/docs/tasks/MSK-1-evidence/verify-report.md")" "Result: ❌ FAIL" "report ends with the FAIL verdict"
+assert_code "$(cd "$D" && bash scripts/verify.sh gate MSK-1 >/dev/null 2>&1; echo $?)" "1" "gate blocks on a FAIL report"
+if kill -0 "$(cat "$D/pid" 2>/dev/null)" 2>/dev/null; then no "the started service is stopped after a failure"; else ok "the started service is stopped after a failure"; fi
+rm -f "$D/up" "$D/web/src/app/invoices/list.component.ts"
+# a pass with no screenshot is not evidence
+( cd "$D" && mkdir -p web/src/app/reports && echo r > web/src/app/reports/chart.component.ts && git checkout -q web/src/app/orders/orders.component.ts )
+OUT=$(cd "$D" && PATH="$VP" VERIFY_FE_URL=http://localhost:4200 VERIFY_FE_CMD="$SVC" VERIFY_E2E_CMD="$D/bin/fake-e2e" VERIFY_E2E_DIR=. VERIFY_TIMEOUT=15 bash scripts/verify.sh run MSK-1 2>&1); RC=$?
+assert_code "$RC" "1" "a journey that passes without a screenshot counts as a fail"
+rm -rf "$D/up" "$D/web/src/app/reports"
+# runtime files no feature owns
+( cd "$D" && echo q > web/src/app/other.service.ts )
+OUT=$(cd "$D" && PATH="$VP" VERIFY_FE_URL=http://localhost:4200 VERIFY_FE_CMD="$SVC" bash scripts/verify.sh run MSK-1 2>&1); RC=$?
+assert_code "$RC" "1" "a changed runtime file that maps to no feature fails the run"
+assert_contains "$OUT" "web/src/app/other.service.ts" "the unmapped file is named"
+[ -f "$D/up" ] && no "nothing is started when the diff is unmapped" || ok "nothing is started when the diff is unmapped"
+rm -f "$D/web/src/app/other.service.ts"
+# a service that dies or never answers: bounded wait, clear failure
+( cd "$D" && echo y >> web/src/app/orders/orders.component.ts )
+OUT=$(cd "$D" && PATH="$VP" VERIFY_FE_URL=http://localhost:4200 VERIFY_FE_CMD="exit 3" VERIFY_TIMEOUT=15 bash scripts/verify.sh run MSK-1 2>&1); RC=$?
+assert_code "$RC" "1" "a service that exits at start fails the run"
+assert_contains "$OUT" "exited before answering" "the start failure is explained"
+OUT=$(cd "$D" && PATH="$VP" VERIFY_FE_URL=http://localhost:4200 VERIFY_FE_CMD="echo \$\$ > $D/pid; exec sleep 300" VERIFY_TIMEOUT=2 bash scripts/verify.sh run MSK-1 2>&1); RC=$?
+assert_code "$RC" "1" "a service that never answers fails after the bounded timeout"
+assert_contains "$OUT" "within 2s" "the timeout is reported"
+if kill -0 "$(cat "$D/pid" 2>/dev/null)" 2>/dev/null; then no "a service that timed out is stopped"; else ok "a service that timed out is stopped"; fi
+rm -rf "$D"
+for F in .claude/commands/dp-build.md .claude/commands/dp-pr.md .claude/skills/definition-of-done/SKILL.md .claude/skills/self-heal/SKILL.md .devpilot/process.md; do
+  assert_contains "$(cat "$REPO/$F")" "verify.sh" "$F wires in verify"
+done
+assert_contains "$(cat "$REPO/.claude/commands/dp-pr.md")" "verify.sh gate" "/dp-pr refuses a PR without a passing verify report"
+assert_contains "$(cat "$REPO/.claude/skills/definition-of-done/SKILL.md")" "Verify passed, with evidence attached" "definition-of-done requires verify evidence"
+assert_contains "$(cat "$REPO/install.sh")" "VERIFY_FE_CMD=" "installer writes the verify keys into config.sh"
+D=$(sandbox); ( cd "$D" && mkdir -p .claude/skills/verify-change && cp "$REPO/.claude/skills/verify-change/SKILL.md" .claude/skills/verify-change/ )
+OUT=$(cd "$D" && bash scripts/doctor.sh 2>&1)
+assert_contains "$OUT" "verify not configured" "doctor reports an unconfigured verify"
+assert_contains "$OUT" "no docs/feature-map.md" "doctor reports a missing feature map"
+rm -rf "$D"
+
 echo "== DevPilot release metadata =="
 V=$(cat "$REPO/VERSION")
 assert_contains "$(cat "$REPO/CHANGELOG.md")" "## [$V]" "CHANGELOG.md has a section for VERSION $V (release notes)"

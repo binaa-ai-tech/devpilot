@@ -48,6 +48,7 @@ All are `user-invocable: false` — the `/` menu shows only the `/dp-*` commands
 | `ui-e2e-playwright` | Full UI testing: journeys, auth once, API seeding, axe a11y, visual + mobile, traces. |
 | `token-lean-testing` | Run suites via `scripts/run-tests.sh` — full log on disk, only failures in context. |
 | `test-guard` | Enforcement gate — no changed source file ships without a test (`scripts/test-guard.sh`). |
+| `verify-change` | Verification = running the change: start the app, drive the journeys the diff touches (feature map), keep evidence (`scripts/verify.sh`). |
 | `performance` | Code performance checklist + k6 / web-vitals budgets. |
 
 ## Maintenance

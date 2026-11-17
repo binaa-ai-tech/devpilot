@@ -36,6 +36,8 @@
 - [ ] `STRICT=1 bash scripts/test-guard.sh` — every changed source file has a test (or a justified exemption below)
 - [ ] Bug fix: a regression test fails before the fix and passes after
 - [ ] UI change: Playwright journey + axe scan for the new/changed screen
+- [ ] Verified by running it: `bash scripts/verify.sh run <KEY>` passed — evidence in `docs/tasks/<KEY>-evidence/`
+      (or the written reason this change has no runtime surface). Feature map still a DRAFT? Say so here.
 
 ## Checklist
 

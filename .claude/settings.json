@@ -78,6 +78,7 @@
       "Bash(bash scripts/test-guard.sh *)",
       "Bash(bash scripts/tracker.sh *)",
       "Bash(bash scripts/usage-hook.sh *)",
+      "Bash(bash scripts/verify.sh *)",
       "Bash(bash scripts/version.sh *)",
       "Bash(STRICT=1 bash scripts/test-guard.sh *)",
       "Bash(STRICT=1 bash scripts/audit.sh *)",
