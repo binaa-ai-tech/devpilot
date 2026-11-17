@@ -316,8 +316,11 @@ assert_contains "$(cd "$D" && bash scripts/metrics.sh usage)" '$15.00' "metrics 
 assert_contains "$(cat "$REPO/.claude/settings.json")" "usage-hook.sh" "usage hook registered (Stop + SessionEnd)"
 rm -rf "$D"
 
-echo "== secrets provider (keychain via secret-tool) =="
+echo "== secrets provider (keychain: macOS security · Linux secret-tool — both faked) =="
 D=$(sandbox); FK=$(mktemp -d); cp "$REPO/tests/fake-secret-tool.sh" "$FK/secret-tool"; chmod +x "$FK/secret-tool"; export FAKE_STORE="$D/store"
+# macOS ships /usr/bin/security, which the keychain provider prefers: shadow it so the test never
+# touches a real login keychain (and passes on a runner service with no unlocked keychain).
+[ "$(uname)" = Darwin ] && { cp "$REPO/tests/fake-security.sh" "$FK/security"; chmod +x "$FK/security"; }
 printf 'tracker:\n  type: local\nsecrets:\n  provider: keychain\n' > "$D/project.config.md"
 ( cd "$D" && PATH="$FK:/usr/bin:/bin" bash scripts/tracker.sh setup azure azdo_org_url=https://dev.azure.com/a azdo_project=P azdo_pat=s3cret >/dev/null 2>&1 )
 assert_eq "$(grep -c s3cret "$D/.devpilot/config.sh" 2>/dev/null)" "0" "PAT is not written to config.sh"
