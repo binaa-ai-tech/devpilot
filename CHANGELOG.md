@@ -4,6 +4,27 @@ All notable changes to DevPilot. Versions follow [SemVer](https://semver.org); e
 section becomes the GitHub Release notes when the `vx.y.z` tag is pushed
 (`.github/workflows/release.yml`).
 
+## [6.0.1] — 2026-11-10
+
+### Fixed
+- **`install.sh --update` outside a project** — run in a folder with no `project.config.md` (e.g. the
+  parent of the real project), it used to scatter a partial install there and report success. It now
+  stops with "not a DevPilot project" and writes nothing.
+- **`install.sh` inside the DevPilot repo** — stopped with a confusing `cp: … are identical`; it now
+  says to run the installer from your project.
+- **`doctor.sh` misses retired model ids** — `--update` leaves `project.config.md` alone, so a project
+  could keep `claude-sonnet-5` / `claude-haiku-4-5-*` after 6.0 while doctor stayed green. Doctor now
+  warns about Claude 3.x, 4.x and plain `claude-sonnet-5` in the tiers, `models.*.tier1` and the team
+  agents, and points to `/dp-setup models <profile>`.
+
+### Changed
+- **Elephant-Goldfish synced to upstream `b7d9e27`** (plugin 0.1.1): `egm-bootstrap` recognizes more
+  source extensions (Fortran, Haskell, VB, PowerShell, R, Elixir).
+
+### Upgrade
+`bash install.sh --update` from your project. If doctor warns about retired model ids, run
+`/dp-setup models <auto|balanced|save>`.
+
 ## [6.0.0] — 2026-11-09
 
 ### Added

@@ -119,6 +119,18 @@ for PAIR in "ba:team-ba" "team_lead:team-lead" "qa:team-qa" "frontend_dev:team-f
 done
 [ "$DRIFT" = 0 ] && ok "agent frontmatter matches config (models.*.tier1)"
 
+# Retired model ids still pinned (--update never rewrites project.config.md, so they linger)
+RETIRED_RE='claude-(3[-.][0-9a-z.-]*|(opus|sonnet|haiku)-[1-4]([-.][0-9a-z.-]*)?|sonnet-5)'
+OLD_IDS=$( { for T in power standard lite; do cfg_deep coding_models claude "$T"; done
+             grep -A30 '^models:' project.config.md 2>/dev/null | sed -n 's/.*tier1:[[:space:]]*//p' | sed 's/#.*//' | tr -d '"'
+             grep -h '^model:' .claude/agents/team-*.md 2>/dev/null | awk '{print $2}'; } \
+           | awk '{print $1}' | grep -xE "$RETIRED_RE" | sort -u | tr '\n' ' ')
+if [ -n "$OLD_IDS" ]; then
+  warn "retired model id(s) still configured: ${OLD_IDS% } — re-apply your profile: /dp-setup models <auto|balanced|save> (or bash scripts/model-profiles.sh apply <profile>)"
+else
+  ok "no retired model ids configured"
+fi
+
 # ── Config completeness (missing values fail mid-task otherwise) ──────────────
 MISSING_CFG=0
 for K in project_name ticket_prefix base_branch merge_policy; do

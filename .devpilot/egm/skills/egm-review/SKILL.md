@@ -9,7 +9,7 @@ description: >-
   Zoom Out Review, and Implementation Readiness.
 ---
 
-> **DevPilot:** vendored from google/elephant-goldfish-model@5382b17 (Apache-2.0). Read `.devpilot/egm/DEVPILOT.md` first — it overrides `docs/claude.md` where they differ. EGM root: `.devpilot/egm`.
+> **DevPilot:** vendored from google/elephant-goldfish-model@b7d9e27 (Apache-2.0). Read `.devpilot/egm/DEVPILOT.md` first — it overrides `docs/claude.md` where they differ. EGM root: `.devpilot/egm`.
 
 # Review, Validation & Automated Remediation
 

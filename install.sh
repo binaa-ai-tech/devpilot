@@ -63,6 +63,13 @@ if [ -d "$(dirname "$0")/.claude" ]; then
   DEVPILOT_LOCAL="$(cd "$(dirname "$0")" && pwd)"
 fi
 
+# Never install into DevPilot's own source tree: every copy would be a file onto itself.
+if [ -n "$DEVPILOT_LOCAL" ] && [ "$PROJECT_ROOT" -ef "$DEVPILOT_LOCAL" ]; then
+  echo "Error: this is the DevPilot repo itself — run the installer from your project instead:" >&2
+  echo "  cd <your-project> && bash $DEVPILOT_LOCAL/install.sh ${1:-}" >&2
+  exit 1
+fi
+
 GREEN="\033[0;32m"
 YELLOW="\033[1;33m"
 CYAN="\033[0;36m"
@@ -273,6 +280,14 @@ run_update() {
 }
 
 if [ "${1:-}" = "--update" ] || [ "${1:-}" = "update" ]; then
+  # --update refreshes an existing install; without project.config.md this is not one (often the
+  # parent folder of the real project) and the update would scatter a partial install here.
+  if [ ! -f project.config.md ]; then
+    echo "Error: no project.config.md in $PROJECT_ROOT — this is not a DevPilot project." >&2
+    echo "  cd into the project (the folder with project.config.md) and re-run --update," >&2
+    echo "  or run install.sh without --update for a fresh install." >&2
+    exit 1
+  fi
   run_update
 fi
 

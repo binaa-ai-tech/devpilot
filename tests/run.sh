@@ -559,6 +559,17 @@ assert_contains "$OUT" "missing: 2" "the override list replaces the default one"
 ( cd "$D" && bash "$REPO/install.sh" --update >/dev/null 2>&1; [ -f scripts/test-guard.exempt ] ) && ok "install.sh --update keeps scripts/test-guard.exempt" || no "install.sh --update keeps scripts/test-guard.exempt"
 rm -rf "$D"
 
+# --update only refreshes an existing install, and never runs inside DevPilot's own repo
+P=$(mktemp -d); mkdir -p "$P/real-project"
+ERR=$( cd "$P" && bash "$REPO/install.sh" --update 2>&1 >/dev/null ); RC=$?
+assert_code "$RC" "1" "install.sh --update refuses a folder without project.config.md"
+assert_contains "$ERR" "not a DevPilot project" "the refusal says why"
+assert_eq "$(ls -A "$P" | tr '\n' ' ')" "real-project " "the refused --update writes nothing"
+rm -rf "$P"
+ERR=$( cd "$REPO" && bash ./install.sh --update 2>&1 >/dev/null ); RC=$?
+assert_code "$RC" "1" "install.sh refuses to run inside the DevPilot repo"
+assert_contains "$ERR" "DevPilot repo itself" "the refusal points to the project instead"
+
 echo "== two-tier index + scope cache (token-lean) =="
 D=$(mktemp -d); git -C "$D" init -q; git -C "$D" config user.email t@t.t; git -C "$D" config user.name t; git -C "$D" config commit.gpgsign false
 mkdir -p "$D/scripts" "$D/src/app/header" "$D/src/orders"
@@ -624,6 +635,27 @@ assert_contains "$( cd "$D" && bash scripts/doctor.sh 2>&1 )" "net8.0 is out of 
 sed -i.bak 's/net8.0/net10.0/' "$D/src/Api/Api.csproj" && rm -f "$D/src/Api/Api.csproj.bak"
 assert_eq "$( cd "$D" && bash scripts/doctor.sh 2>&1 | grep -c 'out of support' )" "0" "doctor is quiet on net10.0"
 rm -rf "$D/src"
+cp "$D/project.config.md" "$D/project.config.md.orig"
+cat >> "$D/project.config.md" <<'EOF'
+coding_models:
+  claude:
+    power:    "claude-opus-5-5"
+    standard: "claude-sonnet-5"
+    lite:     "claude-haiku-4-5-20251001"
+models:
+  ba:
+    tier1: claude-haiku-4-5-20251001
+  team_lead:
+    tier1: claude-sonnet-5-5
+EOF
+OUT=$( cd "$D" && bash scripts/doctor.sh 2>&1 )
+assert_contains "$OUT" "retired model id(s) still configured: claude-haiku-4-5-20251001 claude-sonnet-5 " "doctor flags retired model ids pinned in the config"
+assert_contains "$OUT" "/dp-setup models" "the retired-model warning says how to fix it"
+sed -i.bak -e 's/"claude-sonnet-5"/"claude-sonnet-5-5"/' -e 's/claude-haiku-4-5-20251001/claude-haiku-5-5/g' "$D/project.config.md" && rm -f "$D/project.config.md.bak"
+OUT=$( cd "$D" && bash scripts/doctor.sh 2>&1 )
+assert_eq "$(printf '%s\n' "$OUT" | grep -c 'still configured')" "0" "doctor is quiet on current model ids"
+assert_contains "$OUT" "no retired model ids configured" "doctor confirms the model ids are current"
+mv "$D/project.config.md.orig" "$D/project.config.md"
 ( cd "$D" && bash scripts/status.sh >/dev/null 2>&1 ); assert_code "$?" "0" "status runs"
 ( cd "$D" && bash scripts/metrics.sh >/dev/null 2>&1 ); assert_code "$?" "0" "metrics runs"
 ( cd "$D" && bash scripts/audit.sh >/dev/null 2>&1 ); assert_code "$?" "0" "audit runs (no manifest)"
