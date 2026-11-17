@@ -135,7 +135,9 @@ cmd_check() {
   verified=$(trailer "$msg" Verified)
   reason=$(trailer "$msg" Unverified-Reason)
   problem=""
-  if [ -z "$verified" ]; then problem="no 'Verified:' trailer"
+  if [ -z "$verified" ]; then
+    problem="no 'Verified:' trailer"
+    grep -qi '^Verified:' "$msg" && problem="'Verified:' is not in the trailer block — trailers must be in the message's last paragraph, with Co-Authored-By (use: git commit --trailer \"Verified: …\")"
   elif ! valid_verified "$verified"; then problem="invalid 'Verified: $verified' (use: verify, tests, code-review or none)"
   elif [ "$(printf '%s' "$verified" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')" = none ]; then problem="'Verified: none'"
   else

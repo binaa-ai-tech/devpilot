@@ -78,7 +78,7 @@ For each unresolved thread:
    WANT=$(bash scripts/version.sh next "$LEVEL" --ref "origin/$BASE_BRANCH")
    [ "$(bash scripts/version.sh current)" != "$WANT" ] && bash scripts/version.sh bump "$WANT" \
      && bash scripts/version.sh files | xargs git add && git commit -m "chore(release): bump version to $WANT" \
-       -m "Verified: none" -m "Unverified-Reason: version files only"
+       --trailer "Verified: none" --trailer "Unverified-Reason: version files only"
    ```
    Update the PR title `[vX.Y.Z]` and the body's machine line to match.
 2. **Fetch the failures** (transport table).
