@@ -267,6 +267,8 @@ run_update() {
 
   ensure_usage_hook
   ensure_permissions
+  # Refresh the git hooks (commit-msg gains the Verified: trailer check — observe mode by default).
+  [ -d .git/hooks ] && { bash scripts/install-git-hooks.sh >/dev/null 2>&1 && info "Git hooks refreshed (Conventional Commits + Verified: trailer, gate: $(bash scripts/commit-gate.sh mode 2>/dev/null))"; }
 
   # Secrets + per-developer state stay out of git (config.sh may now hold Azure/Jira keys).
   touch .gitignore
