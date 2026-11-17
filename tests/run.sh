@@ -1359,6 +1359,69 @@ assert_contains "$OUT" "verify not configured" "doctor reports an unconfigured v
 assert_contains "$OUT" "no docs/feature-map.md" "doctor reports a missing feature map"
 rm -rf "$D"
 
+echo "== rules-guard.sh — checks out of reach of the change =="
+D=$(sandbox)
+( cd "$D" && mkdir -p .claude/skills/review-checklist .devpilot/rules .github/workflows src \
+  && printf 'rule v1\n' > .claude/skills/review-checklist/SKILL.md && printf 'guide\n' > CLAUDE.md \
+  && printf 'on: push\n' > .github/workflows/ci.yml && echo code > src/app.ts \
+  && git add -A && git commit -qm base && git branch -M develop && git checkout -qb feature/msk-1-x )
+for P in .claude/skills/x/SKILL.md .claude/commands/dp-pr.md .claude/settings.json .devpilot/rules/dotnet.md .devpilot/rules.md \
+         .devpilot/reliability-checklist.md CLAUDE.md scripts/test-guard.sh scripts/test-guard.exempt .github/workflows/ci.yml; do
+  assert_code "$(cd "$D" && bash scripts/rules-guard.sh match "$P"; echo $?)" "0" "rules-guard protects $P"
+done
+for P in src/app.ts docs/requirements/x.md scripts/deploy.sh README.md; do
+  assert_code "$(cd "$D" && bash scripts/rules-guard.sh match "$P"; echo $?)" "1" "rules-guard leaves $P alone"
+done
+assert_code "$(cd "$D" && bash scripts/rules-guard.sh match "$D/CLAUDE.md"; echo $?)" "0" "rules-guard resolves an absolute path"
+OUT=$(cd "$D" && bash scripts/rules-guard.sh touched); RC=$?
+assert_code "$RC" "0" "touched: clean branch → rc 0"
+( cd "$D" && echo more >> src/app.ts && printf 'rule v2 (weakened)\n' > .claude/skills/review-checklist/SKILL.md && git add -A && git commit -qm "feat: change" )
+OUT=$(cd "$D" && bash scripts/rules-guard.sh touched); RC=$?
+assert_code "$RC" "1" "touched: a branch that edits a skill → rc 1"
+assert_contains "$OUT" "⚠️ This change edits the checks that judge it — human review required." "touched prints the human-review banner"
+assert_contains "$OUT" ".claude/skills/review-checklist/SKILL.md" "touched names the edited check"
+assert_eq "$(printf '%s\n' "$OUT" | grep -c 'src/app.ts')" "0" "touched does not list ordinary source files"
+assert_eq "$(cd "$D" && bash scripts/rules-guard.sh show .claude/skills/review-checklist/SKILL.md)" "rule v1" "show returns the base-branch copy, not the working tree"
+( cd "$D" && mkdir -p .claude/skills/new && echo n > .claude/skills/new/SKILL.md )
+assert_code "$(cd "$D" && bash scripts/rules-guard.sh show .claude/skills/new/SKILL.md >/dev/null 2>&1; echo $?)" "1" "show refuses a rule that is new on the branch"
+assert_code "$(cd "$D" && bash scripts/rules-guard.sh show CLAUDE.md nosuchbranch >/dev/null 2>&1; echo $?)" "2" "show fails clearly when the base branch is missing"
+( cd "$D" && git checkout -q develop && printf 'docs/feature-map.md   # the grading rubric\n' > .devpilot/protected-paths && git add -A && git commit -qm "chore: protect map" && git checkout -q feature/msk-1-x )
+assert_code "$(cd "$D" && bash scripts/rules-guard.sh match docs/feature-map.md; echo $?)" "0" "project paths in .devpilot/protected-paths (base branch) are protected too"
+# the PreToolUse hook: blocked during a build, allowed otherwise
+hook() { printf '{"tool_input":{"file_path":"%s"}}' "$1" | ( cd "$D" && bash scripts/scope-hook.sh 2>&1 ); }
+hook "$D/CLAUDE.md" >/dev/null; assert_code "$?" "0" "no build guard → editing CLAUDE.md is allowed"
+( cd "$D" && bash scripts/rules-guard.sh lock MSK-1 >/dev/null )
+OUT=$(hook "$D/.claude/skills/review-checklist/SKILL.md"); RC=$?
+assert_code "$RC" "2" "build guard blocks an edit to a skill (absolute path, .md file)"
+assert_contains "$OUT" "one of the checks that judge this change" "the block message says why"
+assert_contains "$OUT" "Tooling: yes" "the block message names the tooling flag"
+hook ".github/workflows/ci.yml" >/dev/null; assert_code "$?" "2" "build guard blocks an edit to a CI workflow"
+hook "scripts/test-guard.exempt" >/dev/null; assert_code "$?" "2" "build guard blocks widening the test-guard exemptions"
+hook "src/app.ts" >/dev/null; assert_code "$?" "0" "build guard allows ordinary source files"
+hook "docs/qa/x.md" >/dev/null; assert_code "$?" "0" "build guard allows task docs"
+( cd "$D" && echo backend > .devpilot/.scope-lock )
+hook "src/x.component.ts" >/dev/null; assert_code "$?" "2" "the layer lock still applies alongside the build guard"
+hook "CLAUDE.md" >/dev/null; assert_code "$?" "2" "rule files are blocked even though .md files pass the layer lock"
+( cd "$D" && rm -f .devpilot/.scope-lock && bash scripts/rules-guard.sh lock MSK-1 --tooling >/dev/null )
+hook "CLAUDE.md" >/dev/null; assert_code "$?" "0" "a tooling Story (--tooling) may edit the rules"
+assert_contains "$(cd "$D" && bash scripts/rules-guard.sh status)" "tooling yes" "status shows the tooling flag"
+( cd "$D" && bash scripts/rules-guard.sh lock MSK-1 >/dev/null && git checkout -q develop )
+hook "CLAUDE.md" >/dev/null; assert_code "$?" "0" "a lock left by another branch is ignored (stale build)"
+( cd "$D" && git checkout -q feature/msk-1-x && bash scripts/rules-guard.sh unlock >/dev/null )
+hook "CLAUDE.md" >/dev/null; assert_code "$?" "0" "unlock lifts the build guard"
+assert_code "$(cd "$D" && bash scripts/rules-guard.sh lock >/dev/null 2>&1; echo $?)" "2" "lock needs at least one key"
+rm -rf "$D"
+for F in .claude/skills/review-checklist/SKILL.md .devpilot/prompts/team/lead-review.md .claude/commands/dp-pr.md; do
+  assert_contains "$(cat "$REPO/$F")" "rules-guard.sh show" "$F loads its rules from the base branch"
+  assert_contains "$(cat "$REPO/$F")" "This change edits the checks that judge it — human review required." "$F carries the human-review banner"
+done
+assert_contains "$(cat "$REPO/.claude/commands/dp-build.md")" "rules-guard.sh lock" "/dp-build turns the build guard on"
+assert_contains "$(cat "$REPO/.claude/commands/dp-build.md")" "rules-guard.sh unlock" "/dp-build turns the build guard off at close"
+assert_contains "$(cat "$REPO/.devpilot/templates/team/item-brief.md")" "Tooling: no" "item brief carries the tooling flag"
+for P in '/.claude/' '/.devpilot/' '/scripts/' '/.github/workflows/' '/CLAUDE.md'; do
+  assert_contains "$(cat "$REPO/.github/CODEOWNERS")" "$P" "CODEOWNERS owns $P explicitly"
+done
+
 echo "== DevPilot release metadata =="
 V=$(cat "$REPO/VERSION")
 assert_contains "$(cat "$REPO/CHANGELOG.md")" "## [$V]" "CHANGELOG.md has a section for VERSION $V (release notes)"

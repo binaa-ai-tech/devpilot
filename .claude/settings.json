@@ -68,6 +68,7 @@
       "Bash(bash scripts/notify.sh *)",
       "Bash(bash scripts/open-pr.sh *)",
       "Bash(bash scripts/resolve-model.sh *)",
+      "Bash(bash scripts/rules-guard.sh *)",
       "Bash(bash scripts/run-tests.sh *)",
       "Bash(bash scripts/scope-guard.sh *)",
       "Bash(bash scripts/scope-hook.sh *)",

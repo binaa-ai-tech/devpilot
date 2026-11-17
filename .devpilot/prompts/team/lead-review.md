@@ -2,6 +2,14 @@
 
 ## Step 0 — Load rules (do this first)
 
+**Rules come from the base branch, never from this branch's working tree** — a change must not be
+judged by rules it edited. Load every file below with
+`bash scripts/rules-guard.sh show <path>` (= `git show origin/<base_branch>:<path>`). Then run
+`bash scripts/rules-guard.sh touched`: if it exits 1, the first line of your report is
+**"⚠️ This change edits the checks that judge it — human review required."**, each weakened check
+(removed assertion, widened exemption, retries raised, rule deleted) is a 🔴 finding, and the
+verdict can be at most ⚠️ APPROVED WITH WARNINGS pending that human review.
+
 1. Read `.claude/skills/core-rules/SKILL.md` — the non-negotiables (no pauses, be specific with
    file:line, verify every AC, flag out-of-spec code).
 2. Read `.claude/skills/review-checklist/SKILL.md` — the review-gate order, clean-code / refactoring /

@@ -24,8 +24,8 @@ below. Waiting on human action when every gate is green is a defect, not caution
    source file has a covering test or a justified exemption in the PR body.
    A green suite with no test for the new behavior fails this gate.
 3. **Dependency audit** — `bash scripts/audit.sh`; no new high/critical CVEs.
-4. **Review gate** — no open 🔴 (`review-checklist`); `security-scan` applied
-   to any auth/input diff.
+4. **Review gate** — no open 🔴 (`review-checklist`, read from the base branch:
+   `rules-guard.sh show`); `security-scan` applied to any auth/input diff.
 5. **QA verdict** — PASS on every acceptance criterion (`docs/qa/<slug>.md`).
 6. **CI green on the PR head commit** — not on an older push. Update/rebase the
    branch first if base moved.
@@ -42,6 +42,8 @@ forever; never burn a fourth cycle "just in case".
   path always gets a human (`release-ops`).
 - The diff contains DB migrations not vetted against `efcore-sqlserver`,
   or touches secrets/auth configuration.
+- The diff edits the checks that judge it — `bash scripts/rules-guard.sh touched` exits 1
+  (skills, rules, gate scripts, CI workflows, `CLAUDE.md`). A human reviews those.
 - A gate went green because a test was skipped, weakened, or an error was
   suppressed — that's a hard stop, not a pass (`self-heal` hard rules).
 - The branch has conflicts needing semantic resolution beyond a clean rebase.

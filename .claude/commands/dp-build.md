@@ -47,6 +47,10 @@ SPRINT_SLUG=$(echo "$SPRINT" | tr '[:upper:] ' '[:lower:]-' | tr -cd 'a-z0-9-')
 # One Story → feature/<key>-<slug> (e.g. feature/ado-345-csv-export); several → feature/<prefix>-sprint-<slug>
 bash scripts/git-flow.sh feature-start "<KEY or 'sprint'>" "<slug or $SPRINT_SLUG>"
 BRANCH=$(git branch --show-current)
+# Rules guard: from here the PreToolUse hook blocks edits to the checks that judge this build
+# (skills, rules, gate scripts, CI workflows, CLAUDE.md). Add --tooling ONLY when a Story's
+# brief says "Tooling: yes" (the Story itself changes DevPilot tooling).
+bash scripts/rules-guard.sh lock <STORY_KEYS>      # + --tooling: grep -l '^Tooling: yes' docs/tasks/*-brief.md
 bash scripts/tracker.sh sprint start "$SPRINT" 2>/dev/null || true
 for KEY in <STORY_KEYS>; do
   bash scripts/tracker.sh status "$KEY" "In Progress"
@@ -126,8 +130,11 @@ Commit the evidence with the work: `git add docs/tasks/*-evidence docs/feature-m
 
 ## Step 6 — Review gate + version bump + one PR → develop
 
-**Review (Team Lead):** `.claude/skills/review-checklist/SKILL.md`, `security-scan` over auth/input
-changes, `definition-of-done` — never open around a 🔴 BLOCKER. Then:
+**Review (Team Lead):** the checklist comes from the base branch, not this branch's copy —
+`bash scripts/rules-guard.sh show .claude/skills/review-checklist/SKILL.md`; `security-scan` over
+auth/input changes, `definition-of-done` — never open around a 🔴. First run
+`bash scripts/rules-guard.sh touched`: exit 1 means the diff edits its own checks — the review and
+the PR body start with the banner it prints, and the PR is never auto-merged. Then:
 ```bash
 STRICT=1 bash scripts/test-guard.sh
 for KEY in <STORY_KEYS>; do bash scripts/verify.sh gate "$KEY" || exit 1; done   # no passing verify report → no PR
@@ -193,6 +200,7 @@ Resolve by exit code:
 
 ```bash
 bash scripts/close-delivery.sh --pr "$PR_URL" --version "$VERSION" --sprint "$SPRINT" <STORY_KEYS>
+bash scripts/rules-guard.sh unlock
 bash scripts/generate-backlog-index.sh
 bash scripts/notify.sh done "v$VERSION merged into $BASE_BRANCH — <N> item(s) · $PR_URL"
 ```

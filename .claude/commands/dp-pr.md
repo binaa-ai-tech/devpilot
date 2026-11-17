@@ -39,6 +39,13 @@ MERGE_POLICY=$(grep '^merge_policy:' project.config.md | head -1 | awk '{print $
 Fetch the PR (table above), check out its head branch, and read the machine line in its body:
 `<!-- devpilot: keys="…" sprint="…" version="…" -->` → `KEYS`, `SPRINT`, `VERSION` (Step 4).
 
+**Rules from the base branch.** Everything this command reviews against — skills, commands,
+`.devpilot/rules*`, `CLAUDE.md`, `scripts/test-guard.*`, CI workflows — is read with
+`bash scripts/rules-guard.sh show <path>` (`git show origin/$BASE_BRANCH:<path>`), never from the PR
+branch. Run `bash scripts/rules-guard.sh touched "$BASE_BRANCH"`: exit 1 → post its banner
+(**"⚠️ This change edits the checks that judge it — human review required."**) as the first line of
+the review, treat any weakened check as 🔴, and **do not merge** — leave it green for a human.
+
 **Verify gate — no evidence, no PR.** For each key: `bash scripts/verify.sh gate <KEY>`. It passes
 only with a `docs/tasks/<KEY>-evidence/verify-report.md` that says PASS, or one that records a
 written reason the change has no runtime surface (docs-only, CI, tooling). On ❌: run

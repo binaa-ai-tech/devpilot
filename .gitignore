@@ -1,6 +1,7 @@
 # ── Local config & secrets (never commit) ───────────────────────────────────
 .devpilot/config.sh
 .devpilot/.scope-lock
+.devpilot/.rules-lock
 .env
 .env.local
 .env.*.local

@@ -22,6 +22,8 @@
 ## Scope
 Layers: <frontend / backend / DB / integration>
 Key files / components: <from the plan, if known>
+Tooling: no   <!-- "yes" only when this Story itself changes DevPilot rules, skills, gate scripts or CI
+                   workflows; otherwise /dp-build blocks edits to them (scripts/rules-guard.sh) -->
 
 ## Technical notes
 <API contracts, data/schema changes, edge cases, dependencies on other Stories>

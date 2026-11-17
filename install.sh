@@ -204,7 +204,7 @@ run_update() {
   TEMPLATE_TEAM="requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md bug-report.md item-brief.md"
   CMDS="dp-deliver.md dp-plan.md dp-spec.md dp-sprint.md dp-build.md dp-test.md dp-pr.md dp-release.md dp-hotfix.md dp-status.md dp-setup.md"
   AGENTS_LIST="team-lead.md team-ba.md team-frontend.md team-dotnet.md team-python.md team-qa.md"
-  SCRIPTS="git-flow.sh resolve-model.sh model-profiles.sh checkpoint.sh devpilot-config.sh devpilot-lib.sh tracker.sh jira.sh azdo.sh github.sh git-host.sh version.sh close-delivery.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy.sh smoke.sh setup-environments.sh db-package.sh usage-hook.sh deploy-init.sh generate-project-index.sh generate-backlog-index.sh md-to-adf.sh sync-egm.sh verify.sh"
+  SCRIPTS="git-flow.sh resolve-model.sh model-profiles.sh checkpoint.sh devpilot-config.sh devpilot-lib.sh tracker.sh jira.sh azdo.sh github.sh git-host.sh version.sh close-delivery.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy.sh smoke.sh setup-environments.sh db-package.sh usage-hook.sh deploy-init.sh generate-project-index.sh generate-backlog-index.sh md-to-adf.sh sync-egm.sh verify.sh rules-guard.sh"
 
   info "Refreshing .devpilot/rules..."
   fetch ".devpilot/rules.md" ".devpilot/rules.md"
@@ -267,7 +267,7 @@ run_update() {
 
   # Secrets + per-developer state stay out of git (config.sh may now hold Azure/Jira keys).
   touch .gitignore
-  for entry in ".devpilot/config.sh" ".devpilot/.tracker-skip" ".devpilot/logs/"; do
+  for entry in ".devpilot/config.sh" ".devpilot/.tracker-skip" ".devpilot/.rules-lock" ".devpilot/logs/"; do
     grep -qxF "$entry" .gitignore || echo "$entry" >> .gitignore
   done
 
@@ -846,7 +846,7 @@ for f in git-flow.sh resolve-model.sh model-profiles.sh checkpoint.sh \
           open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh \
           doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh \
           deploy.sh smoke.sh setup-environments.sh db-package.sh usage-hook.sh deploy-init.sh \
-          generate-project-index.sh generate-backlog-index.sh md-to-adf.sh sync-egm.sh verify.sh; do
+          generate-project-index.sh generate-backlog-index.sh md-to-adf.sh sync-egm.sh verify.sh rules-guard.sh; do
   fetch "scripts/$f" "scripts/$f"
   chmod +x "scripts/$f" 2>/dev/null || true
 done
@@ -871,7 +871,7 @@ done
 # .devpilot/config.sh holds tracker API keys and must never be committed.
 touch .gitignore
 if [ -f ".gitignore" ]; then
-  for entry in ".devpilot/config.sh" ".devpilot/.tracker-skip" ".devpilot/.scope-lock" ".env" ".env.local" ".devpilot/logs/" "docs/index/.state" "docs/project-index.md" "docs/index/*.md"; do
+  for entry in ".devpilot/config.sh" ".devpilot/.tracker-skip" ".devpilot/.scope-lock" ".devpilot/.rules-lock" ".env" ".env.local" ".devpilot/logs/" "docs/index/.state" "docs/project-index.md" "docs/index/*.md"; do
     grep -qF "$entry" .gitignore || echo "$entry" >> .gitignore
   done
 fi
