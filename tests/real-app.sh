@@ -13,6 +13,9 @@
 # 2. install DevPilot (--defaults) and generate CI + CD
 # 3. run the CD "build once" step exactly as generated → out/api, out/web, out/db
 # 4. run the test suites through scripts/run-tests.sh
+# 5. verify in a real browser: scripts/verify.sh starts `dotnet run` + `ng serve`, drives
+#    Playwright journeys (Chromium) from docs/feature-map.md, three runs in a row
+#    (VERIFY=0 skips this step)
 # =============================================================================
 set -euo pipefail
 REPO="$(cd "$(dirname "$0")/.." && pwd)"
@@ -109,6 +112,105 @@ if [ "${RUN_ANGULAR_TESTS:-1}" = 1 ]; then
 fi
 if command -v actionlint >/dev/null 2>&1; then
   actionlint .github/workflows/devpilot-ci.yml .github/workflows/devpilot-cd.yml && ok "actionlint" || no "actionlint"
+fi
+
+if [ "${VERIFY:-1}" = 1 ]; then
+step "5. verify — the running app, a real browser, three runs in a row"
+# A page with a known result to observe (the map's Expected line is the rubric).
+printf '<h1 data-testid="title">DevPilot verify</h1>\n<p data-testid="version">Shop 1.0.0</p>\n' > web/src/app/app.html
+mkdir -p docs web/e2e
+cat > docs/feature-map.md <<'MAP'
+# Feature map
+
+## F-01 · Home page
+- Route: /
+- Files: web/src/app/*
+- Steps: open the app
+- Selectors: getByTestId('title') · getByTestId('version')
+- Expected: the heading "DevPilot verify" and the text "Shop 1.0.0" are shown
+
+## F-02 · Weather forecast API
+- Route: /weatherforecast (API)
+- Files: api/*
+- Steps: GET /weatherforecast
+- Selectors: —
+- Expected: HTTP 200 with a JSON array of 5 forecasts
+MAP
+cat > web/playwright.config.ts <<'TS'
+import { defineConfig, devices } from '@playwright/test';
+
+// Services are started by scripts/verify.sh, so there is no webServer block here.
+export default defineConfig({
+  testDir: './e2e',
+  retries: 0,
+  workers: 1,
+  reporter: 'line',
+  use: { baseURL: process.env.VERIFY_FE_URL ?? 'http://localhost:4200', trace: 'retain-on-failure' },
+  projects: [{ name: 'chromium', use: { ...devices['Desktop Chrome'] } }],
+});
+TS
+cat > web/e2e/fixtures.ts <<'TS'
+import { test as base, expect } from '@playwright/test';
+import * as fs from 'node:fs';
+
+// Evidence for scripts/verify.sh: screenshots, console errors and failed requests land in
+// $VERIFY_EVIDENCE_DIR (the feature's folder under docs/tasks/<KEY>-evidence/).
+export const test = base.extend<{ evidence: string }>({
+  evidence: async ({ page }, use, testInfo) => {
+    const dir = process.env.VERIFY_EVIDENCE_DIR ?? testInfo.outputDir;
+    fs.mkdirSync(dir, { recursive: true });
+    const consoleErrors: string[] = [];
+    const failed: string[] = [];
+    page.on('console', m => { if (m.type() === 'error') consoleErrors.push(m.text()); });
+    page.on('requestfailed', r => failed.push(`${r.method()} ${r.url()} ${r.failure()?.errorText ?? ''}`));
+    page.on('response', r => { if (r.status() >= 400) failed.push(`${r.status()} ${r.url()}`); });
+    await use(dir);
+    if (consoleErrors.length) fs.writeFileSync(`${dir}/console-errors.log`, consoleErrors.join('\n') + '\n');
+    if (failed.length) fs.writeFileSync(`${dir}/network-failures.log`, failed.join('\n') + '\n');
+  },
+});
+export { expect };
+TS
+cat > web/e2e/verify.spec.ts <<'TS'
+import { test, expect } from './fixtures';
+
+test('home page shows the app @F-01', async ({ page, evidence }) => {
+  await page.goto('/');
+  await expect(page.getByTestId('title')).toHaveText('DevPilot verify');
+  await expect(page.getByTestId('version')).toHaveText('Shop 1.0.0');
+  await page.screenshot({ path: `${evidence}/home.png`, fullPage: true });
+});
+
+test('weather forecast API answers @F-02', async ({ page, request, evidence }) => {
+  const url = `${process.env.VERIFY_API_URL ?? 'http://localhost:5080'}/weatherforecast`;
+  const res = await request.get(url);
+  expect(res.status()).toBe(200);
+  expect(await res.json()).toHaveLength(5);
+  await page.goto(url);
+  await page.screenshot({ path: `${evidence}/weatherforecast.png` });
+});
+TS
+(cd web && npm install --no-audit --no-fund --loglevel=error -D @playwright/test >/dev/null 2>&1 \
+  && if [ "$(uname)" = Linux ]; then npx playwright install --with-deps chromium >/dev/null 2>&1; else npx playwright install chromium >/dev/null 2>&1; fi) \
+  && ok "Playwright + Chromium installed" || no "Playwright + Chromium installed"
+git add -A && git commit -qm "test: verify journeys" --no-verify
+
+export VERIFY_API_CMD="dotnet run --project api/Shop.Api.csproj --urls http://localhost:5080"
+export VERIFY_API_HEALTH="http://localhost:5080/weatherforecast" VERIFY_API_URL="http://localhost:5080"
+export VERIFY_FE_CMD="npm --prefix web start -- --port 4200" VERIFY_FE_URL="http://localhost:4200"
+export VERIFY_E2E_DIR="web" VERIFY_TIMEOUT=240
+if bash scripts/verify.sh run REAL-1 --all --repeat 3 > "$W/verify.log" 2>&1; then ok "verify.sh run --all --repeat 3"; else no "verify.sh run (tail: $(tail -8 "$W/verify.log" | tr '\n' ' '))"; fi
+REP=docs/tasks/REAL-1-evidence/verify-report.md
+grep -q '^Result: ✅ PASS' "$REP" 2>/dev/null && ok "verify report: PASS" || no "verify report: PASS"
+grep -q 'Runs: 3 (identical)' "$REP" 2>/dev/null && ok "three runs in a row gave identical results" || no "three runs in a row gave identical results"
+for F in F-01 F-02; do
+  [ -n "$(find "docs/tasks/REAL-1-evidence/$F" -name '*.png' 2>/dev/null | head -1)" ] && ok "$F: screenshot kept as evidence" || no "$F: screenshot kept as evidence"
+done
+bash scripts/verify.sh gate REAL-1 >/dev/null && ok "verify gate passes" || no "verify gate passes"
+for U in http://localhost:4200 http://localhost:5080/weatherforecast; do
+  if curl -s -o /dev/null --max-time 3 "$U"; then no "service stopped after verify ($U still answers)"; else ok "service stopped after verify ($U)"; fi
+done
+grep -q 'console error' "$REP" && echo "  ℹ️  $(grep -c 'pass' "$REP") journey line(s); console/network counts are in $REP"
 fi
 
 echo ""
