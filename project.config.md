@@ -48,7 +48,7 @@ merge_policy: auto               # auto | pr-only
 #           (escape hatch: after 2 blocks in a row on a branch, the next commit goes through, logged)
 # off     — no check. COMMIT_GATE in the environment or .devpilot/config.sh overrides this.
 
-commit_gate: observe             # off | observe | enforce
+commit_gate: enforce             # off | observe | enforce — DevPilot's own repo enforces it (projects get observe)
 
 ## Spec review — Elephant-Goldfish (Google's EGM, vendored in .devpilot/egm)
 # Before code, the requirements doc must survive zero-context reviewer agents (/dp-spec).
