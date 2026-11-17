@@ -105,6 +105,9 @@ recommendation.
 Then the **self-contained brief** any teammate or Claude session can build from the tracker
 alone — `docs/tasks/<SLUG>-brief.md` from `.devpilot/templates/team/item-brief.md`, filled from
 the FULL requirements (all ACs, scope, technical notes, repo + branch convention, spec paths, DoD).
+Set the brief's `Tooling:` line to `yes` only when the requirement itself is about DevPilot tooling
+(rules, skills, gate scripts, CI workflows); it stays `no` otherwise, and `/dp-build` then blocks
+edits to those files (`scripts/rules-guard.sh`).
 
 ---
 

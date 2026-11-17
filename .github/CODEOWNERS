@@ -1,2 +1,11 @@
 # Every change needs a review from the owner.
 * @AbdelkaderMohamed
+
+# The checks that judge a change — owned explicitly, so they stay owned if the `*` rule
+# above ever changes (scripts/rules-guard.sh lists the same paths).
+/.claude/            @AbdelkaderMohamed
+/.devpilot/          @AbdelkaderMohamed
+/scripts/            @AbdelkaderMohamed
+/.github/workflows/  @AbdelkaderMohamed
+/.github/CODEOWNERS  @AbdelkaderMohamed
+/CLAUDE.md           @AbdelkaderMohamed

@@ -127,7 +127,8 @@ release_start() {
   if [ "$(bash "$SCRIPTS_DIR/version.sh" current)" != "$version" ]; then
     bash "$SCRIPTS_DIR/version.sh" bump "$version" >/dev/null
     bash "$SCRIPTS_DIR/version.sh" files | xargs git add
-    git commit -m "chore(release): set version $version" || true
+    git commit -m "chore(release): set version $version" -m "Verified: none
+Unverified-Reason: version files only — the released code was verified on develop" || true
   fi
 
   git push -u origin "$branch"

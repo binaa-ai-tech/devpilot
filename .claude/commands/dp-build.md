@@ -47,6 +47,10 @@ SPRINT_SLUG=$(echo "$SPRINT" | tr '[:upper:] ' '[:lower:]-' | tr -cd 'a-z0-9-')
 # One Story → feature/<key>-<slug> (e.g. feature/ado-345-csv-export); several → feature/<prefix>-sprint-<slug>
 bash scripts/git-flow.sh feature-start "<KEY or 'sprint'>" "<slug or $SPRINT_SLUG>"
 BRANCH=$(git branch --show-current)
+# Rules guard: from here the PreToolUse hook blocks edits to the checks that judge this build
+# (skills, rules, gate scripts, CI workflows, CLAUDE.md). Add --tooling ONLY when a Story's
+# brief says "Tooling: yes" (the Story itself changes DevPilot tooling).
+bash scripts/rules-guard.sh lock <STORY_KEYS>      # + --tooling: grep -l '^Tooling: yes' docs/tasks/*-brief.md
 bash scripts/tracker.sh sprint start "$SPRINT" 2>/dev/null || true
 for KEY in <STORY_KEYS>; do
   bash scripts/tracker.sh status "$KEY" "In Progress"
@@ -88,7 +92,8 @@ Each agent prompt:
 > `<BRANCH>`. Implement all <layer> work per the plans. Read `.claude/skills/self-heal/SKILL.md`.
 > Build + test with `bash scripts/run-tests.sh <angular|dotnet|python>` (summary only). Commit per
 > Story, conventional message ending with the tracker ref (`bash scripts/tracker.sh ref <KEY>` →
-> `MSK-12` · `AB#345` · `#7`). Report what you built in 3 bullets.
+> `MSK-12` · `AB#345` · `#7`) and the verification stamp `bash scripts/commit-gate.sh stamp` prints
+> for that tree (`Verified: tests` once `run-tests.sh` passed on it; never claim what didn't run). Report what you built in 3 bullets.
 
 ---
 
@@ -98,7 +103,9 @@ QA is automated and is the only test gate — never pause for the user to test o
 
 Spawn `subagent_type: "team-qa"`:
 > Sprint `<SPRINT>`. Verify every AC of every Story: case matrix per AC
-> (`test-design`), layers per its pyramid, a Playwright journey for every
+> (`test-design`) with a **kind per planned test — `example | property | differential | e2e`**
+> (property tests for rules that must hold for every input, differential tests where behavior
+> must not change), layers per its pyramid, a Playwright journey for every
 > user-facing AC (`ui-e2e-playwright`; `performance` only for a perf AC). Run everything
 > via `bash scripts/run-tests.sh all`, gate on `definition-of-done`, write
 > `docs/qa/<SPRINT_SLUG>.md`. Verdict per Story: PASS / BLOCKED.
@@ -107,12 +114,35 @@ BLOCKED → `bash scripts/notify.sh blocked "QA BLOCKED in $SPRINT: <keys + reas
 
 ---
 
+## Step 5b — Verify: run the change (before the final commit)
+
+Tests passing is not the proof — the running app is (`.claude/skills/verify-change/SKILL.md`). Per Story:
+```bash
+bash scripts/verify.sh run "$KEY"     # start app → journeys the diff touches (docs/feature-map.md) → evidence → stop
+```
+- Exit 3 → there was no feature map; a `DRAFT — needs owner review` one was written. Fill the
+  entries this sprint touches, re-run, and flag the draft in the PR body.
+- ❌ FAIL → `self-heal` (3 attempts: fix the code or the journey, never the map's `Expected`),
+  then escalate. Never continue to Step 6 on a failing report.
+- No runtime surface (docs / CI / tooling only) → the script records it, or
+  `bash scripts/verify.sh skip "$KEY" "<reason>"`.
+
+Commit the evidence with the work: `git add docs/tasks/*-evidence docs/feature-map.md`.
+
+---
+
 ## Step 6 — Review gate + version bump + one PR → develop
 
-**Review (Team Lead):** `.claude/skills/review-checklist/SKILL.md`, `security-scan` over auth/input
-changes, `definition-of-done` — never open around a 🔴 BLOCKER. Then:
+**Review (Team Lead):** the checklist comes from the base branch, not this branch's copy —
+`bash scripts/rules-guard.sh show .claude/skills/review-checklist/SKILL.md`; `security-scan` over
+auth/input changes, `bash scripts/reliability.sh match` (answer each triggered item with evidence),
+`definition-of-done` — never open around a 🔴 Important. First run
+`bash scripts/rules-guard.sh touched`: exit 1 means the diff edits its own checks — the review and
+the PR body start with the banner it prints, and the PR is never auto-merged. Then:
 ```bash
 STRICT=1 bash scripts/test-guard.sh
+bash scripts/commit-gate.sh mark code-review      # only once the review is APPROVED — feeds the Verified: stamp
+for KEY in <STORY_KEYS>; do bash scripts/verify.sh gate "$KEY" || exit 1; done   # no passing verify report → no PR
 ```
 
 **Version** (skip when `BUMP=off`) — bumped **from develop's current version**, so two PRs in
@@ -127,7 +157,7 @@ for KEY in <STORY_KEYS>; do
   bash scripts/changelog.sh add "$KEY" "<feat|fix per the Story's intent>" "<user-facing one-liner>" "$(bash scripts/tracker.sh url "$KEY")"
 done
 git add docs/changes
-git commit -m "chore(release): bump version to $VERSION"
+git commit -m "chore(release): bump version to $VERSION" -m "Verified: none" -m "Unverified-Reason: version files and changelog entries only"
 ```
 
 **PR body** — `docs/tasks/<SPRINT_SLUG>-pr.md`:
@@ -138,6 +168,9 @@ git commit -m "chore(release): bump version to $VERSION"
 - [<KEY>](<tracker.sh url KEY>) — <title>   (one line per Story; add `<tracker.sh ref KEY>`)
 ### QA
 <verdict table from docs/qa/<SPRINT_SLUG>.md> · Review: docs/reviews/<slug>.md
+### Verify
+<the Result line + journey table of each docs/tasks/<KEY>-evidence/verify-report.md, or the written
+"no runtime surface" reason> · feature map: <reviewed | ⚠️ DRAFT — needs owner review>
 <!-- devpilot: keys="<STORY_KEYS>" sprint="<SPRINT>" version="<VERSION>" -->
 ```
 The last line lets `/dp-pr` finish the job (close items + sprint) on a later run.
@@ -146,7 +179,7 @@ The last line lets `/dp-pr` finish the job (close items + sprint) on a later run
 # Local tracker only: close the items INSIDE the PR (they are files in git; develop only
 # changes via PRs) — they become Done exactly when it merges. No-op for Jira/Azure/GitHub.
 bash scripts/close-delivery.sh --prepare --version "$VERSION" --sprint "$SPRINT" <STORY_KEYS>
-git add docs/ && git commit -m "docs($SPRINT_SLUG): plans, qa, review" || true
+git add docs/ && git commit -m "docs($SPRINT_SLUG): plans, qa, review" -m "Verified: none" -m "Unverified-Reason: task documents only" || true
 TITLE="[v$VERSION] <summary> ($(for K in <STORY_KEYS>; do bash scripts/tracker.sh ref "$K"; done | paste -sd' ' -))"
 PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$TITLE" "docs/tasks/${SPRINT_SLUG}-pr.md" --items "<STORY_KEYS>"); PR_RC=$?
 echo "open-pr rc=$PR_RC (0 merged · 3 open/waiting · 1 error)"
@@ -172,6 +205,7 @@ Resolve by exit code:
 
 ```bash
 bash scripts/close-delivery.sh --pr "$PR_URL" --version "$VERSION" --sprint "$SPRINT" <STORY_KEYS>
+bash scripts/rules-guard.sh unlock
 bash scripts/generate-backlog-index.sh
 bash scripts/notify.sh done "v$VERSION merged into $BASE_BRANCH — <N> item(s) · $PR_URL"
 ```
@@ -192,6 +226,7 @@ the items In Progress: `bash scripts/notify.sh blocked "PR open, not merged — 
 🔀  PR:       <PR_URL>  (squash-merged, branch deleted)
 ⏱  Time:     <START_TIME> → <END_TIME>
 📁  QA:       docs/qa/<SPRINT_SLUG>.md
+🔎  Verify:   <n> journey(s) ✅ → docs/tasks/<KEY>-evidence/verify-report.md  (or: no runtime surface)
 📍  Now on:   <BASE_BRANCH> (pulled)
 ──────────────────────────────────────────────────────
 🚀  Promote when ready:  /dp-release sit → uat → prd

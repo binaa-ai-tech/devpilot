@@ -4,6 +4,61 @@ All notable changes to DevPilot. Versions follow [SemVer](https://semver.org); e
 section becomes the GitHub Release notes when the `vx.y.z` tag is pushed
 (`.github/workflows/release.yml`).
 
+## [6.1.0] — 2026-11-17
+
+Verification upgrade: agents prove their work with **evidence**, and the checks that judge a change
+**cannot be edited by that change**.
+
+### Added
+- **Verify — run the change, keep the evidence.** `scripts/verify.sh run <KEY>` and the
+  `verify-change` skill start the app (`VERIFY_FE_CMD` / `VERIFY_API_CMD`, bounded health wait), drive
+  the journeys the diff touches in a real browser and stop what they started. Screenshots, console
+  errors, failed requests and `verify-report.md` land in `docs/tasks/<KEY>-evidence/`. The features
+  and their expected results live in `docs/feature-map.md`, which is also the grading rubric. Without
+  one, a `DRAFT — needs owner review` map is generated from the requirements and routes. `/dp-build`
+  runs verify before the final commit, and `/dp-pr` refuses a PR without a passing report or a written
+  "no runtime surface" reason. It is part of `definition-of-done`, and `self-heal` covers its failures.
+- **Checks out of reach of the change.** `scripts/rules-guard.sh`: reviews load skills, rules, gate
+  scripts and CI workflows from the base branch (`rules-guard.sh show`). A diff that touches them
+  opens with "⚠️ This change edits the checks that judge it — human review required.", is never
+  auto-merged, and a weakened check is a 🔴 finding. While `/dp-build` / `/dp-deliver` build, the
+  PreToolUse hook blocks edits to those paths unless the item brief says `Tooling: yes`. `CODEOWNERS`
+  names them explicitly.
+- **Reliability checklist triggered by the diff.** `.devpilot/reliability-checklist.md` (11 seed items:
+  migrations, stored procedures, API contract, authz, routes, logging, config, UTC+4 time zones,
+  money, retries, dependencies) and `scripts/reliability.sh match`. The review runs only the items
+  whose trigger matches and answers each with evidence.
+- **Verification stamp + commit gate.** Every commit carries `Verified: verify | tests | code-review | none`.
+  `run-tests.sh`, `verify.sh` and an approved review record stamps against the working tree, and
+  `scripts/commit-gate.sh stamp` prints only the checks that really ran on it. The commit-msg hook
+  checks the trailer with `commit_gate: off | observe | enforce` (default **observe**: log to
+  `.devpilot/logs/commit-gate.log`, never block). Under `enforce`, `Unverified-Reason:` is the honest
+  way through, and after 2 blocks in a row the next commit passes and is logged.
+  `git log --grep '^Verified: none'` lists unverified changes.
+- **Review the reviewers.** `scripts/review-metrics.sh [since]` lists merged PRs later reverted and
+  fixes that touched a merged PR's files within N days, and whether the review flagged them. A miss
+  seen in ≥ 2 PRs becomes a checklist item (`.devpilot/process.md`). `core-rules` → Pruning, run once
+  per release by `/dp-release prd`.
+- **Property and differential tests.** `test-design` covers round-trip, invariant, idempotency and
+  equivalence properties with banking, cheque-book and raffle examples (fast-check · FsCheck ·
+  Hypothesis in target projects). `stack-upgrade` gets differential-test recipes (Angular upgrade, .NET API
+  migration, stored-procedure rewrite) with `docs/tests/approved-differences.md`. Every planned test
+  has a kind: `example | property | differential | e2e`.
+
+### Changed
+- **Flaky tests: root cause or delete — never skip, sleep or retry.** Playwright `retries: 0`, CI
+  included (it used to retry once in CI). If the 3-attempt protocol finds no cause, the test is deleted
+  and recorded in `docs/tests/removed-tests.md` with a follow-up item. "Quarantine" is gone.
+- **Review findings are 🔴 Important / 🟢 Nit / 🟣 Pre-existing**, each with a one-line why
+  (was BLOCKER / SHOULD / NIT). Pre-existing bugs never block the author's PR; they get a follow-up.
+- Version, docs and changelog commits made by the commands carry `Verified: none` + a reason.
+
+### Upgrade
+`bash install.sh --update` (it also refreshes the commit-msg hook, in observe mode). Set
+the verify keys (`bash scripts/devpilot-config.sh set verify_fe_url=http://localhost:4200`, …) and let
+the first `verify.sh run` draft `docs/feature-map.md`. `/dp-status health` reports what is missing.
+An existing `.devpilot/reliability-checklist.md` is never overwritten.
+
 ## [6.0.1] — 2026-11-10
 
 ### Fixed

@@ -15,7 +15,10 @@ user-invocable: false
    the `team-qa` agent + automated suite are the test gate, and `auto-merge` is the
    merge gate. The only legitimate stop is a gray-zone dedup question or a red gate the
    bounded auto-fix loop can't clear.
-2. **One concern per commit.** Conventional message: `feat|fix|chore(scope): …`.
+2. **One concern per commit.** Conventional message: `feat|fix|chore(scope): …`, ending with the
+   **verification stamp** of what actually ran on that tree — `bash scripts/commit-gate.sh stamp`
+   prints it (`Verified: verify, tests, code-review`, or `Verified: none`). Never write a check
+   that didn't run. `none` gets a second trailer: `Unverified-Reason: <why>`.
 3. **Tests live next to the code** and cover the happy path + one edge/error
    branch for each acceptance criterion you implement.
 4. **No secrets in code.** Use environment configuration.
@@ -25,7 +28,7 @@ user-invocable: false
 8. **Stay in scope.** Touch only files the plan names for your layer.
 9. **Always end with verification** — run the stack's build + tests through
    `bash scripts/run-tests.sh` (full log to disk, only failures in context —
-   `token-lean-testing`); never leave the build red.
+   `token-lean-testing`), then run the change itself (`verify-change`); never leave the build red.
 10. **Reach for heavier skills on demand only** — `self-heal` on a failure,
     `security-scan` on auth/input handling, `architecture-guard` on structural
     change, `angular-*` / `dotnet-*` / `python-*` / `efcore-sqlserver` / `api-contract` when
@@ -43,3 +46,12 @@ user-invocable: false
       summary. **Exception:** a **QA BLOCKED** (or hard-failure) state _is_ worth
       a comment, because it's an exception, not narration.
     - Technical detail belongs in the **PR description**; the ticket links to it.
+
+## Pruning — rules that are never pruned stop being read
+Once per release (`/dp-release`), whoever cuts it reviews the guidance this file points to:
+- **Reliability checklist** — `bash scripts/review-metrics.sh` and the review reports since the last
+  release: drop an item that never triggered, or triggered and never caught anything; merge two
+  items that always fire together. Keep the ones with an incident or PR in their `Origin`.
+- **Rules and skills** — delete a rule nobody can point to a reason for, merge duplicates (the same
+  rule in two skills drifts), and shorten whatever agents keep skimming past.
+- A removal is a normal PR — reviewed by a human, because it edits the checks (`rules-guard.sh`).

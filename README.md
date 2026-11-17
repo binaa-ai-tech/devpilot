@@ -6,7 +6,7 @@
 
 You write what you need in one sentence. DevPilot plans it, writes the code, tests it, reviews it, and merges it.
 
-[![Version](https://img.shields.io/badge/version-6.0.1-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-6.1.0-blue.svg)](VERSION)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Runs on](https://img.shields.io/badge/runs%20on-Claude%20Code-7c3aed.svg)](#what-you-need)
 [![Stack](https://img.shields.io/badge/stack-Angular%20%7C%20.NET%20%7C%20Python%20%7C%20SQL%20Server-orange.svg)](#what-you-need)
@@ -156,7 +156,10 @@ You never call the AI agents directly. The commands start them for you.
    ├─ 3. DESIGN   Tech Lead lists the files to change, the API shape, and which tests are needed.
    ├─ 4. CODE     .NET agent: API, database, migrations  ║  Angular agent: pages, services
    ├─ 5. TEST     Unit tests · API tests on real SQL Server · browser tests (Playwright)
+   │              VERIFY: starts the app and walks the changed features in a real browser;
+   │              screenshots + a pass/fail report go to docs/tasks/<TICKET>-evidence/
    ├─ 6. REVIEW   Code quality · security · performance · every changed file has a test
+   │              · rules read from develop, not from the change · reliability items the diff triggers
    ├─ 7. VERSION  Bumps develop's version: feature 1.4.0 → 1.5.0 · bug 1.4.0 → 1.4.1
    │              + a changelog entry for each story
    ├─ 8. MERGE    PR "[v1.5.0] Add CSV export (PROJ-12)" into develop, merged when all checks pass
@@ -176,6 +179,7 @@ You never call the AI agents directly. The commands start them for you.
 | Spec review (Elephant-Goldfish) | `docs/specs/<name>/review.md` |
 | Technical plan | `docs/plans/<name>.md` |
 | Test results | `docs/qa/<name>.md` |
+| Proof it runs (screenshots + report) | `docs/tasks/<TICKET>-evidence/verify-report.md` |
 | Code review | the pull request description |
 
 ---
@@ -197,6 +201,19 @@ The agents run tests with `bash scripts/run-tests.sh`. It saves the full output 
 ```bash
 bash scripts/run-tests.sh all        # or: angular | dotnet | e2e
 ```
+
+**Passing tests are not the proof — running the change is.** Before the final commit,
+`bash scripts/verify.sh run <TICKET>` starts the app (`VERIFY_FE_CMD` / `VERIFY_API_CMD` in
+`.devpilot/config.sh`), walks the features the change touches in a real browser, and keeps
+screenshots, console errors, failed requests and a pass/fail report in `docs/tasks/<TICKET>-evidence/`.
+The features and what each must show are listed in `docs/feature-map.md` — the first run drafts it
+for you to review. No passing report (or a written reason the change has nothing to run), no PR.
+
+**Flaky tests** are never skipped, slept or retried (Playwright runs with `retries: 0`, CI too): the
+root cause is found, or the test is deleted and logged in `docs/tests/removed-tests.md` with a
+follow-up item. For rules that must hold for every input, the QA agent writes **property tests**
+(fast-check, FsCheck, Hypothesis); for upgrades and rewrites, **differential tests** compare the old
+and new code on the same inputs.
 
 ---
 
@@ -265,8 +282,16 @@ Code is merged only when all of these pass. The AI never skips them.
 - ✅ All tests pass, and the build is green.
 - ✅ No security problems, such as SQL injection, missing permission checks, secrets in code, or vulnerable packages.
 - ✅ No breaking API change without a new version.
-- ✅ Code review has no blocking (🔴) issues.
+- ✅ The change was run: the features it touches passed in a real browser, with screenshots (`scripts/verify.sh`).
+- ✅ Code review has no blocking (🔴 Important) issues. Rules are read from `develop`, never from the change itself;
+  a change that edits the rules, skills, gate scripts or CI is flagged for a human and never auto-merged (`scripts/rules-guard.sh`).
+- ✅ Every reliability-checklist item the diff triggers (migration, auth, money, time zones, …) is answered with evidence
+  (`.devpilot/reliability-checklist.md`, `scripts/reliability.sh`).
 - ✅ CI is green on the pull request.
+
+Every commit also says what proved it — a `Verified: verify | tests | code-review | none` trailer
+(`scripts/commit-gate.sh`; gate mode `commit_gate: observe | enforce | off` in `project.config.md`).
+List the unverified changes with `git log --grep '^Verified: none'`.
 
 If a check fails, DevPilot tries to fix it up to 3 times, then stops and explains the problem.
 It never deletes or weakens a test to make it pass.
@@ -350,7 +375,7 @@ Azure Repos uses the same `AZDO_PAT`.
 
 ## 9. What the team knows (skills)
 
-The agents follow **25 skills**: short playbooks written for Angular + ASP.NET Core + SQL Server, plus Python (FastAPI / asyncio agents). They are
+The agents follow **26 skills**: short playbooks written for Angular + ASP.NET Core + SQL Server, plus Python (FastAPI / asyncio agents). They are
 native Claude Code skills in `.claude/skills/`, so Claude loads each one **only when it's needed**:
 
 | When Claude… | It loads |
@@ -364,7 +389,8 @@ native Claude Code skills in `.claude/skills/`, so Claude loads each one **only 
 | writes a Python test | `python-testing` (pytest, httpx against the real app) |
 | writes a browser test (`e2e/**`) | `ui-e2e-playwright` |
 | plans, reviews, merges or releases | `definition-of-ready`, `spec-review`, `review-checklist`, `security-scan`, `auto-merge`, `release-ops` |
-| derives test cases or picks a test layer | `test-design` |
+| derives test cases or picks a test layer | `test-design` (incl. property + differential tests, flaky-test policy) |
+| proves a change works by running it | `verify-change` (`scripts/verify.sh` + `docs/feature-map.md`) |
 | upgrades Angular or .NET | `stack-upgrade` (.NET 8/9 → 10) |
 
 The full list is in [.claude/skills/README.md](.claude/skills/README.md). The skills don't appear in the `/` menu:
@@ -467,10 +493,11 @@ and `versioning` from the [Configuration](#8-configuration) example.
 .claude/commands/   the 11 /dp-* commands
 .claude/agents/     team-ba · team-lead · team-frontend (Angular) · team-dotnet (.NET) · team-python (Python) · team-qa
                     + egm-* zero-context spec reviewers (vendored from Elephant-Goldfish)
-.claude/skills/    25 native Claude Code skills: stack skills load on matching files,
+.claude/skills/    26 native Claude Code skills: stack skills load on matching files,
                     the rest when a command or agent needs them (index: .claude/skills/README.md)
 .devpilot/rules/    coding rules for angular, dotnet, sqlserver
 .devpilot/process.md  the full delivery process: phases, gates, roles
+.devpilot/reliability-checklist.md  review items triggered by the diff (grows from real misses: review-metrics.sh)
 .devpilot/egm/      Google's Elephant-Goldfish Model (Apache-2.0) — refresh with scripts/sync-egm.sh
 scripts/            tracker.sh (+ jira.sh · azdo.sh · github.sh) · open-pr.sh · version.sh · close-delivery.sh
                     · git flow · tests · CI · deploy · health check

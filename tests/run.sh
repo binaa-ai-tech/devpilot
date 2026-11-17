@@ -1232,6 +1232,375 @@ fi
 assert_eq "$(grep -c 'Redis\|env:' "$Y" 2>/dev/null)" "0" "no hooks → no extra steps and no env block"
 rm -rf "$D"
 
+echo "== verify.sh — run the change, keep the evidence =="
+D=$(sandbox)
+( cd "$D" && mkdir -p bin web/src/app/orders web/src/app/invoices .devpilot docs/requirements \
+  && echo x > web/src/app/orders/orders.component.ts && printf '# Requirements: Export orders\n' > docs/requirements/export.md \
+  && printf "export const routes = [{ path: 'orders', component: X }, { path: '**', redirectTo: '' }];\n" > web/src/app/app.routes.ts \
+  && git add -A && git commit -qm base && git branch -M develop && git checkout -qb feature/x )
+# curl stand-in: the "service" answers only once its start command created $D/up
+printf '#!/usr/bin/env bash\n[ -f "%s/up" ] && printf 200 || printf 000\n' "$D" > "$D/bin/curl"
+# journey runner stand-in: F-01 observes its expected result and leaves a screenshot; anything else fails
+cat > "$D/bin/fake-e2e" <<'EOF'
+#!/usr/bin/env bash
+j=""; while [ $# -gt 0 ]; do [ "$1" = "--grep" ] && j="$2"; shift; done
+case "$j" in
+  "@F-01") echo png > "$VERIFY_EVIDENCE_DIR/orders.png"; echo "TypeError: x" > "$VERIFY_EVIDENCE_DIR/console-errors.log"; exit 0 ;;
+  "@noshot") exit 0 ;;
+  *) exit 1 ;;
+esac
+EOF
+chmod +x "$D/bin/curl" "$D/bin/fake-e2e"
+VP="$D/bin:$PATH"
+assert_code "$(cd "$D" && bash scripts/verify.sh bogus >/dev/null 2>&1; echo $?)" "2" "verify: unknown command → usage (rc 2)"
+assert_code "$(cd "$D" && bash scripts/verify.sh run >/dev/null 2>&1; echo $?)" "2" "verify run without a key → rc 2"
+assert_code "$(cd "$D" && bash scripts/verify.sh run 'MSK 1;rm' >/dev/null 2>&1; echo $?)" "2" "verify rejects a key with shell characters"
+assert_code "$(cd "$D" && bash scripts/verify.sh run MSK-1 --repeat x >/dev/null 2>&1; echo $?)" "2" "verify --repeat needs a number"
+assert_code "$(cd "$D" && bash scripts/verify.sh skip MSK-1 >/dev/null 2>&1; echo $?)" "2" "verify skip without a reason is refused"
+assert_code "$(cd "$D" && bash scripts/verify.sh gate MSK-1 >/dev/null 2>&1; echo $?)" "1" "verify gate: no report → blocked"
+OUT=$(cd "$D" && VERIFY_FE_URL=http://env:1 bash scripts/verify.sh config)
+assert_contains "$OUT" "VERIFY_FE_URL=http://env:1" "verify config: environment variable is read"
+assert_contains "$OUT" "VERIFY_TIMEOUT=120" "verify config: timeout defaults to 120s"
+assert_contains "$OUT" "--retries=0" "verify config: journeys run with retries 0 by default"
+( cd "$D" && printf "VERIFY_FE_URL='http://file:2'\nVERIFY_API_HEALTH='http://file:3/health'\n" > .devpilot/config.sh )
+OUT=$(cd "$D" && bash scripts/verify.sh config)
+assert_contains "$OUT" "VERIFY_API_HEALTH=http://file:3/health" "verify config: .devpilot/config.sh is read through devpilot-config.sh"
+assert_contains "$(cd "$D" && VERIFY_FE_URL=http://env:1 bash scripts/verify.sh config)" "VERIFY_FE_URL=http://env:1" "verify config: environment wins over config.sh"
+assert_code "$(cd "$D" && VERIFY_TIMEOUT=soon bash scripts/verify.sh config >/dev/null 2>&1; echo $?)" "2" "verify config: a non-numeric timeout is rejected"
+rm -f "$D/.devpilot/config.sh"
+OUT=$(cd "$D" && PATH="$VP" bash scripts/verify.sh run MSK-1 2>&1); RC=$?
+assert_code "$RC" "3" "verify run with no feature map → writes a draft and stops (rc 3)"
+MAPTXT=$(cat "$D/docs/feature-map.md")
+assert_contains "$MAPTXT" "DRAFT — needs owner review" "the generated feature map is marked DRAFT"
+assert_contains "$MAPTXT" "· Export orders" "draft map has an entry per requirements doc"
+assert_contains "$MAPTXT" "- Route: /orders" "draft map has an entry per Angular route"
+assert_eq "$(grep -c '\*\*$' <<<"$(grep '^- Route:' "$D/docs/feature-map.md")")" "0" "draft map skips the wildcard route"
+assert_contains "$(cd "$D" && bash scripts/verify.sh config)" "(draft)" "verify config reports the map as a draft"
+cat > "$D/docs/feature-map.md" <<'EOF'
+# Feature map
+## F-01 · Export orders as CSV
+- Route: /orders
+- Files: web/src/app/orders/*, api/Controllers/Orders*
+- Expected: CSV downloads | toast "Export ready"
+## F-02 · Invoices
+- Files: web/src/app/invoices/*
+- Expected: the invoice opens
+## F-03 · Reports
+- Files: web/src/app/reports/*
+- Expected: the chart renders
+- Journey: @noshot
+EOF
+OUT=$(cd "$D" && PATH="$VP" bash scripts/verify.sh run MSK-1 2>&1); RC=$?
+assert_code "$RC" "0" "docs-only diff → verify records no runtime surface"
+assert_contains "$(cat "$D/docs/tasks/MSK-1-evidence/verify-report.md")" "Result: ⏭ NO RUNTIME SURFACE" "the report says why nothing ran"
+assert_code "$(cd "$D" && bash scripts/verify.sh gate MSK-1 >/dev/null 2>&1; echo $?)" "0" "gate accepts a written no-runtime-surface reason"
+( cd "$D" && echo y >> web/src/app/orders/orders.component.ts )
+assert_eq "$(cd "$D" && bash scripts/verify.sh features 2>/dev/null | cut -f1 | tr '\n' ' ')" "F-01 " "only the features the diff touches are selected"
+assert_eq "$(cd "$D" && bash scripts/verify.sh features --all 2>/dev/null | wc -l | tr -d ' ')" "3" "--all selects every feature"
+OUT=$(cd "$D" && PATH="$VP" bash scripts/verify.sh run MSK-1 2>&1); RC=$?
+assert_code "$RC" "2" "runtime change but verify not configured → rc 2"
+assert_contains "$OUT" "verify_fe_url" "the not-configured message names the keys to set"
+SVC="echo \$\$ > $D/pid; touch $D/up; exec sleep 300"
+OUT=$(cd "$D" && PATH="$VP" VERIFY_FE_URL=http://localhost:4200 VERIFY_FE_CMD="$SVC" VERIFY_E2E_CMD="$D/bin/fake-e2e" VERIFY_E2E_DIR=. VERIFY_TIMEOUT=15 \
+  bash scripts/verify.sh run MSK-1 --repeat 3 2>&1); RC=$?
+assert_code "$RC" "0" "verify run: service started, journey passed 3× in a row"
+REP=$(cat "$D/docs/tasks/MSK-1-evidence/verify-report.md")
+assert_contains "$REP" "Result: ✅ PASS" "report ends with the PASS verdict"
+assert_contains "$REP" "Runs: 3 (identical)" "three runs gave identical results"
+assert_contains "$REP" '| F-01 · Export orders as CSV | `@F-01` | CSV downloads / toast "Export ready" | ✅ pass | 1 screenshot(s) · 1 console error(s) · 0 failed request(s) |' "one pass/fail line per journey with its expected result and evidence"
+[ -f "$D/docs/tasks/MSK-1-evidence/F-01/orders.png" ] && ok "screenshot saved under docs/tasks/<KEY>-evidence/<feature>/" || no "screenshot saved under docs/tasks/<KEY>-evidence/<feature>/"
+[ -f "$D/docs/tasks/MSK-1-evidence/F-01/journey.log" ] && ok "journey log kept as evidence" || no "journey log kept as evidence"
+if kill -0 "$(cat "$D/pid" 2>/dev/null)" 2>/dev/null; then no "the started service is stopped after a pass"; else ok "the started service is stopped after a pass"; fi
+assert_code "$(cd "$D" && bash scripts/verify.sh gate MSK-1 >/dev/null 2>&1; echo $?)" "0" "gate passes on a PASS report"
+# an already-running service is reused and left alone
+OUT=$(cd "$D" && PATH="$VP" VERIFY_FE_URL=http://localhost:4200 VERIFY_FE_CMD="echo started > $D/second" VERIFY_E2E_CMD="$D/bin/fake-e2e" VERIFY_E2E_DIR=. bash scripts/verify.sh run MSK-1 2>&1)
+assert_contains "$OUT" "reused" "a service that already answers is reused"
+[ -f "$D/second" ] && no "a reused service is not started twice" || ok "a reused service is not started twice"
+rm -f "$D/up"
+# a failing journey: report FAIL, gate red, service still stopped
+( cd "$D" && echo z > web/src/app/invoices/list.component.ts )
+OUT=$(cd "$D" && PATH="$VP" VERIFY_FE_URL=http://localhost:4200 VERIFY_FE_CMD="$SVC" VERIFY_E2E_CMD="$D/bin/fake-e2e" VERIFY_E2E_DIR=. VERIFY_TIMEOUT=15 bash scripts/verify.sh run MSK-1 2>&1); RC=$?
+assert_code "$RC" "1" "a journey whose expected result is not observed fails the run"
+assert_contains "$(cat "$D/docs/tasks/MSK-1-evidence/verify-report.md")" "Result: ❌ FAIL" "report ends with the FAIL verdict"
+assert_code "$(cd "$D" && bash scripts/verify.sh gate MSK-1 >/dev/null 2>&1; echo $?)" "1" "gate blocks on a FAIL report"
+if kill -0 "$(cat "$D/pid" 2>/dev/null)" 2>/dev/null; then no "the started service is stopped after a failure"; else ok "the started service is stopped after a failure"; fi
+rm -f "$D/up" "$D/web/src/app/invoices/list.component.ts"
+# a pass with no screenshot is not evidence
+( cd "$D" && mkdir -p web/src/app/reports && echo r > web/src/app/reports/chart.component.ts && git checkout -q web/src/app/orders/orders.component.ts )
+OUT=$(cd "$D" && PATH="$VP" VERIFY_FE_URL=http://localhost:4200 VERIFY_FE_CMD="$SVC" VERIFY_E2E_CMD="$D/bin/fake-e2e" VERIFY_E2E_DIR=. VERIFY_TIMEOUT=15 bash scripts/verify.sh run MSK-1 2>&1); RC=$?
+assert_code "$RC" "1" "a journey that passes without a screenshot counts as a fail"
+rm -rf "$D/up" "$D/web/src/app/reports"
+# runtime files no feature owns
+( cd "$D" && echo q > web/src/app/other.service.ts )
+OUT=$(cd "$D" && PATH="$VP" VERIFY_FE_URL=http://localhost:4200 VERIFY_FE_CMD="$SVC" bash scripts/verify.sh run MSK-1 2>&1); RC=$?
+assert_code "$RC" "1" "a changed runtime file that maps to no feature fails the run"
+assert_contains "$OUT" "web/src/app/other.service.ts" "the unmapped file is named"
+[ -f "$D/up" ] && no "nothing is started when the diff is unmapped" || ok "nothing is started when the diff is unmapped"
+rm -f "$D/web/src/app/other.service.ts"
+# a service that dies or never answers: bounded wait, clear failure
+( cd "$D" && echo y >> web/src/app/orders/orders.component.ts )
+OUT=$(cd "$D" && PATH="$VP" VERIFY_FE_URL=http://localhost:4200 VERIFY_FE_CMD="exit 3" VERIFY_TIMEOUT=15 bash scripts/verify.sh run MSK-1 2>&1); RC=$?
+assert_code "$RC" "1" "a service that exits at start fails the run"
+assert_contains "$OUT" "exited before answering" "the start failure is explained"
+OUT=$(cd "$D" && PATH="$VP" VERIFY_FE_URL=http://localhost:4200 VERIFY_FE_CMD="echo \$\$ > $D/pid; exec sleep 300" VERIFY_TIMEOUT=2 bash scripts/verify.sh run MSK-1 2>&1); RC=$?
+assert_code "$RC" "1" "a service that never answers fails after the bounded timeout"
+assert_contains "$OUT" "within 2s" "the timeout is reported"
+if kill -0 "$(cat "$D/pid" 2>/dev/null)" 2>/dev/null; then no "a service that timed out is stopped"; else ok "a service that timed out is stopped"; fi
+rm -rf "$D"
+for F in .claude/commands/dp-build.md .claude/commands/dp-pr.md .claude/skills/definition-of-done/SKILL.md .claude/skills/self-heal/SKILL.md .devpilot/process.md; do
+  assert_contains "$(cat "$REPO/$F")" "verify.sh" "$F wires in verify"
+done
+assert_contains "$(cat "$REPO/.claude/commands/dp-pr.md")" "verify.sh gate" "/dp-pr refuses a PR without a passing verify report"
+assert_contains "$(cat "$REPO/.claude/skills/definition-of-done/SKILL.md")" "Verify passed, with evidence attached" "definition-of-done requires verify evidence"
+assert_contains "$(cat "$REPO/install.sh")" "VERIFY_FE_CMD=" "installer writes the verify keys into config.sh"
+D=$(sandbox); ( cd "$D" && mkdir -p .claude/skills/verify-change && cp "$REPO/.claude/skills/verify-change/SKILL.md" .claude/skills/verify-change/ )
+OUT=$(cd "$D" && bash scripts/doctor.sh 2>&1)
+assert_contains "$OUT" "verify not configured" "doctor reports an unconfigured verify"
+assert_contains "$OUT" "no docs/feature-map.md" "doctor reports a missing feature map"
+rm -rf "$D"
+
+echo "== rules-guard.sh — checks out of reach of the change =="
+D=$(sandbox)
+( cd "$D" && mkdir -p .claude/skills/review-checklist .devpilot/rules .github/workflows src \
+  && printf 'rule v1\n' > .claude/skills/review-checklist/SKILL.md && printf 'guide\n' > CLAUDE.md \
+  && printf 'on: push\n' > .github/workflows/ci.yml && echo code > src/app.ts \
+  && git add -A && git commit -qm base && git branch -M develop && git checkout -qb feature/msk-1-x )
+for P in .claude/skills/x/SKILL.md .claude/commands/dp-pr.md .claude/settings.json .devpilot/rules/dotnet.md .devpilot/rules.md \
+         .devpilot/reliability-checklist.md CLAUDE.md scripts/test-guard.sh scripts/test-guard.exempt .github/workflows/ci.yml; do
+  assert_code "$(cd "$D" && bash scripts/rules-guard.sh match "$P"; echo $?)" "0" "rules-guard protects $P"
+done
+for P in src/app.ts docs/requirements/x.md scripts/deploy.sh README.md; do
+  assert_code "$(cd "$D" && bash scripts/rules-guard.sh match "$P"; echo $?)" "1" "rules-guard leaves $P alone"
+done
+assert_code "$(cd "$D" && bash scripts/rules-guard.sh match "$D/CLAUDE.md"; echo $?)" "0" "rules-guard resolves an absolute path"
+OUT=$(cd "$D" && bash scripts/rules-guard.sh touched); RC=$?
+assert_code "$RC" "0" "touched: clean branch → rc 0"
+( cd "$D" && echo more >> src/app.ts && printf 'rule v2 (weakened)\n' > .claude/skills/review-checklist/SKILL.md && git add -A && git commit -qm "feat: change" )
+OUT=$(cd "$D" && bash scripts/rules-guard.sh touched); RC=$?
+assert_code "$RC" "1" "touched: a branch that edits a skill → rc 1"
+assert_contains "$OUT" "⚠️ This change edits the checks that judge it — human review required." "touched prints the human-review banner"
+assert_contains "$OUT" ".claude/skills/review-checklist/SKILL.md" "touched names the edited check"
+assert_eq "$(printf '%s\n' "$OUT" | grep -c 'src/app.ts')" "0" "touched does not list ordinary source files"
+assert_eq "$(cd "$D" && bash scripts/rules-guard.sh show .claude/skills/review-checklist/SKILL.md)" "rule v1" "show returns the base-branch copy, not the working tree"
+( cd "$D" && mkdir -p .claude/skills/new && echo n > .claude/skills/new/SKILL.md )
+assert_code "$(cd "$D" && bash scripts/rules-guard.sh show .claude/skills/new/SKILL.md >/dev/null 2>&1; echo $?)" "1" "show refuses a rule that is new on the branch"
+assert_code "$(cd "$D" && bash scripts/rules-guard.sh show CLAUDE.md nosuchbranch >/dev/null 2>&1; echo $?)" "2" "show fails clearly when the base branch is missing"
+( cd "$D" && git checkout -q develop && printf 'docs/feature-map.md   # the grading rubric\n' > .devpilot/protected-paths && git add -A && git commit -qm "chore: protect map" && git checkout -q feature/msk-1-x )
+assert_code "$(cd "$D" && bash scripts/rules-guard.sh match docs/feature-map.md; echo $?)" "0" "project paths in .devpilot/protected-paths (base branch) are protected too"
+# the PreToolUse hook: blocked during a build, allowed otherwise
+hook() { printf '{"tool_input":{"file_path":"%s"}}' "$1" | ( cd "$D" && bash scripts/scope-hook.sh 2>&1 ); }
+hook "$D/CLAUDE.md" >/dev/null; assert_code "$?" "0" "no build guard → editing CLAUDE.md is allowed"
+( cd "$D" && bash scripts/rules-guard.sh lock MSK-1 >/dev/null )
+OUT=$(hook "$D/.claude/skills/review-checklist/SKILL.md"); RC=$?
+assert_code "$RC" "2" "build guard blocks an edit to a skill (absolute path, .md file)"
+assert_contains "$OUT" "one of the checks that judge this change" "the block message says why"
+assert_contains "$OUT" "Tooling: yes" "the block message names the tooling flag"
+hook ".github/workflows/ci.yml" >/dev/null; assert_code "$?" "2" "build guard blocks an edit to a CI workflow"
+hook "scripts/test-guard.exempt" >/dev/null; assert_code "$?" "2" "build guard blocks widening the test-guard exemptions"
+hook "src/app.ts" >/dev/null; assert_code "$?" "0" "build guard allows ordinary source files"
+hook "docs/qa/x.md" >/dev/null; assert_code "$?" "0" "build guard allows task docs"
+( cd "$D" && echo backend > .devpilot/.scope-lock )
+hook "src/x.component.ts" >/dev/null; assert_code "$?" "2" "the layer lock still applies alongside the build guard"
+hook "CLAUDE.md" >/dev/null; assert_code "$?" "2" "rule files are blocked even though .md files pass the layer lock"
+( cd "$D" && rm -f .devpilot/.scope-lock && bash scripts/rules-guard.sh lock MSK-1 --tooling >/dev/null )
+hook "CLAUDE.md" >/dev/null; assert_code "$?" "0" "a tooling Story (--tooling) may edit the rules"
+assert_contains "$(cd "$D" && bash scripts/rules-guard.sh status)" "tooling yes" "status shows the tooling flag"
+( cd "$D" && bash scripts/rules-guard.sh lock MSK-1 >/dev/null && git checkout -q develop )
+hook "CLAUDE.md" >/dev/null; assert_code "$?" "0" "a lock left by another branch is ignored (stale build)"
+( cd "$D" && git checkout -q feature/msk-1-x && bash scripts/rules-guard.sh unlock >/dev/null )
+hook "CLAUDE.md" >/dev/null; assert_code "$?" "0" "unlock lifts the build guard"
+assert_code "$(cd "$D" && bash scripts/rules-guard.sh lock >/dev/null 2>&1; echo $?)" "2" "lock needs at least one key"
+rm -rf "$D"
+for F in .claude/skills/review-checklist/SKILL.md .devpilot/prompts/team/lead-review.md .claude/commands/dp-pr.md; do
+  assert_contains "$(cat "$REPO/$F")" "rules-guard.sh show" "$F loads its rules from the base branch"
+  assert_contains "$(cat "$REPO/$F")" "This change edits the checks that judge it — human review required." "$F carries the human-review banner"
+done
+assert_contains "$(cat "$REPO/.claude/commands/dp-build.md")" "rules-guard.sh lock" "/dp-build turns the build guard on"
+assert_contains "$(cat "$REPO/.claude/commands/dp-build.md")" "rules-guard.sh unlock" "/dp-build turns the build guard off at close"
+assert_contains "$(cat "$REPO/.devpilot/templates/team/item-brief.md")" "Tooling: no" "item brief carries the tooling flag"
+for P in '/.claude/' '/.devpilot/' '/scripts/' '/.github/workflows/' '/CLAUDE.md'; do
+  assert_contains "$(cat "$REPO/.github/CODEOWNERS")" "$P" "CODEOWNERS owns $P explicitly"
+done
+
+echo "== flaky-test policy + property / differential tests =="
+QUAR=$(grep -rliI 'quarantin' "$REPO/.claude" "$REPO/.devpilot" "$REPO/scripts" "$REPO/CLAUDE.md" "$REPO/README.md" "$REPO/docs" 2>/dev/null | grep -v '/\.devpilot/egm/' | tr '\n' ' ')
+assert_eq "${QUAR:-none}" "none" "no 'quarantine' wording left anywhere"
+for F in .claude/skills/test-design/SKILL.md .claude/skills/ui-e2e-playwright/SKILL.md .claude/skills/release-ops/SKILL.md \
+         .claude/commands/dp-pr.md .devpilot/prompts/team/qa-agent.md; do
+  TXT=$(cat "$REPO/$F")
+  assert_contains "$TXT" "docs/tests/removed-tests.md" "$F: an unexplained flaky test is deleted and recorded"
+  assert_contains "$TXT" "retries: 0" "$F: Playwright retries stay 0"
+  assert_contains "$TXT" "ordering, shared state, time" "$F: names the root causes to look for"
+done
+assert_eq "$(grep -c 'process.env.CI ? 1' "$REPO/.claude/skills/ui-e2e-playwright/SKILL.md")" "0" "the Playwright config no longer retries in CI"
+TD=$(cat "$REPO/.claude/skills/test-design/SKILL.md")
+for W in "Round-trip" "Invariant" "Idempotency" "Equivalence" "fast-check" "FsCheck" "Hypothesis" "example | property | differential | e2e"; do
+  assert_contains "$TD" "$W" "test-design covers: $W"
+done
+assert_contains "$(cat "$REPO/.claude/skills/angular-testing/SKILL.md")" "fast-check" "angular-testing says when to use fast-check"
+assert_contains "$(cat "$REPO/.claude/skills/dotnet-testing/SKILL.md")" "FsCheck" "dotnet-testing says when to use FsCheck"
+assert_contains "$(cat "$REPO/.claude/skills/python-testing/SKILL.md")" "Hypothesis" "python-testing says when to use Hypothesis"
+SU=$(cat "$REPO/.claude/skills/stack-upgrade/SKILL.md")
+for W in "docs/tests/approved-differences.md" "Angular version upgrade" ".NET API migration" "Stored-procedure rewrite" "Normalize"; do
+  assert_contains "$SU" "$W" "stack-upgrade differential tests: $W"
+done
+for F in .devpilot/prompts/team/qa-agent.md .claude/commands/dp-build.md; do
+  assert_contains "$(cat "$REPO/$F")" "example | property | differential | e2e" "$F: every planned test gets a kind"
+done
+assert_eq "$(grep -rlE '"(fast-check|fscheck|hypothesis)"' "$REPO" --include=package.json --include='*.csproj' --include=requirements*.txt 2>/dev/null | wc -l | tr -d ' ')" "0" "DevPilot itself takes no test-library dependency"
+
+echo "== reliability checklist — triggered by the diff =="
+assert_code "$(bash "$REPO/scripts/reliability.sh" validate "$REPO/.devpilot/reliability-checklist.md" >/dev/null; echo $?)" "0" "shipped checklist validates (trigger + check + origin per item)"
+N=$(grep -c '^## R-' "$REPO/.devpilot/reliability-checklist.md")
+[ "$N" -ge 10 ] && ok "checklist is seeded with $N items" || no "checklist is seeded with ≥ 10 items (got $N)"
+assert_eq "$(grep '^- Origin:' "$REPO/.devpilot/reliability-checklist.md" | grep -vc 'seed')" "0" "initial items carry Origin: seed"
+D=$(sandbox)
+( cd "$D" && mkdir -p .devpilot api/Migrations api/Controllers web/src && cp "$REPO/.devpilot/reliability-checklist.md" .devpilot/ \
+  && printf 'public class OrdersService { }\n' > api/OrdersService.cs && printf 'export const x = 1;\n' > web/src/util.ts \
+  && git add -A && git commit -qm base && git branch -M develop && git checkout -qb feature/msk-2-x )
+OUT=$(cd "$D" && bash scripts/reliability.sh match)
+assert_contains "$OUT" "no checklist item triggered" "a branch with no changes triggers nothing"
+( cd "$D" && printf 'public class OrdersService { [Authorize(Roles = "Teller")] public void Close() { var at = DateTime.Now; } }\n' > api/OrdersService.cs \
+  && printf 'migrationBuilder.AddColumn<string>("Iban", "Accounts");\n' > api/Migrations/20261117_AddIban.cs && git add -A && git commit -qm "feat: change" )
+OUT=$(cd "$D" && bash scripts/reliability.sh match)
+for ID in R-01 R-04 R-08; do assert_contains "$OUT" "### $ID " "match runs $ID (its trigger is in the diff)"; done
+for ID in R-03 R-05 R-06 R-09 R-11; do assert_eq "$(printf '%s\n' "$OUT" | grep -c "### $ID ")" "0" "match skips $ID (not triggered)"; done
+assert_contains "$OUT" 'file `api/Migrations/20261117_AddIban.cs`' "a path trigger names the file"
+assert_contains "$OUT" 'line `api/OrdersService.cs`' "a code trigger names the changed line"
+assert_contains "$OUT" "- Evidence:" "each triggered item asks for evidence"
+assert_contains "$OUT" "source: develop:.devpilot/reliability-checklist.md" "the checklist is read from the base branch"
+( cd "$D" && awk '/^## R-04/{skip=1;next} /^## /{skip=0} !skip' .devpilot/reliability-checklist.md > x && mv x .devpilot/reliability-checklist.md )
+assert_contains "$(cd "$D" && bash scripts/reliability.sh match)" "### R-04 " "deleting an item on the branch does not silence it (base copy wins)"
+( cd "$D" && git checkout -q develop -- .devpilot/reliability-checklist.md )
+# validate rejects incomplete items
+printf '## R-01 · No trigger\n- Check: q?\n- Origin: seed\n## R-02 · No check\n- Paths: `*.sql`\n- Origin: seed\n## R-03 · No origin\n- Code: `foo`\n- Check: q?\n## R-03 · Bad regex\n- Code: `(`\n- Check: q?\n- Origin: #12\n' > "$D/bad.md"
+OUT=$(cd "$D" && bash scripts/reliability.sh validate bad.md); RC=$?
+assert_code "$RC" "1" "validate fails on incomplete items"
+for W in "R-01: no trigger" "R-02: no Check" "R-03: no Origin" "R-03: duplicate id" "not a valid extended regex"; do assert_contains "$OUT" "$W" "validate reports: $W"; done
+( cd "$D" && git checkout -q develop && git rm -q .devpilot/reliability-checklist.md && git commit -qm rm )
+assert_code "$(cd "$D" && bash scripts/reliability.sh match >/dev/null 2>&1; echo $?)" "2" "no checklist anywhere → rc 2"
+rm -rf "$D"
+RC_TXT=$(cat "$REPO/.claude/skills/review-checklist/SKILL.md")
+for W in "🔴 **Important**" "🟢 **Nit**" "🟣 **Pre-existing**" "states why in one line" "reliability.sh match"; do
+  assert_contains "$RC_TXT" "$W" "review-checklist: $W"
+done
+assert_eq "$(grep -c 'SHOULD\|BLOCKER' "$REPO/.claude/skills/review-checklist/SKILL.md")" "0" "review-checklist no longer uses the old BLOCKER/SHOULD tags"
+assert_contains "$(cat "$REPO/.devpilot/templates/team/review-report.md")" "Why (one line)" "review report template asks why for every finding"
+assert_contains "$(cat "$REPO/.devpilot/prompts/team/lead-review.md")" "reliability.sh match" "the Team Lead runs the triggered reliability items"
+
+echo "== commit gate — the verification stamp =="
+D=$(sandbox)
+( cd "$D" && mkdir -p .devpilot src docs && echo a > src/a.ts && printf '.devpilot/logs/\n.devpilot/config.sh\n' > .gitignore && git add -A && git -c commit.gpgsign=false commit -qm "chore: base" --no-verify && bash scripts/install-git-hooks.sh >/dev/null )
+cm() { ( cd "$D" && echo "$RANDOM" >> src/a.ts && git add -A && git -c commit.gpgsign=false commit -q -F - ) 2>&1; }
+assert_eq "$(cd "$D" && bash scripts/commit-gate.sh mode)" "observe" "the gate defaults to observe"
+OUT=$(printf 'feat(a): no stamp\n' | cm); RC=$?
+assert_code "$RC" "0" "observe: a commit without a Verified: trailer goes through"
+assert_contains "$(cat "$D/.devpilot/logs/commit-gate.log")" "observe	" "observe: what would have been blocked is logged"
+assert_contains "$(cat "$D/.devpilot/logs/commit-gate.log")" "no 'Verified:' trailer" "the log says why"
+OUT=$(printf 'not conventional\n\nVerified: tests\n' | cm); RC=$?
+assert_code "$RC" "1" "the Conventional Commits check still runs first"
+export COMMIT_GATE=enforce
+OUT=$(printf 'feat(a): no stamp\n' | cm); RC=$?
+assert_code "$RC" "1" "enforce: a commit without a trailer is blocked"
+assert_contains "$OUT" "Unverified-Reason:" "the block message shows how to pass honestly"
+assert_contains "$OUT" "Block 1 of 2" "the block message counts toward the escape hatch"
+OUT=$(printf 'feat(a): stamped\n\nVerified: tests, code-review\n' | cm); RC=$?
+assert_code "$RC" "0" "enforce: Verified: tests, code-review goes through"
+assert_eq "$(ls "$D/.git/devpilot" 2>/dev/null | wc -l | tr -d ' ')" "0" "a verified commit resets the block counter"
+OUT=$(printf 'feat(a): bad value\n\nVerified: yes\n' | cm); assert_code "$?" "1" "enforce: an unknown check name is blocked"
+OUT=$(printf 'feat(a): mixed\n\nVerified: none, tests\n' | cm); assert_code "$?" "1" "enforce: none mixed with checks is blocked"
+( cd "$D" && rm -rf .git/devpilot )
+OUT=$(printf 'feat(a): nothing ran\n\nVerified: none\n' | cm); assert_code "$?" "1" "enforce: Verified: none alone is blocked"
+OUT=$(printf 'docs(a): typo\n\nVerified: none\nUnverified-Reason: comment typo, nothing to run\n' | cm); RC=$?
+assert_code "$RC" "0" "enforce: Verified: none with an Unverified-Reason goes through"
+assert_contains "$(tail -1 "$D/.devpilot/logs/commit-gate.log")" "allowed-unverified" "an unverified commit with a reason is logged"
+( cd "$D" && rm -rf .git/devpilot )
+printf 'feat(a): one\n' | cm >/dev/null; R1=$?
+printf 'feat(a): two\n' | cm >/dev/null; R2=$?
+OUT=$(printf 'feat(a): three\n' | cm); R3=$?
+assert_eq "$R1 $R2 $R3" "1 1 0" "escape hatch: after 2 blocks in a row the next commit goes through"
+assert_contains "$OUT" "let through after 2 blocks" "the escape hatch says what it did"
+assert_contains "$(tail -1 "$D/.devpilot/logs/commit-gate.log")" "escape-hatch" "the escape hatch is logged"
+printf 'feat(a): four\n' | cm >/dev/null; assert_code "$?" "1" "the counter restarts after the escape hatch"
+( cd "$D" && rm -rf .git/devpilot && git checkout -qb other )
+printf 'feat(a): other branch\n' | cm >/dev/null; assert_code "$?" "1" "the counter is per branch"
+( cd "$D" && git -c commit.gpgsign=false commit -q --allow-empty --no-verify -m "feat: on other" && git checkout -q - && rm -rf .git/devpilot )
+OUT=$(cd "$D" && git -c commit.gpgsign=false merge --no-ff -q other -m "Merge branch 'other'" 2>&1); assert_code "$?" "0" "merge commits are not checked"
+unset COMMIT_GATE
+( cd "$D" && printf "COMMIT_GATE='enforce'\n" > .devpilot/config.sh && rm -rf .git/devpilot )
+assert_eq "$(cd "$D" && bash scripts/commit-gate.sh mode)" "enforce" "the mode is read from .devpilot/config.sh"
+( cd "$D" && rm .devpilot/config.sh && printf 'commit_gate: off   # team policy\n' >> project.config.md )
+assert_eq "$(cd "$D" && bash scripts/commit-gate.sh mode)" "off" "the mode is read from project.config.md"
+L1=$(wc -l < "$D/.devpilot/logs/commit-gate.log")
+printf 'feat(a): off\n' | cm >/dev/null; assert_code "$?" "0" "off: nothing is checked"
+assert_eq "$(wc -l < "$D/.devpilot/logs/commit-gate.log")" "$L1" "off: nothing is logged"
+assert_eq "$(COMMIT_GATE=bogus bash -c "cd '$D' && bash scripts/commit-gate.sh mode")" "observe" "an unknown mode falls back to observe"
+# the stamp reflects what actually ran on this exact tree
+( cd "$D" && rm -rf .devpilot/logs/stamps )
+assert_eq "$(cd "$D" && bash scripts/commit-gate.sh stamp)" "Verified: none" "stamp with nothing run → none"
+( cd "$D" && bash scripts/commit-gate.sh mark tests )
+assert_eq "$(cd "$D" && bash scripts/commit-gate.sh stamp)" "Verified: tests" "stamp after a passing test run → tests"
+( cd "$D" && bash scripts/commit-gate.sh mark verify && bash scripts/commit-gate.sh mark code-review fail )
+assert_eq "$(cd "$D" && bash scripts/commit-gate.sh stamp)" "Verified: verify, tests" "a failed check is not stamped"
+( cd "$D" && echo report > docs/qa.md )
+assert_eq "$(cd "$D" && bash scripts/commit-gate.sh stamp)" "Verified: verify, tests" "writing docs/ after the checks keeps the stamp"
+( cd "$D" && echo edit >> src/a.ts )
+assert_eq "$(cd "$D" && bash scripts/commit-gate.sh stamp)" "Verified: none" "editing code after the checks drops the stamp"
+assert_code "$(cd "$D" && bash scripts/commit-gate.sh mark nonsense >/dev/null 2>&1; echo $?)" "2" "mark rejects an unknown check"
+rm -rf "$D"
+assert_contains "$(cat "$REPO/scripts/run-tests.sh")" "commit-gate.sh\" mark tests" "run-tests.sh stamps the tests it ran"
+assert_contains "$(cat "$REPO/scripts/verify.sh")" "commit-gate.sh\" mark verify" "verify.sh stamps a verify run"
+assert_contains "$(cat "$REPO/README.md")" "git log --grep '^Verified: none'" "README shows how to list unverified changes"
+assert_contains "$(cat "$REPO/.claude/skills/core-rules/SKILL.md")" "commit-gate.sh stamp" "core-rules: commits carry the stamp"
+
+echo "== review-metrics.sh — review the reviewers =="
+D=$(sandbox)
+NOW=$(date +%s); DAY=86400
+gc() {  # gc <days-ago> <message> — commit everything at that date
+  local t=$((NOW - $1 * DAY))
+  ( cd "$D" && git add -A && GIT_AUTHOR_DATE="@$t +0000" GIT_COMMITTER_DATE="@$t +0000" git -c commit.gpgsign=false commit -qm "$2" --no-verify )
+}
+( cd "$D" && mkdir -p src docs/reviews && echo 0 > src/fees.ts && echo 0 > src/tax.ts && echo 0 > src/raffle.ts && echo 0 > src/old.ts )
+gc 60 "chore: base"; ( cd "$D" && git branch -M develop )
+( cd "$D" && echo 1 >> src/fees.ts && printf '# Review\n🟢 Nit — src/other.ts:3\n' > docs/reviews/fees.md ); gc 30 "feat(fees): transfer fees (#10)"
+( cd "$D" && echo 1 >> src/tax.ts && printf '# Review\n🔴 Important — src/tax.ts:9 — rounding\n' > docs/reviews/tax.md ); gc 29 "feat(tax): VAT (#11)"
+( cd "$D" && echo 1 >> src/raffle.ts ); gc 28 "feat(raffle): draw (#12)"
+( cd "$D" && echo 1 >> src/old.ts ); gc 50 "feat(old): legacy (#9)"
+( cd "$D" && echo 2 >> src/fees.ts ); gc 25 "fix(fees): rounding on large amounts"
+( cd "$D" && echo 2 >> src/tax.ts ); gc 27 "fix(tax): VAT on zero-rated items"
+RSHA=$(cd "$D" && git log --format=%H --grep='draw (#12)' -1)
+( cd "$D" && t=$((NOW - 20 * DAY)) && GIT_AUTHOR_DATE="@$t +0000" GIT_COMMITTER_DATE="@$t +0000" git -c commit.gpgsign=false revert --no-edit "$RSHA" >/dev/null 2>&1 )
+( cd "$D" && echo 2 >> src/old.ts ); gc 10 "fix(old): long after the merge"
+OUT=$(cd "$D" && bash scripts/review-metrics.sh "90 days ago"); RC=$?
+assert_code "$RC" "0" "review-metrics runs on plain git history"
+assert_contains "$OUT" "PRs merged: 4" "every merged PR in the window is counted"
+assert_contains "$OUT" "| #10 |" "a fix touching a merged PR's files within the window is a slip"
+assert_contains "$(printf '%s\n' "$OUT" | grep '| #10 |')" "not flagged" "…and the review that missed it is named"
+assert_contains "$(printf '%s\n' "$OUT" | grep '| #11 |')" "| flagged |" "a slip the review did mention counts as flagged"
+assert_contains "$(printf '%s\n' "$OUT" | grep '| #12 |')" "reverted" "a reverted PR is reported"
+assert_contains "$(printf '%s\n' "$OUT" | grep '| #12 |')" "no review report" "a PR merged without a review report says so"
+assert_eq "$(printf '%s\n' "$OUT" | grep -c '| #9 |')" "0" "a fix outside the window (--days) is not a slip"
+assert_contains "$(cd "$D" && bash scripts/review-metrics.sh "90 days ago" --days 60)" "| #9 |" "--days widens the window"
+assert_contains "$OUT" "not flagged by review: 2" "the summary counts the misses"
+assert_code "$(cd "$D" && bash scripts/review-metrics.sh --days x >/dev/null 2>&1; echo $?)" "2" "--days needs a number"
+assert_code "$(cd "$D" && bash scripts/review-metrics.sh --base nosuch >/dev/null 2>&1; echo $?)" "2" "an unknown base branch fails clearly"
+rm -rf "$D"
+assert_contains "$(cat "$REPO/.devpilot/process.md")" "Review the reviewers" "process.md documents what to do with a miss"
+assert_contains "$(cat "$REPO/.devpilot/process.md")" "≥ 2 PRs" "a candidate rule must recur before it is added"
+assert_contains "$(cat "$REPO/.claude/skills/core-rules/SKILL.md")" "## Pruning" "core-rules has a Pruning section"
+assert_contains "$(cat "$REPO/.claude/commands/dp-release.md")" "review-metrics.sh" "a release runs review-metrics and prunes"
+
+echo "== devpilot-config.sh get — values written by the installer template =="
+D=$(sandbox)
+( cd "$D" && mkdir -p .devpilot && printf "VERIFY_FE_URL=\"\"                       # e.g. http://localhost:4200\nVERIFY_TIMEOUT=\"120\"   # seconds\nVERIFY_FE_CMD='npm --prefix web start'\nJIRA_API_TOKEN=abc#def\nNOTE=\"it's # not a comment\"\n" > .devpilot/config.sh )
+assert_eq "$(cd "$D" && bash scripts/devpilot-config.sh get verify_fe_url)" "" "an empty value with a trailing comment reads as empty"
+assert_eq "$(cd "$D" && bash scripts/devpilot-config.sh get verify_timeout)" "120" "a quoted value with a trailing comment reads without the comment"
+assert_eq "$(cd "$D" && bash scripts/devpilot-config.sh get verify_fe_cmd)" "npm --prefix web start" "a single-quoted value keeps its spaces"
+assert_eq "$(cd "$D" && bash scripts/devpilot-config.sh get jira_api_token)" "abc#def" "a # inside a token is kept"
+assert_eq "$(cd "$D" && bash scripts/devpilot-config.sh get note)" "it's # not a comment" "a # inside quotes is kept"
+assert_eq "$(cd "$D" && bash scripts/devpilot-config.sh get missing_key)" "" "a missing key reads as empty"
+rm -rf "$D"
+
 echo "== DevPilot release metadata =="
 V=$(cat "$REPO/VERSION")
 assert_contains "$(cat "$REPO/CHANGELOG.md")" "## [$V]" "CHANGELOG.md has a section for VERSION $V (release notes)"

@@ -32,7 +32,7 @@ Resolve what to test:
 Spawn `subagent_type: "team-qa"`:
 > Scope: `<resolved scope>`. Read `.claude/skills/test-design/SKILL.md` and derive
 > the test-case matrix per AC (happy / boundary / negative / state, P0–P2,
-> traceability). For each case pick the layer per the same skill's pyramid:
+> traceability), giving every planned test a kind: `example | property | differential | e2e`. For each case pick the layer per the same skill's pyramid:
 > Angular unit, .NET / Python unit, .NET / Python integration, or Playwright UI journey. Write the matrix
 > into `docs/qa/<slug>.md` BEFORE writing test code.
 
@@ -56,7 +56,7 @@ Same agent, continuing:
 > Run everything through the token-lean runner (`.claude/skills/token-lean-testing/SKILL.md`):
 > `bash scripts/run-tests.sh all` (or `e2e` in `ui` mode). Apply `.claude/skills/self-heal/SKILL.md`
 > on failures (3 attempts, re-running only the failing tests, test-code fixes only — an
-> implementation bug is a 🔴 BLOCKER finding, never a weakened assertion). Commit tests with
+> implementation bug is a 🔴 Important finding, never a weakened assertion). Commit tests with
 > `test(<slug>): <what>`. Finish `docs/qa/<slug>.md` with the matrix, coverage added, suite
 > summary table, trace paths for failures, and PASS / BLOCKED per AC.
 

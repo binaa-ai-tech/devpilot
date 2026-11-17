@@ -50,7 +50,11 @@ state the assumption and continue; don't stop to ask.
 ## Part 1 — Build / Lint / Test Recovery (3-attempt protocol)
 
 When a build, lint, or test command fails (run suites via `bash scripts/run-tests.sh` —
-`token-lean-testing` — and read only the failure lines):
+`token-lean-testing` — and read only the failure lines) — **or `bash scripts/verify.sh run` reports
+❌ FAIL / UNSTABLE** (`verify-change`): read `docs/tasks/<KEY>-evidence/<feature>/journey.log` and the
+service logs in `.devpilot/logs/verify-*.log`, then follow the same three attempts. A verify
+failure is fixed in the code, the journey's locators, or the start-up config — never by editing
+the feature map's `Expected` result or the report.
 
 ### Attempt 1 — Diagnose
 1. Read the COMPLETE error output. Do not skim.
@@ -78,7 +82,7 @@ When a build, lint, or test command fails (run suites via `bash scripts/run-test
 
 Command: `<exact failing command>`
 Error:
-<paste the full error output>
+<paste the full error output — for verify: the failing journey lines of verify-report.md>
 
 Root cause hypothesis: <your best diagnosis>
 
@@ -92,7 +96,10 @@ Needs human input to resolve.
 
 ### Hard rules — never do these to "fix" a failure
 - Do not add `// @ts-ignore` or `// eslint-disable` to silence errors (unless a documented false positive)
-- Do not delete or skip tests to make the suite green
+- Do not delete or skip tests to make the suite green. One exception, and it is deletion, never a
+  skip or a retry: a **flaky** test whose root cause these 3 attempts did not find is deleted and
+  recorded in `docs/tests/removed-tests.md` with a follow-up item (`test-design` → Flaky tests)
+- Do not add a `sleep` / fixed wait, raise a timeout or retry count, or re-run until green
 - Do not widen types to `any` or add `!` non-null assertions to fix type errors
 - Do not change test assertions to match broken behavior
 

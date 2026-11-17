@@ -78,7 +78,7 @@ rendered — never guess selectors from the template.
 ## Config defaults
 ```ts
 use: { baseURL, trace: 'retain-on-failure', screenshot: 'only-on-failure', video: 'off' },
-retries: process.env.CI ? 1 : 0,   // a test that needs its retry is reported as flaky: fix it
+retries: 0,   // in CI too — a retry that turns red into green hides a flaky test (`test-design` → Flaky tests)
 reporter: process.env.CI ? [['line'], ['html', { open: 'never' }]] : 'line',
 ```
 
@@ -89,9 +89,14 @@ reporter: process.env.CI ? [['line'], ['html', { open: 'never' }]] : 'line',
 
 ## CI placement
 - PR: a smoke subset (tag `@smoke`, ≤ 3 journeys, `--grep @smoke`). Full suite post-merge / nightly.
-- A flaky test is a bug: fix it within the sprint. Don't raise retries to hide it.
+- **A flaky journey may not be skipped, given a `waitForTimeout` / fixed wait, or retried until
+  green.** `retries` stays `0`, in CI as well. Find the root cause — ordering, shared state, time,
+  network, or a missing await / locator wait. Not found within the 3-attempt protocol (`self-heal`)
+  → delete the journey, record it in `docs/tests/removed-tests.md` (test, file, symptom, what was
+  ruled out, date, Story key) and open a follow-up item to rewrite it (`test-design` → Flaky tests).
 
 ## Ship-with
 - [ ] Each UI-facing AC has a journey (happy + one visible failure) or a written reason it's covered lower.
 - [ ] Role/label/testid locators only; no `waitForTimeout`; data seeded via API per test.
+- [ ] `retries: 0` (CI included); no `.skip` / `test.fixme`; any removed flaky journey is in `docs/tests/removed-tests.md`.
 - [ ] axe scan clean on new screens; traces kept on failure; suite green via `run-tests.sh e2e`.
