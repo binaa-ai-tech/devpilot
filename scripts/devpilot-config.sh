@@ -96,9 +96,16 @@ config_get() {
   require_config
   local line val
   line=$(grep -E "^${key}=" "$CONFIG_FILE" 2>/dev/null | head -1 || true)
-  val="${line#*=}"
-  val=$(strip_wrapping_quotes "$val")
-  echo "$val"
+  [ -z "$line" ] && { echo ""; return 0; }
+  # Let the shell parse the assignment: quotes and a trailing "# comment" are handled the way
+  # every sourcing script (smoke.sh, devpilot-lib.sh) reads the file.
+  if val=$(env -i bash -c "$line
+printf '%s' \"\${$key:-}\"" 2>/dev/null); then
+    echo "$val"
+  else
+    val="${line#*=}"
+    strip_wrapping_quotes "$val"
+  fi
 }
 
 # Set a single key in config.sh (creates or updates the line)

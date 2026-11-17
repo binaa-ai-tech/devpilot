@@ -1590,6 +1590,17 @@ assert_contains "$(cat "$REPO/.devpilot/process.md")" "≥ 2 PRs" "a candidate r
 assert_contains "$(cat "$REPO/.claude/skills/core-rules/SKILL.md")" "## Pruning" "core-rules has a Pruning section"
 assert_contains "$(cat "$REPO/.claude/commands/dp-release.md")" "review-metrics.sh" "a release runs review-metrics and prunes"
 
+echo "== devpilot-config.sh get — values written by the installer template =="
+D=$(sandbox)
+( cd "$D" && mkdir -p .devpilot && printf "VERIFY_FE_URL=\"\"                       # e.g. http://localhost:4200\nVERIFY_TIMEOUT=\"120\"   # seconds\nVERIFY_FE_CMD='npm --prefix web start'\nJIRA_API_TOKEN=abc#def\nNOTE=\"it's # not a comment\"\n" > .devpilot/config.sh )
+assert_eq "$(cd "$D" && bash scripts/devpilot-config.sh get verify_fe_url)" "" "an empty value with a trailing comment reads as empty"
+assert_eq "$(cd "$D" && bash scripts/devpilot-config.sh get verify_timeout)" "120" "a quoted value with a trailing comment reads without the comment"
+assert_eq "$(cd "$D" && bash scripts/devpilot-config.sh get verify_fe_cmd)" "npm --prefix web start" "a single-quoted value keeps its spaces"
+assert_eq "$(cd "$D" && bash scripts/devpilot-config.sh get jira_api_token)" "abc#def" "a # inside a token is kept"
+assert_eq "$(cd "$D" && bash scripts/devpilot-config.sh get note)" "it's # not a comment" "a # inside quotes is kept"
+assert_eq "$(cd "$D" && bash scripts/devpilot-config.sh get missing_key)" "" "a missing key reads as empty"
+rm -rf "$D"
+
 echo "== DevPilot release metadata =="
 V=$(cat "$REPO/VERSION")
 assert_contains "$(cat "$REPO/CHANGELOG.md")" "## [$V]" "CHANGELOG.md has a section for VERSION $V (release notes)"
