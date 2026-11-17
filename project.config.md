@@ -41,6 +41,15 @@ git_host: auto
 
 merge_policy: auto               # auto | pr-only
 
+## Commit gate — the `Verified:` trailer on every commit (scripts/commit-gate.sh)
+# Every commit says what proved it: `Verified: verify | tests | code-review | none`.
+# observe — never blocks; what enforce would block is logged to .devpilot/logs/commit-gate.log (default)
+# enforce — blocks a missing / invalid / `none` trailer unless `Unverified-Reason: <why>` is given
+#           (escape hatch: after 2 blocks in a row on a branch, the next commit goes through, logged)
+# off     — no check. COMMIT_GATE in the environment or .devpilot/config.sh overrides this.
+
+commit_gate: observe             # off | observe | enforce
+
 ## Spec review — Elephant-Goldfish (Google's EGM, vendored in .devpilot/egm)
 # Before code, the requirements doc must survive zero-context reviewer agents (/dp-spec).
 # auto   — M/L Stories, plus anything touching auth, money, PII or a public API contract

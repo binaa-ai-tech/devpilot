@@ -18,7 +18,11 @@ process, not from skipping steps.
 - **Pipeline as code**, versioned with the repo. Every PR runs: restore → lint → build → unit +
   integration tests → security/dependency scan → Playwright smoke. A red gate blocks merge.
 - Keep the PR pipeline under ~10 min (cache NuGet/npm, parallelize); full E2E + perf post-merge
-  or nightly. Flaky tests are bugs — fix them, don't blindly retry.
+  or nightly. A flaky test may not be skipped, given a sleep / fixed wait, or retried until green
+  (Playwright `retries: 0`, in CI too): find the root cause (ordering, shared state, time, network,
+  missing await / locator wait), or — when the 3-attempt protocol doesn't find it — delete the test,
+  record it in `docs/tests/removed-tests.md` and open a follow-up item (`test-design` → Flaky tests).
+  A "re-run failed jobs" click is the same retry in a different place.
 - **Build once, promote the same artifact** through every environment; configuration and secrets
   are injected per environment from the CI secret store, never baked in.
 - Deploys are one command, idempotent, and have a **tested rollback**.

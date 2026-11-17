@@ -62,7 +62,7 @@ EGM artifact directory: docs/specs/<SLUG>
 Write `docs/specs/<SLUG>/review.md` with the verdict, then commit the spec and its review on
 the current branch:
 ```bash
-git add docs/requirements/<SLUG>.md docs/specs/<SLUG>/ && git commit -m "docs(spec): goldfish review <SLUG> — <PASS|BLOCKED>"
+git add docs/requirements/<SLUG>.md docs/specs/<SLUG>/ && git commit -m "docs(spec): goldfish review <SLUG> — <PASS|BLOCKED>" -m "Verified: none" -m "Unverified-Reason: spec documents only"
 ```
 Tracker: **PASS** → no comment (the planned comment already links the spec). **BLOCKED** →
 ```bash

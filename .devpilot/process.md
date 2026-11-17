@@ -17,8 +17,8 @@ INTAKE → READY → SPRINT → BUILD → VERIFY → MERGE → RELEASE → OPERA
 | 2 | **Ready** | BA · `/dp-spec` | `definition-of-ready` — clear, testable ACs; sized & sliced; no open questions; M/L Stories (per `spec_review`) passed the Elephant-Goldfish review — zero-context `egm-*` reviewers, no open 🔴 in `docs/specs/<slug>/review.md` (`spec-review`). |
 | 3 | **Sprint** | `/dp-sprint` | Only READY Stories enter; sprint has a goal and a recommended run order. |
 | 4 | **Build** | `/dp-build` | One branch per sprint; each layer agent edits only its layer (its prompt; `scope-guard.sh <layer>` reports cross-layer changes, `.devpilot/.scope-lock` enforces one layer on demand); every commit conventional, build never left red (`core-rules`). |
-| 5 | **Verify** | QA agent, `/dp-test` | Test cases derived per AC and pyramid respected (`test-design`: Vitest · xUnit + real SQL Server · Playwright UI journeys per `ui-e2e-playwright`); suites run token-lean via `scripts/run-tests.sh`; perf budgets proven when in scope (`performance`); QA verdict **PASS** per Story. |
-| 6 | **Merge** | `/dp-build` · `/dp-pr` | Version bumped from `develop`'s version (feature → minor, bug → patch) and the PR titled `[vX.Y.Z]`; the `auto-merge` gate ladder all green **on the PR head**; squash-merge; then items **Done**, Epic Done when its children are, sprint closed when empty (`close-delivery.sh`). Fix loop bounded; humans merge when `merge_policy: pr-only`. |
+| 5 | **Verify** | QA agent, `/dp-test` | Test cases derived per AC and pyramid respected (`test-design`: Vitest · xUnit + real SQL Server · Playwright UI journeys per `ui-e2e-playwright`); suites run token-lean via `scripts/run-tests.sh`; perf budgets proven when in scope (`performance`); QA verdict **PASS** per Story. Then the change is **run**: `scripts/verify.sh` starts the app and drives the journeys the diff touches from `docs/feature-map.md` in a real browser; screenshots + `verify-report.md` land in `docs/tasks/<KEY>-evidence/` (`verify-change`). No passing report (or written "no runtime surface" reason) → no PR. |
+| 6 | **Merge** | `/dp-build` · `/dp-pr` | Review read from the base branch (`rules-guard.sh show`), the diff-triggered reliability items answered with evidence (`reliability.sh match`), findings tagged 🔴 Important / 🟢 Nit / 🟣 Pre-existing; version bumped from `develop`'s version (feature → minor, bug → patch) and the PR titled `[vX.Y.Z]`; the `auto-merge` gate ladder all green **on the PR head**; squash-merge; then items **Done**, Epic Done when its children are, sprint closed when empty (`close-delivery.sh`). Fix loop bounded; humans merge when `merge_policy: pr-only`. |
 | 7 | **Release** | `/dp-release` | `devpilot-cd` builds once and promotes the same artifact DEV→SIT→UAT→PRD with smoke tests (`deploy.sh`, `smoke.sh`); UAT and PRD wait for a human approval; tag + `main` only after PRD is verified; rollback = the pipeline on the previous tag (`release-ops`). |
 | 8 | **Operate** | `/dp-hotfix` · `/dp-status` | Incidents get a blameless postmortem; action items return to Intake; SLOs watched (`release-ops`). |
 
@@ -62,6 +62,22 @@ No tracker configured? The run asks once — connect one or continue locally —
   gets exactly start + DONE (`core-rules` #11).
 - **Token discipline** — read indexes first; load heavy skills only at the
   step that needs them (`.claude/skills/README.md`).
+
+## Review the reviewers
+
+The review gate is itself checked. `bash scripts/review-metrics.sh [since]` lists merged PRs that
+were later **reverted**, and `fix` commits that touched a recently merged PR's files within N days
+(default 14) — with whether that PR's review report flagged the file. For each miss:
+
+1. **Visible on a small diff?** If a reviewer reading only that diff could have caught it, it is a
+   candidate reliability-checklist item: a trigger readable from a diff, a check question, and
+   `Origin: #<PR>` (`.devpilot/reliability-checklist.md`, validated by `reliability.sh validate`).
+2. **Recurs in ≥ 2 PRs** → add the item (a PR reviewed by a human — it edits the checks).
+   **Seen once** → note it in the release's pruning review (`core-rules` → Pruning) and wait.
+3. Not visible from the diff (data, environment, timing) → it belongs to tests or `verify-change`,
+   not to the checklist.
+
+The same pass prunes: items that never trigger or never catch anything are removed.
 
 New to a repo? Run `/dp-status health`, then start at Intake with `/dp-plan` —
 or say `/dp-deliver "<what you want>"` and let the process run end to end.

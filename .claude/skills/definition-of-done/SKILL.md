@@ -20,6 +20,11 @@ A handoff with a failing DoD item is a defect.
 - [ ] No `any` types introduced
 - [ ] No hardcoded secrets or credentials
 
+### Verification (`verify-change`)
+- [ ] **Verify passed, with evidence attached** — `bash scripts/verify.sh run <KEY>` drove the
+      journeys the diff touches; `docs/tasks/<KEY>-evidence/` (screenshots + `verify-report.md`) is
+      committed and linked in the PR — or the report records why the change has no runtime surface
+
 ### Security (always run `security-scan`)
 - [ ] Security scan checklist completed
 - [ ] Zero 🔴 CRITICAL security issues
@@ -89,6 +94,7 @@ All universal items, plus:
 - [ ] All agent DoDs verified (Frontend, Backend, QA reports reviewed)
 - [ ] Architecture guardrails checked across entire diff (from `architecture-guard`)
 - [ ] Security scan run across entire diff (from `security-scan`)
+- [ ] `bash scripts/verify.sh gate <KEY>` passes for every Story (`verify-change`)
 - [ ] Review report written with APPROVED / BLOCKED rating
 - [ ] PR body is the review report
 - [ ] Zero open blockers from QA or review

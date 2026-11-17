@@ -61,7 +61,7 @@ Wait for the SIT job/stage and report its result.
 3. PRD green → finish the release so `main` and the tag match exactly what is live:
    ```bash
    bash scripts/changelog.sh <VERSION>          # docs/changes/* entries → "## v<VERSION>" section
-   git add -A CHANGELOG.md docs/changes && git commit -m "docs(changelog): v<VERSION>" || true
+   git add -A CHANGELOG.md docs/changes && git commit -m "docs(changelog): v<VERSION>" -m "Verified: none" -m "Unverified-Reason: changelog only" || true
    bash scripts/git-flow.sh release-finish <VERSION>
    ```
    `main` and `develop` are protected, so this goes **through PRs**: release → `main` (merge commit)
@@ -75,8 +75,12 @@ Wait for the SIT job/stage and report its result.
      bash scripts/tracker.sh comment "$KEY" "🚀 Released to production in v<VERSION>"
    done
    ```
+5. Review the reviewers + prune (`core-rules` → Pruning; `.devpilot/process.md` → Review the
+   reviewers): `bash scripts/review-metrics.sh "<date of the previous release>"`. Report the slips;
+   a miss seen in ≥ 2 PRs, or a checklist item that never triggered, becomes a follow-up item —
+   never an edit made inside this release.
 
-**Report:** production URL, tag `v<VERSION>`, run link, items noted.
+**Report:** production URL, tag `v<VERSION>`, run link, items noted, review-metrics summary line.
 
 ---
 

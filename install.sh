@@ -111,7 +111,7 @@ fetch() {
 }
 
 # Native Claude Code skills shipped by DevPilot (.claude/skills/<name>/SKILL.md).
-DEVPILOT_SKILLS="core-rules definition-of-ready spec-review architecture-guard angular-dev angular-testing accessibility dotnet-api efcore-sqlserver dotnet-testing python-api python-testing api-contract test-design ui-e2e-playwright token-lean-testing test-guard performance review-checklist security-scan definition-of-done auto-merge release-ops self-heal stack-upgrade"
+DEVPILOT_SKILLS="core-rules definition-of-ready spec-review architecture-guard angular-dev angular-testing accessibility dotnet-api efcore-sqlserver dotnet-testing python-api python-testing api-contract test-design ui-e2e-playwright token-lean-testing test-guard verify-change performance review-checklist security-scan definition-of-done auto-merge release-ops self-heal stack-upgrade"
 install_skills() {
   local n
   for n in $DEVPILOT_SKILLS; do fetch ".claude/skills/$n/SKILL.md" ".claude/skills/$n/SKILL.md"; done
@@ -204,12 +204,15 @@ run_update() {
   TEMPLATE_TEAM="requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md bug-report.md item-brief.md"
   CMDS="dp-deliver.md dp-plan.md dp-spec.md dp-sprint.md dp-build.md dp-test.md dp-pr.md dp-release.md dp-hotfix.md dp-status.md dp-setup.md"
   AGENTS_LIST="team-lead.md team-ba.md team-frontend.md team-dotnet.md team-python.md team-qa.md"
-  SCRIPTS="git-flow.sh resolve-model.sh model-profiles.sh checkpoint.sh devpilot-config.sh devpilot-lib.sh tracker.sh jira.sh azdo.sh github.sh git-host.sh version.sh close-delivery.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy.sh smoke.sh setup-environments.sh db-package.sh usage-hook.sh deploy-init.sh generate-project-index.sh generate-backlog-index.sh md-to-adf.sh sync-egm.sh"
+  SCRIPTS="git-flow.sh resolve-model.sh model-profiles.sh checkpoint.sh devpilot-config.sh devpilot-lib.sh tracker.sh jira.sh azdo.sh github.sh git-host.sh version.sh close-delivery.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy.sh smoke.sh setup-environments.sh db-package.sh usage-hook.sh deploy-init.sh generate-project-index.sh generate-backlog-index.sh md-to-adf.sh sync-egm.sh verify.sh rules-guard.sh reliability.sh commit-gate.sh review-metrics.sh"
 
   info "Refreshing .devpilot/rules..."
   fetch ".devpilot/rules.md" ".devpilot/rules.md"
   fetch ".devpilot/process.md" ".devpilot/process.md"
   fetch "docs/setup-guide.md" "docs/setup-guide.md"
+  # The reliability checklist grows with the project (items whose Origin is one of its PRs):
+  # install it once, never overwrite it.
+  [ -f .devpilot/reliability-checklist.md ] || fetch ".devpilot/reliability-checklist.md" ".devpilot/reliability-checklist.md"
   for f in $RULE_SNIPPETS;   do fetch ".devpilot/rules/$f"        ".devpilot/rules/$f";        done
   for f in $PROMPT_TEAM;     do fetch ".devpilot/prompts/team/$f" ".devpilot/prompts/team/$f"; done
   rm -f .devpilot/prompts/6-env-diff.md   # v6.0: folded into the self-heal skill
@@ -264,10 +267,12 @@ run_update() {
 
   ensure_usage_hook
   ensure_permissions
+  # Refresh the git hooks (commit-msg gains the Verified: trailer check — observe mode by default).
+  [ -d .git/hooks ] && { bash scripts/install-git-hooks.sh >/dev/null 2>&1 && info "Git hooks refreshed (Conventional Commits + Verified: trailer, gate: $(bash scripts/commit-gate.sh mode 2>/dev/null))"; }
 
   # Secrets + per-developer state stay out of git (config.sh may now hold Azure/Jira keys).
   touch .gitignore
-  for entry in ".devpilot/config.sh" ".devpilot/.tracker-skip" ".devpilot/logs/"; do
+  for entry in ".devpilot/config.sh" ".devpilot/.tracker-skip" ".devpilot/.rules-lock" ".devpilot/logs/"; do
     grep -qxF "$entry" .gitignore || echo "$entry" >> .gitignore
   done
 
@@ -697,6 +702,8 @@ info "Installing .devpilot/..."
 fetch ".devpilot/rules.md" ".devpilot/rules.md"
 fetch ".devpilot/process.md" ".devpilot/process.md"
 fetch "docs/setup-guide.md" "docs/setup-guide.md"
+# Diff-triggered reliability checklist — grows with the project, so an existing one is kept.
+[ -f .devpilot/reliability-checklist.md ] || fetch ".devpilot/reliability-checklist.md" ".devpilot/reliability-checklist.md"
 # .devpilot/config.sh holds per-project credentials and is gitignored, so it is
 # NEVER fetched from the repo (a remote fetch would 404 and silently skip it,
 # leaving the project with no config). We generate it locally instead, pre-filled
@@ -769,6 +776,14 @@ UAT_API_URL=""
 PRD_FRONTEND_URL=""
 PRD_API_URL=""
 
+# ── Verify — run the change locally (scripts/verify.sh; skill: verify-change) ─
+# Start commands and the URLs to wait for. Leave a pair blank if the project has no such layer.
+VERIFY_FE_CMD=""                       # e.g. npm --prefix web start
+VERIFY_FE_URL=""                       # e.g. http://localhost:4200
+VERIFY_API_CMD=""                      # e.g. dotnet run --project src/Api --urls http://localhost:5080
+VERIFY_API_HEALTH=""                   # e.g. http://localhost:5080/health
+VERIFY_TIMEOUT="120"                   # seconds to wait for the services to answer
+
 # ── Notifications (best-effort; scripts/notify.sh) ──────────────────────────
 NOTIFY_WEBHOOK=""                      # Slack/Teams/Discord-compatible webhook URL
 NOTIFY_EMAIL="your-email@example.com"  # used when a local 'mail' command exists
@@ -838,7 +853,7 @@ for f in git-flow.sh resolve-model.sh model-profiles.sh checkpoint.sh \
           open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh \
           doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh \
           deploy.sh smoke.sh setup-environments.sh db-package.sh usage-hook.sh deploy-init.sh \
-          generate-project-index.sh generate-backlog-index.sh md-to-adf.sh sync-egm.sh; do
+          generate-project-index.sh generate-backlog-index.sh md-to-adf.sh sync-egm.sh verify.sh rules-guard.sh reliability.sh commit-gate.sh review-metrics.sh; do
   fetch "scripts/$f" "scripts/$f"
   chmod +x "scripts/$f" 2>/dev/null || true
 done
@@ -863,7 +878,7 @@ done
 # .devpilot/config.sh holds tracker API keys and must never be committed.
 touch .gitignore
 if [ -f ".gitignore" ]; then
-  for entry in ".devpilot/config.sh" ".devpilot/.tracker-skip" ".devpilot/.scope-lock" ".env" ".env.local" ".devpilot/logs/" "docs/index/.state" "docs/project-index.md" "docs/index/*.md"; do
+  for entry in ".devpilot/config.sh" ".devpilot/.tracker-skip" ".devpilot/.scope-lock" ".devpilot/.rules-lock" ".env" ".env.local" ".devpilot/logs/" "docs/index/.state" "docs/project-index.md" "docs/index/*.md"; do
     grep -qF "$entry" .gitignore || echo "$entry" >> .gitignore
   done
 fi
@@ -904,6 +919,15 @@ secrets:
 # pr-only — devpilot opens the PR and stops; a human merges it
 
 merge_policy: $MERGE_POLICY
+
+## Commit gate — the Verified: trailer on every commit (scripts/commit-gate.sh)
+# Every commit says what proved it: Verified: verify | tests | code-review | none.
+# observe — never blocks; what enforce would block is logged to .devpilot/logs/commit-gate.log (default)
+# enforce — blocks a missing / invalid / none trailer unless Unverified-Reason: <why> is given
+#           (escape hatch: after 2 blocks in a row on a branch, the next commit goes through, logged)
+# off     — no check. COMMIT_GATE in the environment or .devpilot/config.sh overrides this.
+
+commit_gate: observe             # off | observe | enforce
 
 ## Spec review — Elephant-Goldfish (Google's EGM, vendored in .devpilot/egm)
 # Before code, the requirements doc must survive zero-context reviewer agents (/dp-spec).

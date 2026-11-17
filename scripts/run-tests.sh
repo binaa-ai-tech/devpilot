@@ -139,5 +139,9 @@ case "$MODE" in
 esac
 
 [ $RAN -eq 0 ] && echo "ℹ️  no test suites detected"
+# Verification stamp for the commit trailer (commit-gate.sh): real suites only, not `cmd`.
+if [ $RAN -gt 0 ] && [ "$MODE" != "cmd" ] && [ -f "$ROOT/scripts/commit-gate.sh" ]; then
+  bash "$ROOT/scripts/commit-gate.sh" mark tests "$([ $FAILED -gt 0 ] && echo fail || echo pass)" 2>/dev/null || true
+fi
 [ $FAILED -gt 0 ] && exit 1
 exit 0

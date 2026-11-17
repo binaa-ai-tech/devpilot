@@ -22,6 +22,8 @@
 ## Scope
 Layers: <frontend / backend / DB / integration>
 Key files / components: <from the plan, if known>
+Tooling: no   <!-- "yes" only when this Story itself changes DevPilot rules, skills, gate scripts or CI
+                   workflows; otherwise /dp-build blocks edits to them (scripts/rules-guard.sh) -->
 
 ## Technical notes
 <API contracts, data/schema changes, edge cases, dependencies on other Stories>
@@ -29,6 +31,7 @@ Key files / components: <from the plan, if known>
 ## Definition of Done
 - All acceptance criteria implemented and covered by tests (happy path + one edge/error each).
 - Build + tests green; no `any`/dead code/secrets; in-scope files only.
+- Verify passed with evidence attached: `bash scripts/verify.sh run <KEY>` → `docs/tasks/<KEY>-evidence/` (`verify-change`).
 - Review gate passed (`review-checklist`, `security-scan` on auth/input). See `.claude/skills/definition-of-done/SKILL.md`.
 
 ## Tracking

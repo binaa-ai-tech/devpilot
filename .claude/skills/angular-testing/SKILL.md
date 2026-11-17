@@ -41,6 +41,13 @@ default via `ng test`); keep Jasmine/Karma only if the repo already uses it — 
 3. **Loading, empty, and error** states.
 4. Accessibility basics the unit can see: labelled controls, button roles.
 
+## Property tests — when to use
+For pure logic with a large input space — amount / IBAN / date formatters and parsers, validators,
+pagination and sorting, reducers — add a **fast-check** property next to the example specs
+(`fc.assert(fc.property(arb, x => …))` inside a Vitest `it`): round-trip (`parse(format(x))` equals
+`x`), invariants, idempotent normalizers. Not for component rendering. Kinds and domain examples:
+`test-design` §5.
+
 ## Token-lean runs
 - Iterate on one file: `npx ng test --watch=false --include='**/order-list*.spec.ts'`.
 - Full suite via `bash scripts/run-tests.sh angular` — returns a short summary, not the log.

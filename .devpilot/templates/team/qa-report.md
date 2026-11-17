@@ -9,9 +9,9 @@
 
 ## Acceptance Criteria Coverage
 
-| # | Criterion | Test File | Status |
-|---|-----------|-----------|--------|
-| 1 | <AC text> | `<file:line>` | ✅ Pass / ❌ Fail / ⚠️ Partial |
+| # | Criterion | Test File | Kind | Status |
+|---|-----------|-----------|------|--------|
+| 1 | <AC text> | `<file:line>` | example / property / differential / e2e | ✅ Pass / ❌ Fail / ⚠️ Partial |
 
 ---
 
@@ -46,6 +46,7 @@ Run via `bash scripts/run-tests.sh all` — paste the summary lines only; full l
 ## Warnings
 
 - ⚠️ <Non-blocking concern>
+- ⚠️ <Flaky test removed — also recorded in `docs/tests/removed-tests.md`, follow-up item <KEY>>
 
 ---
 

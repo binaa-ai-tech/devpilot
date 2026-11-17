@@ -39,6 +39,20 @@ MERGE_POLICY=$(grep '^merge_policy:' project.config.md | head -1 | awk '{print $
 Fetch the PR (table above), check out its head branch, and read the machine line in its body:
 `<!-- devpilot: keys="…" sprint="…" version="…" -->` → `KEYS`, `SPRINT`, `VERSION` (Step 4).
 
+**Rules from the base branch.** Everything this command reviews against — skills, commands,
+`.devpilot/rules*`, `CLAUDE.md`, `scripts/test-guard.*`, CI workflows — is read with
+`bash scripts/rules-guard.sh show <path>` (`git show origin/$BASE_BRANCH:<path>`), never from the PR
+branch. Run `bash scripts/rules-guard.sh touched "$BASE_BRANCH"`: exit 1 → post its banner
+(**"⚠️ This change edits the checks that judge it — human review required."**) as the first line of
+the review, treat any weakened check as 🔴, and **do not merge** — leave it green for a human.
+
+**Verify gate — no evidence, no PR.** For each key: `bash scripts/verify.sh gate <KEY>`. It passes
+only with a `docs/tasks/<KEY>-evidence/verify-report.md` that says PASS, or one that records a
+written reason the change has no runtime surface (docs-only, CI, tooling). On ❌: run
+`bash scripts/verify.sh run <KEY>` on the PR branch (`.claude/skills/verify-change/SKILL.md`), commit the
+evidence, and only then continue. Never open, mark ready, or merge a PR while the gate is red —
+report why instead. A PR DevPilot didn't open has no key: use the ticket in its title/branch.
+
 If any **never-auto-merge** condition in `auto-merge` holds (release/`main` target, unvetted
 migrations, secrets/auth config in the diff), still fix CI and comments but stop before merging
 and say why.
@@ -63,14 +77,21 @@ For each unresolved thread:
    LEVEL=<minor|patch from the PR's items>
    WANT=$(bash scripts/version.sh next "$LEVEL" --ref "origin/$BASE_BRANCH")
    [ "$(bash scripts/version.sh current)" != "$WANT" ] && bash scripts/version.sh bump "$WANT" \
-     && bash scripts/version.sh files | xargs git add && git commit -m "chore(release): bump version to $WANT"
+     && bash scripts/version.sh files | xargs git add && git commit -m "chore(release): bump version to $WANT" \
+       -m "Verified: none" -m "Unverified-Reason: version files only"
    ```
    Update the PR title `[vX.Y.Z]` and the body's machine line to match.
 2. **Fetch the failures** (transport table).
 3. **Root-cause and fix** per `.claude/skills/self-heal/SKILL.md` — no skipped tests, no weakened
-   assertions, no suppressed errors. "Flaky" is not a root cause.
+   assertions, no suppressed errors. **"Flaky" is not a root cause, and re-running CI until it
+   passes is not a fix.** A flaky test may not be skipped, given a `sleep` / fixed wait, or retried
+   until green (Playwright `retries: 0`, CI too). Find why — ordering, shared state, time, network,
+   a missing await / locator wait. Not found within the 3-attempt protocol → delete the test, record
+   it in `docs/tests/removed-tests.md` (test, file, symptom, what was ruled out, date, Story key) and
+   open a follow-up item to rewrite it (`.claude/skills/test-design/SKILL.md` → Flaky tests).
 4. **Local ladder before pushing** — `bash scripts/run-tests.sh all`,
-   `STRICT=1 bash scripts/test-guard.sh`, `bash scripts/audit.sh`. Push only a locally green
+   `STRICT=1 bash scripts/test-guard.sh`, `bash scripts/audit.sh`, and — when the fix touched
+   runtime code — `bash scripts/verify.sh run <KEY>` again (the old report proves the old code). Push only a locally green
    commit: `fix(ci): <what>`.
 5. Wait for CI on the new head; green → Step 3, red → next cycle.
 
@@ -100,6 +121,6 @@ No machine line (a PR DevPilot didn't open)? Take keys from the title/branch; sk
 🔀 /dp-pr — PR <n> → <BASE_BRANCH>  (<github | azure>)
 Review:       <n> threads — <fixed> fixed · <answered> answered
 CI cycles:    <0–3>  ·  Fixes: <commit list or "none needed">
-Gate ladder:  build ✅ · tests ✅ · audit ✅ · review ✅ · QA ✅ · CI ✅
+Gate ladder:  build ✅ · tests ✅ · audit ✅ · review ✅ · QA ✅ · verify ✅ · CI ✅
 Outcome:      MERGED v<VERSION> · items Done · sprint <closed|open> | READY (pr-only) | ESCALATED (<why>)
 ```

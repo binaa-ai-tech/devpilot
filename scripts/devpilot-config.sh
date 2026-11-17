@@ -96,9 +96,16 @@ config_get() {
   require_config
   local line val
   line=$(grep -E "^${key}=" "$CONFIG_FILE" 2>/dev/null | head -1 || true)
-  val="${line#*=}"
-  val=$(strip_wrapping_quotes "$val")
-  echo "$val"
+  [ -z "$line" ] && { echo ""; return 0; }
+  # Let the shell parse the assignment: quotes and a trailing "# comment" are handled the way
+  # every sourcing script (smoke.sh, devpilot-lib.sh) reads the file.
+  if val=$(env -i bash -c "$line
+printf '%s' \"\${$key:-}\"" 2>/dev/null); then
+    echo "$val"
+  else
+    val="${line#*=}"
+    strip_wrapping_quotes "$val"
+  fi
 }
 
 # Set a single key in config.sh (creates or updates the line)
@@ -159,7 +166,7 @@ config_set() {
   require_config
 
   # Validate key is a known config key
-  local known_keys="JIRA_BASE_URL JIRA_EMAIL JIRA_API_TOKEN JIRA_PROJECT_KEY AZDO_ORG_URL AZDO_PROJECT AZDO_PAT AZDO_TEAM AZDO_REPO AZDO_STORY_TYPE GITHUB_TOKEN GITHUB_ORG GITHUB_REPO TICKET_PREFIX MAIN_BRANCH DEVELOP_BRANCH DEV_FRONTEND_URL DEV_API_URL SIT_FRONTEND_URL SIT_API_URL UAT_FRONTEND_URL UAT_API_URL PRD_FRONTEND_URL PRD_API_URL NOTIFY_WEBHOOK NOTIFY_EMAIL"
+  local known_keys="JIRA_BASE_URL JIRA_EMAIL JIRA_API_TOKEN JIRA_PROJECT_KEY AZDO_ORG_URL AZDO_PROJECT AZDO_PAT AZDO_TEAM AZDO_REPO AZDO_STORY_TYPE GITHUB_TOKEN GITHUB_ORG GITHUB_REPO TICKET_PREFIX MAIN_BRANCH DEVELOP_BRANCH DEV_FRONTEND_URL DEV_API_URL SIT_FRONTEND_URL SIT_API_URL UAT_FRONTEND_URL UAT_API_URL PRD_FRONTEND_URL PRD_API_URL NOTIFY_WEBHOOK NOTIFY_EMAIL VERIFY_FE_CMD VERIFY_FE_URL VERIFY_API_CMD VERIFY_API_HEALTH VERIFY_TIMEOUT VERIFY_E2E_DIR VERIFY_E2E_CMD COMMIT_GATE"
   if ! echo "$known_keys" | grep -qw "$key"; then
     warn "Unknown key: $key"
     warn "Known keys: $known_keys"

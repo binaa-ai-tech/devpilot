@@ -1,5 +1,8 @@
 # Code Review: <TASK-TITLE>
 
+<!-- If `bash scripts/rules-guard.sh touched` exits 1, the first line of this report is:
+⚠️ This change edits the checks that judge it — human review required. -->
+
 **Ticket:** <KEY>
 **Branch:** `feature/<n>-<slug>`
 **Date:** <DATE>
@@ -52,12 +55,21 @@
 
 ---
 
+## Reliability (`bash scripts/reliability.sh match` — triggered items only)
+
+| Item | Triggered by | Check | Answer + evidence |
+|------|--------------|-------|-------------------|
+| R-0n · <title> | `<file or line>` | <question> | ✅ yes — `<test name / command output / file:line>` |
+
+---
+
 ## Issues Found
 
-| Severity | File | Description |
-|----------|------|-------------|
-| ❌ BLOCKER | `<file>` | <description> |
-| ⚠️ WARNING | `<file>` | <description> |
+| Severity | File:line | Finding | Why (one line) |
+|----------|-----------|---------|----------------|
+| 🔴 Important | `<file:line>` | <what is wrong> | <the failure it causes> |
+| 🟢 Nit | `<file:line>` | <polish> | <why it is better> |
+| 🟣 Pre-existing | `<file:line>` | <already on the base branch> | <impact> → follow-up <KEY> |
 
 ---
 
