@@ -13,7 +13,8 @@ verdict can be at most ⚠️ APPROVED WITH WARNINGS pending that human review.
 1. Read `.claude/skills/core-rules/SKILL.md` — the non-negotiables (no pauses, be specific with
    file:line, verify every AC, flag out-of-spec code).
 2. Read `.claude/skills/review-checklist/SKILL.md` — the review-gate order, clean-code / refactoring /
-   PR-hygiene standards, and 🔴/🟡/🟢 severity tags; never merge around a 🔴.
+   PR-hygiene standards, and the 🔴 Important / 🟢 Nit / 🟣 Pre-existing tags (each with a one-line
+   why); never merge around a 🔴.
 3. Then run each checklist **against the part of the diff it applies to** — load the skill at that pass, skip it if nothing in the diff triggers it:
    - `security-scan` — over auth / input / data-access changes, secrets, PII, new dependencies.
    - `api-contract` — over endpoint/DTO changes: spec + client regenerated, no unversioned break.
@@ -40,9 +41,11 @@ You are the **Team Lead** performing the final gate review. You are the last lin
 3. Apply `security-scan` — complete checklist. Fix any 🔴 CRITICAL findings before writing the report.
 4. Apply `performance` — complete checklist. Fix any 🔴 BLOCKER findings. Note 🟡 warnings.
 5. Apply `architecture-guard` — check for BLOCKER violations. Fix or flag.
-6. Run the complete review checklist below
-7. Verify `definition-of-done` Team Lead DoD — all items checked
-8. Write `docs/reviews/<slug>.md` using `.devpilot/templates/team/review-report.md`
+6. Run `bash scripts/reliability.sh match` (checklist read from the base branch) and answer every
+   triggered item with evidence in the report's **Reliability** section — only those items.
+7. Run the complete review checklist below
+8. Verify `definition-of-done` Team Lead DoD — all items checked
+9. Write `docs/reviews/<slug>.md` using `.devpilot/templates/team/review-report.md`
 
 ## Review Checklist
 
@@ -68,6 +71,10 @@ You are the **Team Lead** performing the final gate review. You are the last lin
 - [ ] `SET NOCOUNT ON; SET XACT_ABORT ON;` on stored procedures
 - [ ] Clean architecture: zero BLOCKER violations from `architecture-guard`
 - [ ] Result pattern used for expected failures
+
+### Reliability (from `scripts/reliability.sh match`)
+- [ ] Every triggered item answered with evidence (test name, command + output, or file:line)
+- [ ] An item answered "no" is a 🔴 Important finding
 
 ### Security (from `security-scan`)
 - [ ] Zero 🔴 CRITICAL findings

@@ -1449,6 +1449,45 @@ for F in .devpilot/prompts/team/qa-agent.md .claude/commands/dp-build.md; do
 done
 assert_eq "$(grep -rlE '"(fast-check|fscheck|hypothesis)"' "$REPO" --include=package.json --include='*.csproj' --include=requirements*.txt 2>/dev/null | wc -l | tr -d ' ')" "0" "DevPilot itself takes no test-library dependency"
 
+echo "== reliability checklist — triggered by the diff =="
+assert_code "$(bash "$REPO/scripts/reliability.sh" validate "$REPO/.devpilot/reliability-checklist.md" >/dev/null; echo $?)" "0" "shipped checklist validates (trigger + check + origin per item)"
+N=$(grep -c '^## R-' "$REPO/.devpilot/reliability-checklist.md")
+[ "$N" -ge 10 ] && ok "checklist is seeded with $N items" || no "checklist is seeded with ≥ 10 items (got $N)"
+assert_eq "$(grep '^- Origin:' "$REPO/.devpilot/reliability-checklist.md" | grep -vc 'seed')" "0" "initial items carry Origin: seed"
+D=$(sandbox)
+( cd "$D" && mkdir -p .devpilot api/Migrations api/Controllers web/src && cp "$REPO/.devpilot/reliability-checklist.md" .devpilot/ \
+  && printf 'public class OrdersService { }\n' > api/OrdersService.cs && printf 'export const x = 1;\n' > web/src/util.ts \
+  && git add -A && git commit -qm base && git branch -M develop && git checkout -qb feature/msk-2-x )
+OUT=$(cd "$D" && bash scripts/reliability.sh match)
+assert_contains "$OUT" "no checklist item triggered" "a branch with no changes triggers nothing"
+( cd "$D" && printf 'public class OrdersService { [Authorize(Roles = "Teller")] public void Close() { var at = DateTime.Now; } }\n' > api/OrdersService.cs \
+  && printf 'migrationBuilder.AddColumn<string>("Iban", "Accounts");\n' > api/Migrations/20261117_AddIban.cs && git add -A && git commit -qm "feat: change" )
+OUT=$(cd "$D" && bash scripts/reliability.sh match)
+for ID in R-01 R-04 R-08; do assert_contains "$OUT" "### $ID " "match runs $ID (its trigger is in the diff)"; done
+for ID in R-03 R-05 R-06 R-09 R-11; do assert_eq "$(printf '%s\n' "$OUT" | grep -c "### $ID ")" "0" "match skips $ID (not triggered)"; done
+assert_contains "$OUT" 'file `api/Migrations/20261117_AddIban.cs`' "a path trigger names the file"
+assert_contains "$OUT" 'line `api/OrdersService.cs`' "a code trigger names the changed line"
+assert_contains "$OUT" "- Evidence:" "each triggered item asks for evidence"
+assert_contains "$OUT" "source: develop:.devpilot/reliability-checklist.md" "the checklist is read from the base branch"
+( cd "$D" && awk '/^## R-04/{skip=1;next} /^## /{skip=0} !skip' .devpilot/reliability-checklist.md > x && mv x .devpilot/reliability-checklist.md )
+assert_contains "$(cd "$D" && bash scripts/reliability.sh match)" "### R-04 " "deleting an item on the branch does not silence it (base copy wins)"
+( cd "$D" && git checkout -q develop -- .devpilot/reliability-checklist.md )
+# validate rejects incomplete items
+printf '## R-01 · No trigger\n- Check: q?\n- Origin: seed\n## R-02 · No check\n- Paths: `*.sql`\n- Origin: seed\n## R-03 · No origin\n- Code: `foo`\n- Check: q?\n## R-03 · Bad regex\n- Code: `(`\n- Check: q?\n- Origin: #12\n' > "$D/bad.md"
+OUT=$(cd "$D" && bash scripts/reliability.sh validate bad.md); RC=$?
+assert_code "$RC" "1" "validate fails on incomplete items"
+for W in "R-01: no trigger" "R-02: no Check" "R-03: no Origin" "R-03: duplicate id" "not a valid extended regex"; do assert_contains "$OUT" "$W" "validate reports: $W"; done
+( cd "$D" && git checkout -q develop && git rm -q .devpilot/reliability-checklist.md && git commit -qm rm )
+assert_code "$(cd "$D" && bash scripts/reliability.sh match >/dev/null 2>&1; echo $?)" "2" "no checklist anywhere → rc 2"
+rm -rf "$D"
+RC_TXT=$(cat "$REPO/.claude/skills/review-checklist/SKILL.md")
+for W in "🔴 **Important**" "🟢 **Nit**" "🟣 **Pre-existing**" "states why in one line" "reliability.sh match"; do
+  assert_contains "$RC_TXT" "$W" "review-checklist: $W"
+done
+assert_eq "$(grep -c 'SHOULD\|BLOCKER' "$REPO/.claude/skills/review-checklist/SKILL.md")" "0" "review-checklist no longer uses the old BLOCKER/SHOULD tags"
+assert_contains "$(cat "$REPO/.devpilot/templates/team/review-report.md")" "Why (one line)" "review report template asks why for every finding"
+assert_contains "$(cat "$REPO/.devpilot/prompts/team/lead-review.md")" "reliability.sh match" "the Team Lead runs the triggered reliability items"
+
 echo "== DevPilot release metadata =="
 V=$(cat "$REPO/VERSION")
 assert_contains "$(cat "$REPO/CHANGELOG.md")" "## [$V]" "CHANGELOG.md has a section for VERSION $V (release notes)"

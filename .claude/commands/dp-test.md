@@ -56,7 +56,7 @@ Same agent, continuing:
 > Run everything through the token-lean runner (`.claude/skills/token-lean-testing/SKILL.md`):
 > `bash scripts/run-tests.sh all` (or `e2e` in `ui` mode). Apply `.claude/skills/self-heal/SKILL.md`
 > on failures (3 attempts, re-running only the failing tests, test-code fixes only — an
-> implementation bug is a 🔴 BLOCKER finding, never a weakened assertion). Commit tests with
+> implementation bug is a 🔴 Important finding, never a weakened assertion). Commit tests with
 > `test(<slug>): <what>`. Finish `docs/qa/<slug>.md` with the matrix, coverage added, suite
 > summary table, trace paths for failures, and PASS / BLOCKED per AC.
 

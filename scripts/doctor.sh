@@ -181,6 +181,14 @@ else
   warn "verify script or verify-change skill missing — re-run: bash install.sh --update"
 fi
 
+# Reliability checklist — diff-triggered review items (scripts/reliability.sh)
+if [ -f .devpilot/reliability-checklist.md ] && [ -f scripts/reliability.sh ]; then
+  if RV=$(bash scripts/reliability.sh validate 2>&1); then ok "reliability checklist: ${RV#*: }"
+  else warn "reliability checklist has problems — bash scripts/reliability.sh validate"; fi
+else
+  warn "no .devpilot/reliability-checklist.md — re-run: bash install.sh --update"
+fi
+
 # Project index
 [ -f docs/project-index.md ] && ok "project index present" || warn "no project index — run: bash scripts/generate-project-index.sh"
 

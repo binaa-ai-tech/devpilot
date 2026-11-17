@@ -46,6 +46,11 @@ bash scripts/rules-guard.sh show <path>        # = git show origin/<base_branch>
 6. **Design & readability** — right layer (`architecture-guard`), standards below.
 7. **Performance & operability** — `performance` over queries/loops/rendering;
    errors handled and logged with context, no secrets/PII in logs.
+8. **Reliability checklist** — `bash scripts/reliability.sh match` reads
+   `.devpilot/reliability-checklist.md` from the base branch and lists **only** the items this diff
+   triggers (usually 3–10), each with what triggered it. Answer every one with evidence — a test
+   name, a command and its output, or `file:line`. An item answered "no", or with no evidence, is a
+   🔴 Important finding. Don't run the items that didn't trigger; the list is long on purpose.
 
 ## Clean-code standards
 - **Names reveal intent** (`elapsedDays`, not `d`); booleans read as questions (`isActive`);
@@ -69,15 +74,29 @@ bash scripts/rules-guard.sh show <path>        # = git show origin/<base_branch>
 - CI green before review; no secrets, generated noise, or TODOs without a ticket.
 
 ## Finding format
-Tag each finding so the author knows what blocks merge, and quote `file:line`:
-- 🔴 **BLOCKER** — must fix before merge (bug, security, missing test, breaking contract).
-- 🟡 **SHOULD** — fix now unless there's a reason; note it.
-- 🟢 **NIT** — optional polish.
+Tag each finding, quote `file:line`, and say **why in one line** — the failure it causes, not the
+rule it breaks:
+- 🔴 **Important** — must fix before merge: a bug, a security hole, a missing test, a broken
+  contract, a weakened check, a reliability item answered "no". Introduced or exposed by this diff.
+- 🟢 **Nit** — optional polish; never blocks.
+- 🟣 **Pre-existing** — a real problem that was already on the base branch
+  (`git show origin/<base>:<file>` / `git blame` shows it predates this change). Not the author's
+  bug and never blocks this PR: open a follow-up item (`tracker.sh new Bug …`) and link it. If the
+  diff makes it worse or newly depends on it, it is 🔴 Important instead.
+
+```
+🔴 Important — api/Orders/OrdersController.cs:42 — Why: the owner check is gone, so any signed-in user can read another customer's orders.
+🟣 Pre-existing — api/Fees/FeeCalculator.cs:18 — Why: fees are computed in double and drift by a fil on large amounts; already on develop → MSK-91.
+```
+`security-scan` and `performance` findings use the same tags in the report: their 🔴 is Important;
+a 🟡 warning is Important when this diff introduced it and it can fail in production, otherwise Nit.
+**Every escalation** — a 🔴, a send-back, a stop for a human — **states why in one line.**
 
 ## Outcome
-- **APPROVED** — zero 🔴, all 🟡 addressed or justified. Proceed to PR/merge.
-- **CHANGES REQUESTED** — any 🔴. Send back with the specific fixes; re-review
-  after. Never merge around a blocker.
+- **APPROVED** — zero 🔴 Important; every triggered reliability item answered with evidence;
+  Pre-existing findings have follow-up items. Proceed to PR/merge.
+- **CHANGES REQUESTED** — any 🔴. Send back with the specific fixes and the one-line why;
+  re-review after. Never merge around an Important finding.
 
 ## Rules
 - Prefer the smallest fix that resolves the issue.

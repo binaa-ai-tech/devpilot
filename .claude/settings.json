@@ -67,6 +67,7 @@
       "Bash(bash scripts/model-profiles.sh *)",
       "Bash(bash scripts/notify.sh *)",
       "Bash(bash scripts/open-pr.sh *)",
+      "Bash(bash scripts/reliability.sh *)",
       "Bash(bash scripts/resolve-model.sh *)",
       "Bash(bash scripts/rules-guard.sh *)",
       "Bash(bash scripts/run-tests.sh *)",

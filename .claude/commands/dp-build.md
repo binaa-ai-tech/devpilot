@@ -134,7 +134,8 @@ Commit the evidence with the work: `git add docs/tasks/*-evidence docs/feature-m
 
 **Review (Team Lead):** the checklist comes from the base branch, not this branch's copy —
 `bash scripts/rules-guard.sh show .claude/skills/review-checklist/SKILL.md`; `security-scan` over
-auth/input changes, `definition-of-done` — never open around a 🔴. First run
+auth/input changes, `bash scripts/reliability.sh match` (answer each triggered item with evidence),
+`definition-of-done` — never open around a 🔴 Important. First run
 `bash scripts/rules-guard.sh touched`: exit 1 means the diff edits its own checks — the review and
 the PR body start with the banner it prints, and the PR is never auto-merged. Then:
 ```bash
