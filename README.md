@@ -291,7 +291,9 @@ Code is merged only when all of these pass. The AI never skips them.
 
 Every commit also says what proved it — a `Verified: verify | tests | code-review | none` trailer
 (`scripts/commit-gate.sh`; gate mode `commit_gate: observe | enforce | off` in `project.config.md`).
-List the unverified changes with `git log --grep '^Verified: none'`.
+List the unverified changes with `git log --grep '^Verified: none'`. The claim is checked
+too: a commit can only say `tests` / `verify` / `code-review` if that check passed on exactly the
+tree being committed (`enforce` blocks a false claim; `observe` logs it).
 
 If a check fails, DevPilot tries to fix it up to 3 times, then stops and explains the problem.
 It never deletes or weakens a test to make it pass.

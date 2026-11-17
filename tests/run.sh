@@ -1495,6 +1495,8 @@ echo "== commit gate — the verification stamp =="
 D=$(sandbox)
 ( cd "$D" && mkdir -p .devpilot src docs && echo a > src/a.ts && printf '.devpilot/logs/\n.devpilot/config.sh\n' > .gitignore && git add -A && git -c commit.gpgsign=false commit -qm "chore: base" --no-verify && bash scripts/install-git-hooks.sh >/dev/null )
 cm() { ( cd "$D" && echo "$RANDOM" >> src/a.ts && git add -A && git -c commit.gpgsign=false commit -q -F - ) 2>&1; }
+# cmv <checks…> — change the tree, record those checks as passed on it, then commit (an honest claim)
+cmv() { ( cd "$D" && echo "$RANDOM" >> src/a.ts && for c in "$@"; do bash scripts/commit-gate.sh mark "$c"; done && git add -A && git -c commit.gpgsign=false commit -q -F - ) 2>&1; }
 assert_eq "$(cd "$D" && bash scripts/commit-gate.sh mode)" "observe" "the gate defaults to observe"
 OUT=$(printf 'feat(a): no stamp\n' | cm); RC=$?
 assert_code "$RC" "0" "observe: a commit without a Verified: trailer goes through"
@@ -1507,8 +1509,8 @@ OUT=$(printf 'feat(a): no stamp\n' | cm); RC=$?
 assert_code "$RC" "1" "enforce: a commit without a trailer is blocked"
 assert_contains "$OUT" "Unverified-Reason:" "the block message shows how to pass honestly"
 assert_contains "$OUT" "Block 1 of 2" "the block message counts toward the escape hatch"
-OUT=$(printf 'feat(a): stamped\n\nVerified: tests, code-review\n' | cm); RC=$?
-assert_code "$RC" "0" "enforce: Verified: tests, code-review goes through"
+OUT=$(printf 'feat(a): stamped\n\nVerified: tests, code-review\n' | cmv tests code-review); RC=$?
+assert_code "$RC" "0" "enforce: Verified: tests, code-review goes through when both ran on that tree"
 assert_eq "$(ls "$D/.git/devpilot" 2>/dev/null | wc -l | tr -d ' ')" "0" "a verified commit resets the block counter"
 OUT=$(printf 'feat(a): bad value\n\nVerified: yes\n' | cm); assert_code "$?" "1" "enforce: an unknown check name is blocked"
 OUT=$(printf 'feat(a): mixed\n\nVerified: none, tests\n' | cm); assert_code "$?" "1" "enforce: none mixed with checks is blocked"
@@ -1529,7 +1531,31 @@ printf 'feat(a): four\n' | cm >/dev/null; assert_code "$?" "1" "the counter rest
 printf 'feat(a): other branch\n' | cm >/dev/null; assert_code "$?" "1" "the counter is per branch"
 ( cd "$D" && git -c commit.gpgsign=false commit -q --allow-empty --no-verify -m "feat: on other" && git checkout -q - && rm -rf .git/devpilot )
 OUT=$(cd "$D" && git -c commit.gpgsign=false merge --no-ff -q other -m "Merge branch 'other'" 2>&1); assert_code "$?" "0" "merge commits are not checked"
+# a claim must be true: the named checks passed on exactly the tree being committed
+( cd "$D" && rm -rf .git/devpilot .devpilot/logs/stamps )
+OUT=$(printf 'feat(a): claims tests\n\nVerified: tests\n' | cm); RC=$?
+assert_code "$RC" "1" "enforce: Verified: tests with no test run is a false claim — blocked"
+assert_contains "$OUT" "no passing run on this exact tree" "the block names the false claim"
+OUT=$(printf 'feat(a): claims tests\n\nVerified: tests\nUnverified-Reason: trust me\n' | cm); RC=$?
+assert_code "$RC" "1" "enforce: a reason does not excuse a false claim"
+( cd "$D" && rm -rf .git/devpilot && echo pre >> src/a.ts && bash scripts/commit-gate.sh mark tests )
+OUT=$(printf 'feat(a): stale\n\nVerified: tests\n' | cm); RC=$?
+assert_code "$RC" "1" "enforce: tests that ran before the last edit do not back the claim"
+( cd "$D" && rm -rf .git/devpilot )
+OUT=$(printf 'feat(a): partly\n\nVerified: tests, verify\n' | cmv tests); RC=$?
+assert_code "$RC" "1" "enforce: every named check must be backed (verify did not run)"
+assert_contains "$OUT" "claims verify" "only the unbacked check is named"
+( cd "$D" && rm -rf .git/devpilot )
+OUT=$(printf 'feat(a): failed\n\nVerified: tests\n' | ( cd "$D" && echo "$RANDOM" >> src/a.ts && bash scripts/commit-gate.sh mark tests fail && git add -A && git -c commit.gpgsign=false commit -q -F - ) 2>&1); RC=$?
+assert_code "$RC" "1" "enforce: a failed test run does not back Verified: tests"
+( cd "$D" && rm -rf .git/devpilot )
+OUT=$(printf 'docs(a): docs only after tests\n\nVerified: tests\n' | ( cd "$D" && echo "$RANDOM" >> src/a.ts && bash scripts/commit-gate.sh mark tests && echo note > docs/n.md && git add -A && git -c commit.gpgsign=false commit -q -F - ) 2>&1); RC=$?
+assert_code "$RC" "0" "a docs/ change after the tests keeps the claim backed"
+( cd "$D" && rm -rf .git/devpilot )
 unset COMMIT_GATE
+OUT=$(printf 'feat(a): observe false claim\n\nVerified: verify\n' | cm); RC=$?
+assert_code "$RC" "0" "observe: a false claim is not blocked"
+assert_contains "$(tail -1 "$D/.devpilot/logs/commit-gate.log")" "claims verify" "observe: the false claim is logged"
 ( cd "$D" && printf "COMMIT_GATE='enforce'\n" > .devpilot/config.sh && rm -rf .git/devpilot )
 assert_eq "$(cd "$D" && bash scripts/commit-gate.sh mode)" "enforce" "the mode is read from .devpilot/config.sh"
 ( cd "$D" && rm .devpilot/config.sh && printf 'commit_gate: off   # team policy\n' >> project.config.md )
