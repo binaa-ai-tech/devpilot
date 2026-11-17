@@ -18,8 +18,11 @@
 #   off      no check
 #   observe  (default) never blocks; what enforce would have blocked → .devpilot/logs/commit-gate.log
 #   enforce  blocks a commit whose trailer is missing, invalid or `none`, unless it carries
-#            `Unverified-Reason: <text>`. Escape hatch: after 2 blocks in a row on the same branch,
-#            the next attempt goes through and is logged (counter in .git/devpilot/).
+#            `Unverified-Reason: <text>`, and blocks a FALSE claim — a check named in `Verified:`
+#            with no passing stamp for this exact tree (a reason does not excuse that; say
+#            `Verified: none`). Escape hatch: after 2 blocks in a row on the same branch, the
+#            next attempt goes through and is logged (counter in .git/devpilot/).
+# The claim check needs the stamps, so it runs on the machine that ran the checks.
 # Merge, revert and fixup commits are never checked.
 # List unverified changes:  git log --grep '^Verified: none'
 # =============================================================================
@@ -64,16 +67,35 @@ cmd_mark() {
   printf '%s %s %s\n' "$(fingerprint)" "$result" "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" > "$STAMPS/$what"
 }
 
+backed() {  # backed <check> <fingerprint> → 0 when that check passed on exactly this tree
+  local line
+  [ -f "$STAMPS/$1" ] || return 1
+  line=$(head -1 "$STAMPS/$1")
+  [ "${line%% *}" = "$2" ] || return 1
+  case "$line" in *" pass "*) return 0 ;; esac
+  return 1
+}
+
 cmd_stamp() {
-  local fp what line got=""
+  local fp what got=""
   fp=$(fingerprint)
   for what in verify tests code-review; do
-    [ -f "$STAMPS/$what" ] || continue
-    line=$(head -1 "$STAMPS/$what")
-    [ "${line%% *}" = "$fp" ] || continue
-    case "$line" in *" pass "*) got="${got:+$got, }$what" ;; esac
+    backed "$what" "$fp" && got="${got:+$got, }$what"
   done
   printf 'Verified: %s\n' "${got:-none}"
+}
+
+# unbacked <verified-value> → the claimed checks with no passing stamp on this tree (space-separated)
+unbacked() {
+  local fp e rest="$1" out=""
+  fp=$(fingerprint)
+  while [ -n "$rest" ]; do
+    e="${rest%%,*}"; [ "$e" = "$rest" ] && rest="" || rest="${rest#*,}"
+    e=$(printf '%s' "$e" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+    [ "$e" = none ] && continue
+    backed "$e" "$fp" || out="${out:+$out }$e"
+  done
+  printf '%s' "$out"
 }
 
 trailer() {  # trailer <msg-file> <Key> → last value of that trailer (comment lines ignored)
@@ -103,7 +125,7 @@ log_gate() {
 }
 
 cmd_check() {
-  local msg="${1:-}" mode header verified reason problem counter branch n
+  local msg="${1:-}" mode header verified reason problem counter branch n false_claim=0 missing
   [ -f "$msg" ] || { echo "Usage: commit-gate.sh check <commit-msg-file>" >&2; exit 2; }
   mode=$(gate_mode)
   [ "$mode" = off ] && return 0
@@ -113,9 +135,17 @@ cmd_check() {
   verified=$(trailer "$msg" Verified)
   reason=$(trailer "$msg" Unverified-Reason)
   problem=""
-  if [ -z "$verified" ]; then problem="no 'Verified:' trailer"
+  if [ -z "$verified" ]; then
+    problem="no 'Verified:' trailer"
+    grep -qi '^Verified:' "$msg" && problem="'Verified:' is not in the trailer block — trailers must be in the message's last paragraph, with Co-Authored-By (use: git commit --trailer \"Verified: …\")"
   elif ! valid_verified "$verified"; then problem="invalid 'Verified: $verified' (use: verify, tests, code-review or none)"
   elif [ "$(printf '%s' "$verified" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')" = none ]; then problem="'Verified: none'"
+  else
+    missing=$(unbacked "$verified")
+    if [ -n "$missing" ]; then
+      false_claim=1
+      problem="'Verified: $verified' claims $(printf '%s' "$missing" | sed 's/ /, /g') — no passing run on this exact tree (bash scripts/commit-gate.sh stamp shows what ran)"
+    fi
   fi
 
   branch=$(git branch --show-current 2>/dev/null); branch="${branch:-detached}"
@@ -128,8 +158,8 @@ cmd_check() {
     return 0
   fi
 
-  # enforce
-  if [ -n "$(printf '%s' "$reason" | tr -d '[:space:]')" ]; then
+  # enforce — a reason excuses an unverified commit, never a false claim
+  if [ "$false_claim" = 0 ] && [ -n "$(printf '%s' "$reason" | tr -d '[:space:]')" ]; then
     log_gate allowed-unverified "$problem — reason: $reason" "$header"; rm -f "$counter"; return 0
   fi
   n=0; [ -f "$counter" ] && n=$(cat "$counter" 2>/dev/null); case "$n" in ''|*[!0-9]*) n=0 ;; esac
@@ -143,6 +173,7 @@ cmd_check() {
   log_gate blocked "$problem" "$header"
   {
     echo "✗ commit-gate (enforce): $problem."
+    [ "$false_claim" = 1 ] && echo "  Run the check on this tree (run-tests.sh / verify.sh / the review), or claim only what ran."
     echo "  Say what proved this commit, as a trailer at the end of the message:"
     echo "    Verified: tests, verify          (from: bash scripts/commit-gate.sh stamp)"
     echo "  Nothing ran? Say why:"

@@ -6,7 +6,7 @@
 
 You write what you need in one sentence. DevPilot plans it, writes the code, tests it, reviews it, and merges it.
 
-[![Version](https://img.shields.io/badge/version-6.1.1-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-6.2.0-blue.svg)](VERSION)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Runs on](https://img.shields.io/badge/runs%20on-Claude%20Code-7c3aed.svg)](#what-you-need)
 [![Stack](https://img.shields.io/badge/stack-Angular%20%7C%20.NET%20%7C%20Python%20%7C%20SQL%20Server-orange.svg)](#what-you-need)
@@ -291,7 +291,9 @@ Code is merged only when all of these pass. The AI never skips them.
 
 Every commit also says what proved it — a `Verified: verify | tests | code-review | none` trailer
 (`scripts/commit-gate.sh`; gate mode `commit_gate: observe | enforce | off` in `project.config.md`).
-List the unverified changes with `git log --grep '^Verified: none'`.
+List the unverified changes with `git log --grep '^Verified: none'`. The claim is checked
+too: a commit can only say `tests` / `verify` / `code-review` if that check passed on exactly the
+tree being committed (`enforce` blocks a false claim; `observe` logs it).
 
 If a check fails, DevPilot tries to fix it up to 3 times, then stops and explains the problem.
 It never deletes or weakens a test to make it pass.
@@ -520,6 +522,10 @@ It runs weekly in CI (`.github/workflows/real-app.yml`).
 
 **Contributing:** use [Conventional Commits](https://www.conventionalcommits.org), keep one change per commit, and run
 `bash tests/run.sh` and `bash tests/e2e.sh` before pushing. Every change goes to `main` through a pull request.
+DevPilot runs its own commit gate in `enforce` mode: install the hook once (`bash scripts/install-git-hooks.sh`),
+and end each commit with the trailer `bash scripts/commit-gate.sh stamp` prints. `Verified: tests` means
+`bash tests/run.sh` passed on exactly that tree; otherwise write `Verified: none` plus `Unverified-Reason: <why>`.
+CI reports PR commits without a trailer.
 
 **Releasing DevPilot:** bump `VERSION` and the README badge, add the version's section to `CHANGELOG.md`, merge,
 then push the tag (`git tag v5.5.0 && git push origin v5.5.0`), or run the `release` workflow by hand on `main`
