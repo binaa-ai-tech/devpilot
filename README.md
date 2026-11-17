@@ -268,6 +268,10 @@ Code is merged only when all of these pass. The AI never skips them.
 - ✅ Code review has no blocking (🔴) issues.
 - ✅ CI is green on the pull request.
 
+Every commit also says what proved it — a `Verified: verify | tests | code-review | none` trailer
+(`scripts/commit-gate.sh`; gate mode `commit_gate: observe | enforce | off` in `project.config.md`).
+List the unverified changes with `git log --grep '^Verified: none'`.
+
 If a check fails, DevPilot tries to fix it up to 3 times, then stops and explains the problem.
 It never deletes or weakens a test to make it pass.
 

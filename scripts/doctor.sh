@@ -181,6 +181,13 @@ else
   warn "verify script or verify-change skill missing — re-run: bash install.sh --update"
 fi
 
+# Commit gate — Verified: trailer (scripts/commit-gate.sh via the commit-msg hook)
+if [ -f scripts/commit-gate.sh ]; then
+  GM=$(bash scripts/commit-gate.sh mode 2>/dev/null)
+  if grep -q 'commit-gate.sh' "$(git rev-parse --git-dir 2>/dev/null)/hooks/commit-msg" 2>/dev/null; then ok "commit gate: $GM (Verified: trailer checked by the commit-msg hook)"
+  else warn "commit-msg hook lacks the commit gate — run: bash scripts/install-git-hooks.sh"; fi
+fi
+
 # Reliability checklist — diff-triggered review items (scripts/reliability.sh)
 if [ -f .devpilot/reliability-checklist.md ] && [ -f scripts/reliability.sh ]; then
   if RV=$(bash scripts/reliability.sh validate 2>&1); then ok "reliability checklist: ${RV#*: }"

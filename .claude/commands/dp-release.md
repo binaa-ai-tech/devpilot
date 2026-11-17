@@ -61,7 +61,7 @@ Wait for the SIT job/stage and report its result.
 3. PRD green → finish the release so `main` and the tag match exactly what is live:
    ```bash
    bash scripts/changelog.sh <VERSION>          # docs/changes/* entries → "## v<VERSION>" section
-   git add -A CHANGELOG.md docs/changes && git commit -m "docs(changelog): v<VERSION>" || true
+   git add -A CHANGELOG.md docs/changes && git commit -m "docs(changelog): v<VERSION>" -m "Verified: none" -m "Unverified-Reason: changelog only" || true
    bash scripts/git-flow.sh release-finish <VERSION>
    ```
    `main` and `develop` are protected, so this goes **through PRs**: release → `main` (merge commit)

@@ -48,6 +48,7 @@
       "Bash(bash scripts/azdo.sh *)",
       "Bash(bash scripts/changelog.sh *)",
       "Bash(bash scripts/checkpoint.sh *)",
+      "Bash(bash scripts/commit-gate.sh *)",
       "Bash(bash scripts/close-delivery.sh *)",
       "Bash(bash scripts/db-package.sh *)",
       "Bash(bash scripts/deploy-init.sh *)",

@@ -92,7 +92,8 @@ Each agent prompt:
 > `<BRANCH>`. Implement all <layer> work per the plans. Read `.claude/skills/self-heal/SKILL.md`.
 > Build + test with `bash scripts/run-tests.sh <angular|dotnet|python>` (summary only). Commit per
 > Story, conventional message ending with the tracker ref (`bash scripts/tracker.sh ref <KEY>` →
-> `MSK-12` · `AB#345` · `#7`). Report what you built in 3 bullets.
+> `MSK-12` · `AB#345` · `#7`) and the verification stamp `bash scripts/commit-gate.sh stamp` prints
+> for that tree (`Verified: tests` once `run-tests.sh` passed on it; never claim what didn't run). Report what you built in 3 bullets.
 
 ---
 
@@ -140,6 +141,7 @@ auth/input changes, `bash scripts/reliability.sh match` (answer each triggered i
 the PR body start with the banner it prints, and the PR is never auto-merged. Then:
 ```bash
 STRICT=1 bash scripts/test-guard.sh
+bash scripts/commit-gate.sh mark code-review      # only once the review is APPROVED — feeds the Verified: stamp
 for KEY in <STORY_KEYS>; do bash scripts/verify.sh gate "$KEY" || exit 1; done   # no passing verify report → no PR
 ```
 
@@ -155,7 +157,7 @@ for KEY in <STORY_KEYS>; do
   bash scripts/changelog.sh add "$KEY" "<feat|fix per the Story's intent>" "<user-facing one-liner>" "$(bash scripts/tracker.sh url "$KEY")"
 done
 git add docs/changes
-git commit -m "chore(release): bump version to $VERSION"
+git commit -m "chore(release): bump version to $VERSION" -m "Verified: none" -m "Unverified-Reason: version files and changelog entries only"
 ```
 
 **PR body** — `docs/tasks/<SPRINT_SLUG>-pr.md`:
@@ -177,7 +179,7 @@ The last line lets `/dp-pr` finish the job (close items + sprint) on a later run
 # Local tracker only: close the items INSIDE the PR (they are files in git; develop only
 # changes via PRs) — they become Done exactly when it merges. No-op for Jira/Azure/GitHub.
 bash scripts/close-delivery.sh --prepare --version "$VERSION" --sprint "$SPRINT" <STORY_KEYS>
-git add docs/ && git commit -m "docs($SPRINT_SLUG): plans, qa, review" || true
+git add docs/ && git commit -m "docs($SPRINT_SLUG): plans, qa, review" -m "Verified: none" -m "Unverified-Reason: task documents only" || true
 TITLE="[v$VERSION] <summary> ($(for K in <STORY_KEYS>; do bash scripts/tracker.sh ref "$K"; done | paste -sd' ' -))"
 PR_URL=$(bash scripts/open-pr.sh "$BASE_BRANCH" "$TITLE" "docs/tasks/${SPRINT_SLUG}-pr.md" --items "<STORY_KEYS>"); PR_RC=$?
 echo "open-pr rc=$PR_RC (0 merged · 3 open/waiting · 1 error)"

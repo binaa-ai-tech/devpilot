@@ -70,7 +70,7 @@ User Story · Product Backlog Item · Requirement · Issue). Then refresh the ba
 Everything between "PR merged" and "live in production", for the git host (`scripts/git-host.sh`):
 ```bash
 bash scripts/generate-ci.sh           # CI (gate ladder on PRs) + CD (build once → DEV → SIT → UAT → PRD; ci.cd: off = CI only)
-git add .github azure-pipelines*.yml && git commit -m "ci: devpilot CI/CD pipelines" && git push
+git add .github azure-pipelines*.yml && git commit -m "ci: devpilot CI/CD pipelines" -m "Verified: none" -m "Unverified-Reason: generated pipeline files; CI runs them on push" && git push
 bash scripts/protect-branches.sh      # CI required on develop + main (GitHub protection / Azure policies)
 bash scripts/setup-environments.sh    # dev · sit · uat · prd — approvals on uat + prd
 ```

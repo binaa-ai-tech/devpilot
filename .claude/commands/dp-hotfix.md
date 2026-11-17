@@ -24,7 +24,7 @@ CD pipeline behind the production approval. Skips the backlog/sprint machinery â
    ```bash
    VERSION=${VERSION:-$(bash scripts/version.sh next patch --ref origin/main)}
    bash scripts/version.sh bump "$VERSION" >/dev/null && bash scripts/version.sh files | xargs git add
-   git commit -m "chore(release): hotfix v$VERSION" && git push -u origin "$(git branch --show-current)"
+   git commit -m "chore(release): hotfix v$VERSION" -m "Verified: none" -m "Unverified-Reason: version files only" && git push -u origin "$(git branch --show-current)"
    ```
 6. **Finish after PRD is green** â€” so `main` and the tag match what is live:
    ```bash

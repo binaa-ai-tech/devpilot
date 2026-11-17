@@ -415,6 +415,9 @@ EOF
 
   echo "  report: $rep"
   echo "──────────────────────────────────────────────────────"
+  if [ -f "$DIR/commit-gate.sh" ]; then   # verification stamp for the commit trailer
+    bash "$DIR/commit-gate.sh" mark verify "$([ "$stable" = 1 ] && [ "$fail" = 0 ] && echo pass || echo fail)" 2>/dev/null || true
+  fi
   [ "$stable" = 1 ] && [ "$fail" = 0 ]
 }
 

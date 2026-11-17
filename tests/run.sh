@@ -1488,6 +1488,71 @@ assert_eq "$(grep -c 'SHOULD\|BLOCKER' "$REPO/.claude/skills/review-checklist/SK
 assert_contains "$(cat "$REPO/.devpilot/templates/team/review-report.md")" "Why (one line)" "review report template asks why for every finding"
 assert_contains "$(cat "$REPO/.devpilot/prompts/team/lead-review.md")" "reliability.sh match" "the Team Lead runs the triggered reliability items"
 
+echo "== commit gate — the verification stamp =="
+D=$(sandbox)
+( cd "$D" && mkdir -p .devpilot src docs && echo a > src/a.ts && printf '.devpilot/logs/\n.devpilot/config.sh\n' > .gitignore && git add -A && git -c commit.gpgsign=false commit -qm "chore: base" --no-verify && bash scripts/install-git-hooks.sh >/dev/null )
+cm() { ( cd "$D" && echo "$RANDOM" >> src/a.ts && git add -A && git -c commit.gpgsign=false commit -q -F - ) 2>&1; }
+assert_eq "$(cd "$D" && bash scripts/commit-gate.sh mode)" "observe" "the gate defaults to observe"
+OUT=$(printf 'feat(a): no stamp\n' | cm); RC=$?
+assert_code "$RC" "0" "observe: a commit without a Verified: trailer goes through"
+assert_contains "$(cat "$D/.devpilot/logs/commit-gate.log")" "observe	" "observe: what would have been blocked is logged"
+assert_contains "$(cat "$D/.devpilot/logs/commit-gate.log")" "no 'Verified:' trailer" "the log says why"
+OUT=$(printf 'not conventional\n\nVerified: tests\n' | cm); RC=$?
+assert_code "$RC" "1" "the Conventional Commits check still runs first"
+export COMMIT_GATE=enforce
+OUT=$(printf 'feat(a): no stamp\n' | cm); RC=$?
+assert_code "$RC" "1" "enforce: a commit without a trailer is blocked"
+assert_contains "$OUT" "Unverified-Reason:" "the block message shows how to pass honestly"
+assert_contains "$OUT" "Block 1 of 2" "the block message counts toward the escape hatch"
+OUT=$(printf 'feat(a): stamped\n\nVerified: tests, code-review\n' | cm); RC=$?
+assert_code "$RC" "0" "enforce: Verified: tests, code-review goes through"
+assert_eq "$(ls "$D/.git/devpilot" 2>/dev/null | wc -l | tr -d ' ')" "0" "a verified commit resets the block counter"
+OUT=$(printf 'feat(a): bad value\n\nVerified: yes\n' | cm); assert_code "$?" "1" "enforce: an unknown check name is blocked"
+OUT=$(printf 'feat(a): mixed\n\nVerified: none, tests\n' | cm); assert_code "$?" "1" "enforce: none mixed with checks is blocked"
+( cd "$D" && rm -rf .git/devpilot )
+OUT=$(printf 'feat(a): nothing ran\n\nVerified: none\n' | cm); assert_code "$?" "1" "enforce: Verified: none alone is blocked"
+OUT=$(printf 'docs(a): typo\n\nVerified: none\nUnverified-Reason: comment typo, nothing to run\n' | cm); RC=$?
+assert_code "$RC" "0" "enforce: Verified: none with an Unverified-Reason goes through"
+assert_contains "$(tail -1 "$D/.devpilot/logs/commit-gate.log")" "allowed-unverified" "an unverified commit with a reason is logged"
+( cd "$D" && rm -rf .git/devpilot )
+printf 'feat(a): one\n' | cm >/dev/null; R1=$?
+printf 'feat(a): two\n' | cm >/dev/null; R2=$?
+OUT=$(printf 'feat(a): three\n' | cm); R3=$?
+assert_eq "$R1 $R2 $R3" "1 1 0" "escape hatch: after 2 blocks in a row the next commit goes through"
+assert_contains "$OUT" "let through after 2 blocks" "the escape hatch says what it did"
+assert_contains "$(tail -1 "$D/.devpilot/logs/commit-gate.log")" "escape-hatch" "the escape hatch is logged"
+printf 'feat(a): four\n' | cm >/dev/null; assert_code "$?" "1" "the counter restarts after the escape hatch"
+( cd "$D" && rm -rf .git/devpilot && git checkout -qb other )
+printf 'feat(a): other branch\n' | cm >/dev/null; assert_code "$?" "1" "the counter is per branch"
+( cd "$D" && git -c commit.gpgsign=false commit -q --allow-empty --no-verify -m "feat: on other" && git checkout -q - && rm -rf .git/devpilot )
+OUT=$(cd "$D" && git -c commit.gpgsign=false merge --no-ff -q other -m "Merge branch 'other'" 2>&1); assert_code "$?" "0" "merge commits are not checked"
+unset COMMIT_GATE
+( cd "$D" && printf "COMMIT_GATE='enforce'\n" > .devpilot/config.sh && rm -rf .git/devpilot )
+assert_eq "$(cd "$D" && bash scripts/commit-gate.sh mode)" "enforce" "the mode is read from .devpilot/config.sh"
+( cd "$D" && rm .devpilot/config.sh && printf 'commit_gate: off   # team policy\n' >> project.config.md )
+assert_eq "$(cd "$D" && bash scripts/commit-gate.sh mode)" "off" "the mode is read from project.config.md"
+L1=$(wc -l < "$D/.devpilot/logs/commit-gate.log")
+printf 'feat(a): off\n' | cm >/dev/null; assert_code "$?" "0" "off: nothing is checked"
+assert_eq "$(wc -l < "$D/.devpilot/logs/commit-gate.log")" "$L1" "off: nothing is logged"
+assert_eq "$(COMMIT_GATE=bogus bash -c "cd '$D' && bash scripts/commit-gate.sh mode")" "observe" "an unknown mode falls back to observe"
+# the stamp reflects what actually ran on this exact tree
+( cd "$D" && rm -rf .devpilot/logs/stamps )
+assert_eq "$(cd "$D" && bash scripts/commit-gate.sh stamp)" "Verified: none" "stamp with nothing run → none"
+( cd "$D" && bash scripts/commit-gate.sh mark tests )
+assert_eq "$(cd "$D" && bash scripts/commit-gate.sh stamp)" "Verified: tests" "stamp after a passing test run → tests"
+( cd "$D" && bash scripts/commit-gate.sh mark verify && bash scripts/commit-gate.sh mark code-review fail )
+assert_eq "$(cd "$D" && bash scripts/commit-gate.sh stamp)" "Verified: verify, tests" "a failed check is not stamped"
+( cd "$D" && echo report > docs/qa.md )
+assert_eq "$(cd "$D" && bash scripts/commit-gate.sh stamp)" "Verified: verify, tests" "writing docs/ after the checks keeps the stamp"
+( cd "$D" && echo edit >> src/a.ts )
+assert_eq "$(cd "$D" && bash scripts/commit-gate.sh stamp)" "Verified: none" "editing code after the checks drops the stamp"
+assert_code "$(cd "$D" && bash scripts/commit-gate.sh mark nonsense >/dev/null 2>&1; echo $?)" "2" "mark rejects an unknown check"
+rm -rf "$D"
+assert_contains "$(cat "$REPO/scripts/run-tests.sh")" "commit-gate.sh\" mark tests" "run-tests.sh stamps the tests it ran"
+assert_contains "$(cat "$REPO/scripts/verify.sh")" "commit-gate.sh\" mark verify" "verify.sh stamps a verify run"
+assert_contains "$(cat "$REPO/README.md")" "git log --grep '^Verified: none'" "README shows how to list unverified changes"
+assert_contains "$(cat "$REPO/.claude/skills/core-rules/SKILL.md")" "commit-gate.sh stamp" "core-rules: commits carry the stamp"
+
 echo "== DevPilot release metadata =="
 V=$(cat "$REPO/VERSION")
 assert_contains "$(cat "$REPO/CHANGELOG.md")" "## [$V]" "CHANGELOG.md has a section for VERSION $V (release notes)"

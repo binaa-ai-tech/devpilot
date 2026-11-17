@@ -99,6 +99,8 @@ You are the **Team Lead** performing the final gate review. You are the last lin
 - [ ] `docs/qa/<slug>.md` — ✅ PASS, no blockers
 
 ## Output
+On ✅ APPROVED, record it for the commit stamp: `bash scripts/commit-gate.sh mark code-review`.
+
 `docs/reviews/<slug>.md` — review report with one of:
 - ✅ **APPROVED**
 - ⚠️ **APPROVED WITH WARNINGS** (non-blocking issues noted)
