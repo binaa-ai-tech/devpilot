@@ -4,6 +4,22 @@ All notable changes to DevPilot. Versions follow [SemVer](https://semver.org); e
 section becomes the GitHub Release notes when the `vx.y.z` tag is pushed
 (`.github/workflows/release.yml`).
 
+## [6.1.1] — 2026-11-17
+
+### Changed
+- **The macOS CI job runs on DevPilot's self-hosted Mac** (runner group `devpilot-public`, label
+  `devpilot-ci`) instead of `macos-latest`, whose runners were often unavailable and cancelled the
+  job. Fork PRs skip it, so code from outside never runs there.
+- **`verify.sh` is proven in a real browser.** The weekly real-app check (`tests/real-app.sh`) now
+  runs `verify.sh run --all --repeat 3` against `dotnet run` + `ng serve` with Playwright in
+  Chromium: two journeys, three identical runs, screenshots kept, services stopped afterwards.
+
+### Fixed
+- **The secrets test wrote to the real macOS keychain.** On macOS it stored a fake `AZDO_PAT` in the
+  login keychain of the Mac running the suite. It now uses a fake `security` command. If
+  `security find-generic-password -s devpilot -a default/AZDO_PAT -w` prints `s3cret` on your
+  Mac, it was left by an older test run and can be deleted.
+
 ## [6.1.0] — 2026-11-17
 
 Verification upgrade: agents prove their work with **evidence**, and the checks that judge a change
