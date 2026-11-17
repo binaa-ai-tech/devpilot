@@ -40,7 +40,11 @@ Write tests that would catch these mutations:
 2. Read `docs/plans/<slug>.md` — understand what was built and where
 3. Read `project.config.md` → note `base_branch`. Run `git diff <base_branch>...HEAD` — read all implementation changes
 4. For each acceptance criterion (load `test-design` here — derive the
-   case matrix on paper first, record it in the QA report):
+   case matrix on paper first, record it in the QA report). **Give every planned test a kind:
+   `example | property | differential | e2e`** — a `property` test where a rule must hold for every
+   input (money, serial ranges, draws, parsers: fast-check / FsCheck / Hypothesis), a
+   `differential` test where behavior must not change (upgrade, migration, procedure rewrite:
+   `stack-upgrade`), `e2e` for a Playwright journey, `example` otherwise:
    - Find the test(s) that cover it
    - If no test exists → write one
    - Verify the test would actually fail if the implementation was broken (mutation-mindset)

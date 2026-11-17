@@ -46,6 +46,13 @@ assertion or mocking library.
 - Each test owns its data (`tmp_path`, fresh fixtures); no test depends on another's leftovers.
 - Secrets come from the fixture, never from the developer's real `.env`.
 
+## Property tests — when to use
+For parsers, normalizers, schema round-trips and pricing / allocation rules, add a **Hypothesis**
+property (`@given(st.…)`) beside the parametrized cases: `Model.model_validate(m.model_dump())`
+equals `m`, a normalizer applied twice equals once, an invariant holds after any sequence of
+operations. Build strategies from valid domain values; never call a model or the network inside a
+property. Kinds and domain examples: `test-design` §5.
+
 ## Tests that lie — never ship these
 - No assertion, or one that can't fail (`assert True`, `assert result is not None` alone).
 - `pytest.raises(Exception)` — assert the exact exception type and message.

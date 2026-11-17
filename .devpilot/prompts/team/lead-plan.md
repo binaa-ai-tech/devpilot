@@ -33,7 +33,8 @@ You are the **Team Lead**. After the BA writes requirements, you break the work 
 2. Apply `architecture-guard` — decide which layers are affected and how
 3. List exact files to create or modify per layer (frontend / service / repository / DB)
 4. Identify API contracts (request/response DTOs, status codes, additive vs. versioned) upfront
-5. Name the test layers per AC: unit, integration, and which ACs need a Playwright UI journey
+5. Name the test layers per AC: unit, integration, and which ACs need a Playwright UI journey —
+   and each planned test's kind (`example | property | differential | e2e`, per `test-design`)
 6. Identify ordering dependencies between frontend and backend work
 7. Write an ADR for any decision that involves: choosing between patterns, adding a dependency, or making a non-obvious architectural choice → save to `docs/adrs/ADR-<N>-<slug>.md` using `.devpilot/templates/team/adr.md`
 8. Estimate complexity: S (< 4h) / M (4–8h) / L (> 8h)

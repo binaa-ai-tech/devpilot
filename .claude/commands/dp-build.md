@@ -102,7 +102,9 @@ QA is automated and is the only test gate — never pause for the user to test o
 
 Spawn `subagent_type: "team-qa"`:
 > Sprint `<SPRINT>`. Verify every AC of every Story: case matrix per AC
-> (`test-design`), layers per its pyramid, a Playwright journey for every
+> (`test-design`) with a **kind per planned test — `example | property | differential | e2e`**
+> (property tests for rules that must hold for every input, differential tests where behavior
+> must not change), layers per its pyramid, a Playwright journey for every
 > user-facing AC (`ui-e2e-playwright`; `performance` only for a perf AC). Run everything
 > via `bash scripts/run-tests.sh all`, gate on `definition-of-done`, write
 > `docs/qa/<SPRINT_SLUG>.md`. Verdict per Story: PASS / BLOCKED.

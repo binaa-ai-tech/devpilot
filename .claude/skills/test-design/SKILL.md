@@ -37,9 +37,14 @@ Choose the **cheapest layer that can actually fail** for the behavior. Run every
 ## 3. Traceability matrix
 Record the cases in the QA report (`docs/qa/<slug>.md`) before implementing them:
 
-| Case | AC | Given / When / Then | Type | Priority | Automated at |
-|------|----|---------------------|------|----------|--------------|
-| TC-1 | AC-1 | logged-in user / clicks export / CSV downloads | happy | P0 | integration |
+| Case | AC | Given / When / Then | Type | Kind | Priority | Automated at |
+|------|----|---------------------|------|------|----------|--------------|
+| TC-1 | AC-1 | logged-in user / clicks export / CSV downloads | happy | example | P0 | integration |
+| TC-2 | AC-2 | any deposit/withdrawal sequence / applied / balance never negative | state | property | P0 | unit |
+
+- **Kind** — every planned test is one of `example | property | differential | e2e`:
+  `example` (hand-picked inputs, the default) · `property` (§5) · `differential` (§6) ·
+  `e2e` (a Playwright journey).
 
 - Every AC has ≥ 1 case; every case traces back to an AC (or names the regression it pins).
   Orphan cases mean the spec is incomplete — flag it.
@@ -50,6 +55,33 @@ Record the cases in the QA report (`docs/qa/<slug>.md`) before implementing them
 Ask "what wrong code would still pass these tests?" Then add the test that catches it: flipped
 conditionals, off-by-one, null/empty, swapped arguments. A case that cannot fail is not a case —
 apply this to the design, not just the code.
+
+## 5. Property tests — state the invariant, let the library attack it
+An example test checks the inputs you thought of. A property test states something that must
+hold for **every** input and lets a generator try to break it, then shrinks a failure to the
+smallest counter-example. Use one where the input space is large and the rule is simple to say.
+
+| Kind | The property | Example from our domain |
+|------|--------------|-------------------------|
+| **Round-trip** | serialize, then parse, gives the original | A cheque-book request → JSON / MT-style message → parsed back equals the request (amounts, IBAN, Arabic names intact) |
+| **Invariant** | a rule holds after any sequence of operations | After any sequence of deposits, withdrawals and reversals a balance is never negative; issued cheque-book serial ranges never overlap; a raffle never sells more tickets than exist |
+| **Idempotency** | running it twice equals running it once | Re-applying a migration, re-normalizing an IBAN or phone number, retrying a payment with the same idempotency key, re-running the raffle draw with the same seed |
+| **Equivalence** | the optimized code matches the naive reference | The batched / SQL prize-allocation or interest calculation returns exactly what the simple loop does |
+
+Libraries (in the **target project**): **fast-check** (Angular / TS, runs inside Vitest) ·
+**FsCheck** (.NET, `FsCheck.Xunit` `[Property]`) · **Hypothesis** (Python, `@given`).
+- Generate **valid domain values** (amounts as integers of the minor unit, real serial ranges),
+  not raw noise — a generator that mostly produces rejected input tests the validator only.
+- Keep the failing seed / shrunk case the library prints and add it as an `example` test.
+- A property is extra to, not instead of, the AC's example cases. Money, serial ranges, draws and
+  parsers are the first candidates; a CRUD screen is not.
+
+## 6. Differential tests — old and new on the same inputs
+When behavior must **not** change (a framework upgrade, an API migration, a stored-procedure
+rewrite, a performance refactor), run the old and the new implementation on the same inputs and
+compare the outputs. Anything that differs is a bug or an unapproved breaking change, unless it
+is listed in `docs/tests/approved-differences.md`. Recipes, normalization and the approved list:
+`stack-upgrade` → Differential tests.
 
 ## Flaky tests — find the cause, or delete the test
 A test that passes and fails on the same code tells you nothing either way, and teaches the team

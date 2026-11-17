@@ -32,7 +32,7 @@ Resolve what to test:
 Spawn `subagent_type: "team-qa"`:
 > Scope: `<resolved scope>`. Read `.claude/skills/test-design/SKILL.md` and derive
 > the test-case matrix per AC (happy / boundary / negative / state, P0–P2,
-> traceability). For each case pick the layer per the same skill's pyramid:
+> traceability), giving every planned test a kind: `example | property | differential | e2e`. For each case pick the layer per the same skill's pyramid:
 > Angular unit, .NET / Python unit, .NET / Python integration, or Playwright UI journey. Write the matrix
 > into `docs/qa/<slug>.md` BEFORE writing test code.
 

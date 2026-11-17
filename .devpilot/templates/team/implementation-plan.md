@@ -74,9 +74,9 @@
 
 ## Test Plan (for QA)
 
-| Test Description | Type | Acceptance Criterion Covered |
-|-----------------|------|------------------------------|
-| `<test name>` | unit / integration / e2e | AC #<n> |
+| Test Description | Type | Kind | Acceptance Criterion Covered |
+|-----------------|------|------|------------------------------|
+| `<test name>` | unit / integration / e2e | example / property / differential / e2e | AC #<n> |
 
 ---
 

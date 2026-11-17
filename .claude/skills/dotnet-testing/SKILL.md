@@ -31,6 +31,14 @@ xUnit1051). Don't migrate v2 → v3 inside a feature; that is its own change.
 - Arrange → Act → Assert, one behavior per test; `[Theory]` + `[InlineData]` for boundaries.
 - Assert on returned values and observable calls (`repo.Received(1).AddAsync(...)`), not privates.
 
+## Property tests — when to use
+For domain rules that must hold for every input — balances and money arithmetic, cheque-book
+serial ranges, raffle allocation, serializers, idempotent handlers — add an **FsCheck** property
+(`FsCheck.Xunit`, `[Property]`) beside the `[Theory]` cases, with generators that produce valid
+domain values. Keep the shrunk counter-example as an `[InlineData]` case. Kinds and domain
+examples: `test-design` §5. For "the rewrite must behave the same" use a differential test
+(`stack-upgrade`).
+
 ## Tests that lie — never ship these
 - **No assertion**, or one that can't fail (`Assert.True(true)`, comparing a value with itself,
   `Assert.NotNull` alone on a result that has fields to check). Assert the exact expected value;

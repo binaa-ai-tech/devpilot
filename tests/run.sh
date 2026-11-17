@@ -1422,7 +1422,7 @@ for P in '/.claude/' '/.devpilot/' '/scripts/' '/.github/workflows/' '/CLAUDE.md
   assert_contains "$(cat "$REPO/.github/CODEOWNERS")" "$P" "CODEOWNERS owns $P explicitly"
 done
 
-echo "== flaky-test policy =="
+echo "== flaky-test policy + property / differential tests =="
 QUAR=$(grep -rliI 'quarantin' "$REPO/.claude" "$REPO/.devpilot" "$REPO/scripts" "$REPO/CLAUDE.md" "$REPO/README.md" "$REPO/docs" 2>/dev/null | grep -v '/\.devpilot/egm/' | tr '\n' ' ')
 assert_eq "${QUAR:-none}" "none" "no 'quarantine' wording left anywhere"
 for F in .claude/skills/test-design/SKILL.md .claude/skills/ui-e2e-playwright/SKILL.md .claude/skills/release-ops/SKILL.md \
@@ -1433,6 +1433,21 @@ for F in .claude/skills/test-design/SKILL.md .claude/skills/ui-e2e-playwright/SK
   assert_contains "$TXT" "ordering, shared state, time" "$F: names the root causes to look for"
 done
 assert_eq "$(grep -c 'process.env.CI ? 1' "$REPO/.claude/skills/ui-e2e-playwright/SKILL.md")" "0" "the Playwright config no longer retries in CI"
+TD=$(cat "$REPO/.claude/skills/test-design/SKILL.md")
+for W in "Round-trip" "Invariant" "Idempotency" "Equivalence" "fast-check" "FsCheck" "Hypothesis" "example | property | differential | e2e"; do
+  assert_contains "$TD" "$W" "test-design covers: $W"
+done
+assert_contains "$(cat "$REPO/.claude/skills/angular-testing/SKILL.md")" "fast-check" "angular-testing says when to use fast-check"
+assert_contains "$(cat "$REPO/.claude/skills/dotnet-testing/SKILL.md")" "FsCheck" "dotnet-testing says when to use FsCheck"
+assert_contains "$(cat "$REPO/.claude/skills/python-testing/SKILL.md")" "Hypothesis" "python-testing says when to use Hypothesis"
+SU=$(cat "$REPO/.claude/skills/stack-upgrade/SKILL.md")
+for W in "docs/tests/approved-differences.md" "Angular version upgrade" ".NET API migration" "Stored-procedure rewrite" "Normalize"; do
+  assert_contains "$SU" "$W" "stack-upgrade differential tests: $W"
+done
+for F in .devpilot/prompts/team/qa-agent.md .claude/commands/dp-build.md; do
+  assert_contains "$(cat "$REPO/$F")" "example | property | differential | e2e" "$F: every planned test gets a kind"
+done
+assert_eq "$(grep -rlE '"(fast-check|fscheck|hypothesis)"' "$REPO" --include=package.json --include='*.csproj' --include=requirements*.txt 2>/dev/null | wc -l | tr -d ' ')" "0" "DevPilot itself takes no test-library dependency"
 
 echo "== DevPilot release metadata =="
 V=$(cat "$REPO/VERSION")
