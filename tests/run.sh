@@ -1422,6 +1422,18 @@ for P in '/.claude/' '/.devpilot/' '/scripts/' '/.github/workflows/' '/CLAUDE.md
   assert_contains "$(cat "$REPO/.github/CODEOWNERS")" "$P" "CODEOWNERS owns $P explicitly"
 done
 
+echo "== flaky-test policy =="
+QUAR=$(grep -rliI 'quarantin' "$REPO/.claude" "$REPO/.devpilot" "$REPO/scripts" "$REPO/CLAUDE.md" "$REPO/README.md" "$REPO/docs" 2>/dev/null | grep -v '/\.devpilot/egm/' | tr '\n' ' ')
+assert_eq "${QUAR:-none}" "none" "no 'quarantine' wording left anywhere"
+for F in .claude/skills/test-design/SKILL.md .claude/skills/ui-e2e-playwright/SKILL.md .claude/skills/release-ops/SKILL.md \
+         .claude/commands/dp-pr.md .devpilot/prompts/team/qa-agent.md; do
+  TXT=$(cat "$REPO/$F")
+  assert_contains "$TXT" "docs/tests/removed-tests.md" "$F: an unexplained flaky test is deleted and recorded"
+  assert_contains "$TXT" "retries: 0" "$F: Playwright retries stay 0"
+  assert_contains "$TXT" "ordering, shared state, time" "$F: names the root causes to look for"
+done
+assert_eq "$(grep -c 'process.env.CI ? 1' "$REPO/.claude/skills/ui-e2e-playwright/SKILL.md")" "0" "the Playwright config no longer retries in CI"
+
 echo "== DevPilot release metadata =="
 V=$(cat "$REPO/VERSION")
 assert_contains "$(cat "$REPO/CHANGELOG.md")" "## [$V]" "CHANGELOG.md has a section for VERSION $V (release notes)"

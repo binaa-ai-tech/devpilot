@@ -46,6 +46,7 @@ Run via `bash scripts/run-tests.sh all` — paste the summary lines only; full l
 ## Warnings
 
 - ⚠️ <Non-blocking concern>
+- ⚠️ <Flaky test removed — also recorded in `docs/tests/removed-tests.md`, follow-up item <KEY>>
 
 ---
 

@@ -44,8 +44,9 @@ forever; never burn a fourth cycle "just in case".
   or touches secrets/auth configuration.
 - The diff edits the checks that judge it — `bash scripts/rules-guard.sh touched` exits 1
   (skills, rules, gate scripts, CI workflows, `CLAUDE.md`). A human reviews those.
-- A gate went green because a test was skipped, weakened, or an error was
-  suppressed — that's a hard stop, not a pass (`self-heal` hard rules).
+- A gate went green because a test was skipped, retried, weakened, or an error was
+  suppressed — that's a hard stop, not a pass (`self-heal` hard rules). A flaky test deleted
+  under the `test-design` policy needs its row in `docs/tests/removed-tests.md`.
 - The branch has conflicts needing semantic resolution beyond a clean rebase.
 
 ## Merge mechanics

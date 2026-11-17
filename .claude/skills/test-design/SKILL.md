@@ -51,6 +51,27 @@ Ask "what wrong code would still pass these tests?" Then add the test that catch
 conditionals, off-by-one, null/empty, swapped arguments. A case that cannot fail is not a case —
 apply this to the design, not just the code.
 
+## Flaky tests — find the cause, or delete the test
+A test that passes and fails on the same code tells you nothing either way, and teaches the team
+to ignore red.
+- **Never** skip it (`.skip`, `[Fact(Skip=…)]`, `@pytest.mark.skip`, `xit`), give it a `sleep` or a
+  fixed wait, or retry it until green. Playwright runs with `retries: 0` — locally **and in CI**.
+- **Find the root cause** — ordering, shared state, time, network, or a missing await / locator
+  wait: it depends on another test having run · rows, files, statics or an account are shared ·
+  clock, timezone, midnight, timers · a real third party or a race between requests · an assertion
+  made before the app settled. Reproduce it: run the test alone, 20× in a loop, in reverse order,
+  with the clock moved.
+- **Not found within the 3-attempt protocol (`self-heal`) → delete the test.** Record it in
+  `docs/tests/removed-tests.md` and open a follow-up item (`tracker.sh new Task …`) to rewrite it:
+
+  | Test | File | Symptom | Ruled out | Date | Story |
+  |------|------|---------|-----------|------|-------|
+  | `exports orders as CSV` | `e2e/specs/orders.spec.ts` | fails ~1 in 8 on the download assertion | ordering, shared rows, clock | 2026-11-17 | MSK-12 |
+
+  A deleted test with a written reason is honest: the gap is visible and owned. A skipped or
+  retried one hides the same gap behind a green run. This is the only sanctioned way a test leaves
+  the suite because it fails — and never for a test that fails **every** time (that is a real bug).
+
 ## How to write them
 - Name the test after the Then, as a sentence: `returns_403_when_user_lacks_role`.
 - Arrange → Act → Assert. One behavior per test; compound tests hide which behavior broke.
@@ -61,5 +82,5 @@ apply this to the design, not just the code.
 ## Rules
 - A green suite with no test for the new behavior is a fail.
 - Never weaken an assertion to make a test pass — fix the code.
-- Flaky tests are bugs; quarantine and fix, don't ignore.
+- A flaky test is a bug with a root cause — see **Flaky tests** below. No skip, no sleep, no retry.
 - `test-guard` is the mechanical enforcement of this skill at every merge gate.

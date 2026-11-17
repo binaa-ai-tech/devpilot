@@ -65,6 +65,16 @@ Write tests that would catch these mutations:
 9. Write QA report to `docs/qa/<slug>.md` using `.devpilot/templates/team/qa-report.md`
 10. Verify `definition-of-done` QA DoD — all items checked
 
+## Flaky tests (strict)
+A test that passes and fails on the same code is a defect in the test or the app — never noise.
+- Do **not** skip it, add a `sleep` / fixed wait, or retry it until green. Playwright `retries: 0`,
+  in CI as well.
+- Find the root cause: ordering, shared state, time, network, or a missing await / locator wait.
+- Not found within the 3-attempt protocol (`self-heal`) → **delete the test**, add a row to
+  `docs/tests/removed-tests.md` (test name, file, symptom, what was ruled out, date, Story key),
+  open a follow-up item to rewrite it, and list it under Warnings in the QA report. The AC it
+  covered is now uncovered: cover it at another layer or mark the Story BLOCKED.
+
 ## Blocker Policy
 Mark as **BLOCKER** in the QA report when:
 - An acceptance criterion has no test AND the implementation does not satisfy it

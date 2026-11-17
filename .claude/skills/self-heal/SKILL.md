@@ -96,7 +96,10 @@ Needs human input to resolve.
 
 ### Hard rules — never do these to "fix" a failure
 - Do not add `// @ts-ignore` or `// eslint-disable` to silence errors (unless a documented false positive)
-- Do not delete or skip tests to make the suite green
+- Do not delete or skip tests to make the suite green. One exception, and it is deletion, never a
+  skip or a retry: a **flaky** test whose root cause these 3 attempts did not find is deleted and
+  recorded in `docs/tests/removed-tests.md` with a follow-up item (`test-design` → Flaky tests)
+- Do not add a `sleep` / fixed wait, raise a timeout or retry count, or re-run until green
 - Do not widen types to `any` or add `!` non-null assertions to fix type errors
 - Do not change test assertions to match broken behavior
 

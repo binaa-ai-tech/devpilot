@@ -82,7 +82,12 @@ For each unresolved thread:
    Update the PR title `[vX.Y.Z]` and the body's machine line to match.
 2. **Fetch the failures** (transport table).
 3. **Root-cause and fix** per `.claude/skills/self-heal/SKILL.md` — no skipped tests, no weakened
-   assertions, no suppressed errors. "Flaky" is not a root cause.
+   assertions, no suppressed errors. **"Flaky" is not a root cause, and re-running CI until it
+   passes is not a fix.** A flaky test may not be skipped, given a `sleep` / fixed wait, or retried
+   until green (Playwright `retries: 0`, CI too). Find why — ordering, shared state, time, network,
+   a missing await / locator wait. Not found within the 3-attempt protocol → delete the test, record
+   it in `docs/tests/removed-tests.md` (test, file, symptom, what was ruled out, date, Story key) and
+   open a follow-up item to rewrite it (`.claude/skills/test-design/SKILL.md` → Flaky tests).
 4. **Local ladder before pushing** — `bash scripts/run-tests.sh all`,
    `STRICT=1 bash scripts/test-guard.sh`, `bash scripts/audit.sh`, and — when the fix touched
    runtime code — `bash scripts/verify.sh run <KEY>` again (the old report proves the old code). Push only a locally green
