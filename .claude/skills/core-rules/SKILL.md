@@ -46,3 +46,12 @@ user-invocable: false
       summary. **Exception:** a **QA BLOCKED** (or hard-failure) state _is_ worth
       a comment, because it's an exception, not narration.
     - Technical detail belongs in the **PR description**; the ticket links to it.
+
+## Pruning — rules that are never pruned stop being read
+Once per release (`/dp-release`), whoever cuts it reviews the guidance this file points to:
+- **Reliability checklist** — `bash scripts/review-metrics.sh` and the review reports since the last
+  release: drop an item that never triggered, or triggered and never caught anything; merge two
+  items that always fire together. Keep the ones with an incident or PR in their `Origin`.
+- **Rules and skills** — delete a rule nobody can point to a reason for, merge duplicates (the same
+  rule in two skills drifts), and shorten whatever agents keep skimming past.
+- A removal is a normal PR — reviewed by a human, because it edits the checks (`rules-guard.sh`).

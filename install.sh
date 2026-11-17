@@ -204,7 +204,7 @@ run_update() {
   TEMPLATE_TEAM="requirements.md implementation-plan.md qa-report.md review-report.md adr.md domain-model.md bug-report.md item-brief.md"
   CMDS="dp-deliver.md dp-plan.md dp-spec.md dp-sprint.md dp-build.md dp-test.md dp-pr.md dp-release.md dp-hotfix.md dp-status.md dp-setup.md"
   AGENTS_LIST="team-lead.md team-ba.md team-frontend.md team-dotnet.md team-python.md team-qa.md"
-  SCRIPTS="git-flow.sh resolve-model.sh model-profiles.sh checkpoint.sh devpilot-config.sh devpilot-lib.sh tracker.sh jira.sh azdo.sh github.sh git-host.sh version.sh close-delivery.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy.sh smoke.sh setup-environments.sh db-package.sh usage-hook.sh deploy-init.sh generate-project-index.sh generate-backlog-index.sh md-to-adf.sh sync-egm.sh verify.sh rules-guard.sh reliability.sh commit-gate.sh"
+  SCRIPTS="git-flow.sh resolve-model.sh model-profiles.sh checkpoint.sh devpilot-config.sh devpilot-lib.sh tracker.sh jira.sh azdo.sh github.sh git-host.sh version.sh close-delivery.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy.sh smoke.sh setup-environments.sh db-package.sh usage-hook.sh deploy-init.sh generate-project-index.sh generate-backlog-index.sh md-to-adf.sh sync-egm.sh verify.sh rules-guard.sh reliability.sh commit-gate.sh review-metrics.sh"
 
   info "Refreshing .devpilot/rules..."
   fetch ".devpilot/rules.md" ".devpilot/rules.md"
@@ -851,7 +851,7 @@ for f in git-flow.sh resolve-model.sh model-profiles.sh checkpoint.sh \
           open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh \
           doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh \
           deploy.sh smoke.sh setup-environments.sh db-package.sh usage-hook.sh deploy-init.sh \
-          generate-project-index.sh generate-backlog-index.sh md-to-adf.sh sync-egm.sh verify.sh rules-guard.sh reliability.sh commit-gate.sh; do
+          generate-project-index.sh generate-backlog-index.sh md-to-adf.sh sync-egm.sh verify.sh rules-guard.sh reliability.sh commit-gate.sh review-metrics.sh; do
   fetch "scripts/$f" "scripts/$f"
   chmod +x "scripts/$f" 2>/dev/null || true
 done

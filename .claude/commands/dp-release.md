@@ -75,8 +75,12 @@ Wait for the SIT job/stage and report its result.
      bash scripts/tracker.sh comment "$KEY" "🚀 Released to production in v<VERSION>"
    done
    ```
+5. Review the reviewers + prune (`core-rules` → Pruning; `.devpilot/process.md` → Review the
+   reviewers): `bash scripts/review-metrics.sh "<date of the previous release>"`. Report the slips;
+   a miss seen in ≥ 2 PRs, or a checklist item that never triggered, becomes a follow-up item —
+   never an edit made inside this release.
 
-**Report:** production URL, tag `v<VERSION>`, run link, items noted.
+**Report:** production URL, tag `v<VERSION>`, run link, items noted, review-metrics summary line.
 
 ---
 

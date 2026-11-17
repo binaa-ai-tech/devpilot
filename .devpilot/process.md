@@ -63,5 +63,21 @@ No tracker configured? The run asks once — connect one or continue locally —
 - **Token discipline** — read indexes first; load heavy skills only at the
   step that needs them (`.claude/skills/README.md`).
 
+## Review the reviewers
+
+The review gate is itself checked. `bash scripts/review-metrics.sh [since]` lists merged PRs that
+were later **reverted**, and `fix` commits that touched a recently merged PR's files within N days
+(default 14) — with whether that PR's review report flagged the file. For each miss:
+
+1. **Visible on a small diff?** If a reviewer reading only that diff could have caught it, it is a
+   candidate reliability-checklist item: a trigger readable from a diff, a check question, and
+   `Origin: #<PR>` (`.devpilot/reliability-checklist.md`, validated by `reliability.sh validate`).
+2. **Recurs in ≥ 2 PRs** → add the item (a PR reviewed by a human — it edits the checks).
+   **Seen once** → note it in the release's pruning review (`core-rules` → Pruning) and wait.
+3. Not visible from the diff (data, environment, timing) → it belongs to tests or `verify-change`,
+   not to the checklist.
+
+The same pass prunes: items that never trigger or never catch anything are removed.
+
 New to a repo? Run `/dp-status health`, then start at Intake with `/dp-plan` —
 or say `/dp-deliver "<what you want>"` and let the process run end to end.

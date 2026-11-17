@@ -1553,6 +1553,43 @@ assert_contains "$(cat "$REPO/scripts/verify.sh")" "commit-gate.sh\" mark verify
 assert_contains "$(cat "$REPO/README.md")" "git log --grep '^Verified: none'" "README shows how to list unverified changes"
 assert_contains "$(cat "$REPO/.claude/skills/core-rules/SKILL.md")" "commit-gate.sh stamp" "core-rules: commits carry the stamp"
 
+echo "== review-metrics.sh — review the reviewers =="
+D=$(sandbox)
+NOW=$(date +%s); DAY=86400
+gc() {  # gc <days-ago> <message> — commit everything at that date
+  local t=$((NOW - $1 * DAY))
+  ( cd "$D" && git add -A && GIT_AUTHOR_DATE="@$t +0000" GIT_COMMITTER_DATE="@$t +0000" git -c commit.gpgsign=false commit -qm "$2" --no-verify )
+}
+( cd "$D" && mkdir -p src docs/reviews && echo 0 > src/fees.ts && echo 0 > src/tax.ts && echo 0 > src/raffle.ts && echo 0 > src/old.ts )
+gc 60 "chore: base"; ( cd "$D" && git branch -M develop )
+( cd "$D" && echo 1 >> src/fees.ts && printf '# Review\n🟢 Nit — src/other.ts:3\n' > docs/reviews/fees.md ); gc 30 "feat(fees): transfer fees (#10)"
+( cd "$D" && echo 1 >> src/tax.ts && printf '# Review\n🔴 Important — src/tax.ts:9 — rounding\n' > docs/reviews/tax.md ); gc 29 "feat(tax): VAT (#11)"
+( cd "$D" && echo 1 >> src/raffle.ts ); gc 28 "feat(raffle): draw (#12)"
+( cd "$D" && echo 1 >> src/old.ts ); gc 50 "feat(old): legacy (#9)"
+( cd "$D" && echo 2 >> src/fees.ts ); gc 25 "fix(fees): rounding on large amounts"
+( cd "$D" && echo 2 >> src/tax.ts ); gc 27 "fix(tax): VAT on zero-rated items"
+RSHA=$(cd "$D" && git log --format=%H --grep='draw (#12)' -1)
+( cd "$D" && t=$((NOW - 20 * DAY)) && GIT_AUTHOR_DATE="@$t +0000" GIT_COMMITTER_DATE="@$t +0000" git -c commit.gpgsign=false revert --no-edit "$RSHA" >/dev/null 2>&1 )
+( cd "$D" && echo 2 >> src/old.ts ); gc 10 "fix(old): long after the merge"
+OUT=$(cd "$D" && bash scripts/review-metrics.sh "90 days ago"); RC=$?
+assert_code "$RC" "0" "review-metrics runs on plain git history"
+assert_contains "$OUT" "PRs merged: 4" "every merged PR in the window is counted"
+assert_contains "$OUT" "| #10 |" "a fix touching a merged PR's files within the window is a slip"
+assert_contains "$(printf '%s\n' "$OUT" | grep '| #10 |')" "not flagged" "…and the review that missed it is named"
+assert_contains "$(printf '%s\n' "$OUT" | grep '| #11 |')" "| flagged |" "a slip the review did mention counts as flagged"
+assert_contains "$(printf '%s\n' "$OUT" | grep '| #12 |')" "reverted" "a reverted PR is reported"
+assert_contains "$(printf '%s\n' "$OUT" | grep '| #12 |')" "no review report" "a PR merged without a review report says so"
+assert_eq "$(printf '%s\n' "$OUT" | grep -c '| #9 |')" "0" "a fix outside the window (--days) is not a slip"
+assert_contains "$(cd "$D" && bash scripts/review-metrics.sh "90 days ago" --days 60)" "| #9 |" "--days widens the window"
+assert_contains "$OUT" "not flagged by review: 2" "the summary counts the misses"
+assert_code "$(cd "$D" && bash scripts/review-metrics.sh --days x >/dev/null 2>&1; echo $?)" "2" "--days needs a number"
+assert_code "$(cd "$D" && bash scripts/review-metrics.sh --base nosuch >/dev/null 2>&1; echo $?)" "2" "an unknown base branch fails clearly"
+rm -rf "$D"
+assert_contains "$(cat "$REPO/.devpilot/process.md")" "Review the reviewers" "process.md documents what to do with a miss"
+assert_contains "$(cat "$REPO/.devpilot/process.md")" "≥ 2 PRs" "a candidate rule must recur before it is added"
+assert_contains "$(cat "$REPO/.claude/skills/core-rules/SKILL.md")" "## Pruning" "core-rules has a Pruning section"
+assert_contains "$(cat "$REPO/.claude/commands/dp-release.md")" "review-metrics.sh" "a release runs review-metrics and prunes"
+
 echo "== DevPilot release metadata =="
 V=$(cat "$REPO/VERSION")
 assert_contains "$(cat "$REPO/CHANGELOG.md")" "## [$V]" "CHANGELOG.md has a section for VERSION $V (release notes)"
