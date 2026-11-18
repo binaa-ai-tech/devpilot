@@ -209,7 +209,7 @@ The standard process the team follows lives in `.devpilot/process.md`.
 | CI/CD, approvals, deploy target | `/dp-setup pipelines` · deploy script: `bash scripts/deploy-init.sh appservice\|iis\|kubernetes\|hook` |
 | Update every repo (GitHub or Azure DevOps) | `bash scripts/update-org.sh <github-org \| https://dev.azure.com/<org>[/<project>]>` |
 | Agents, merge policy, versioning | edit `project.config.md` (one line each) or `/dp-setup wizard` |
-| Update DevPilot itself | `bash install.sh --update` — never touches `project.config.md` or credentials |
+| Update DevPilot itself | `bash install.sh --update` — never touches `project.config.md` or credentials; keeps files your team edited (`--take <path>` / `--overwrite-edited` to take DevPilot's copy; `.devpilot/keep-local` to never touch a path) |
 | Update every repo in your org | `bash scripts/update-org.sh <org> --merge` (from the devpilot clone) — clones each repo, runs `--update` on the base branch, opens/merges one PR per repo; `--install-missing` fresh-installs with defaults where devpilot isn't present. **Never delete + re-install** — that loses per-project config; `--update` exists precisely so you don't have to. |
 
 Every routing decision is read from `project.config.md` at run time — no reinstall needed.
