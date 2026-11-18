@@ -334,12 +334,15 @@ fetch_summary() {
 # rollback, repo settings, force-push → always ask). Never removes the user's rules.
 ensure_permissions() {
   [ -f .claude/settings.json ] && command -v jq >/dev/null 2>&1 || return 0
+  keep_local .claude/settings.json && { skipped .claude/settings.json "listed in $KEEP_LOCAL"; return 0; }
   local src tmp
   src=$(mktemp); tmp=$(mktemp)
   fetch ".claude/settings.json" "$src" >/dev/null 2>&1 || { rm -f "$src" "$tmp"; return 0; }
+  # A rule the team put under ask or deny is never added to allow — that would loosen their policy.
   if jq --slurpfile d "$src" '
        .permissions = (.permissions // {})
-       | .permissions.allow = (((.permissions.allow // []) + ($d[0].permissions.allow // [])) | unique)
+       | ((.permissions.ask // []) + (.permissions.deny // [])) as $held
+       | .permissions.allow = (((.permissions.allow // []) + (($d[0].permissions.allow // []) - $held)) | unique)
        | .permissions.ask   = (((.permissions.ask // [])   + ($d[0].permissions.ask // []))   | unique)' \
        .claude/settings.json > "$tmp" 2>/dev/null; then
     if ! cmp -s "$tmp" .claude/settings.json; then

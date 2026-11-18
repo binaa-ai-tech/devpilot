@@ -622,6 +622,13 @@ assert_eq "$(cat "$D/.claude/skills/test-strategy/SKILL.md" 2>/dev/null)" "team-
 [ -s "$D/.devpilot/managed.sha" ] && ok "the update writes the manifest for the next one" || no "the update writes the manifest for the next one"
 [ -n "$(awk '$2=="scripts/doctor.sh"' "$D/.devpilot/managed.sha")" ] && no "a kept file with no recorded hash must stay unrecorded" || ok "a kept file with no recorded hash stays unrecorded"
 assert_contains "$(cat "$REPO/scripts/update-org.sh")" "update-skipped.txt" "update-org.sh puts kept and added files in the PR body"
+# The permissions merge never loosens the team's policy.
+( cd "$D" && jq '.permissions.allow -= ["Bash(git merge *)"] | .permissions.ask += ["Bash(git merge *)"] | .permissions.deny = ["Bash(git tag *)"] | .permissions.allow -= ["Bash(git tag *)"]' .claude/settings.json > s && mv s .claude/settings.json \
+  && bash "$REPO/install.sh" --update >/dev/null 2>&1 )
+assert_eq "$(jq -r '.permissions.allow | map(select(. == "Bash(git merge *)" or . == "Bash(git tag *)")) | length' "$D/.claude/settings.json")" "0" "--update never allows a rule the team put under ask or deny"
+assert_eq "$(jq -r '.permissions.ask | index("Bash(git merge *)") != null' "$D/.claude/settings.json")" "true" "the team's ask rule stays"
+( cd "$D" && echo '.claude/settings.json' > .devpilot/keep-local && jq '.permissions.allow = ["Bash(ls)"]' .claude/settings.json > s && mv s .claude/settings.json && bash "$REPO/install.sh" --update >/dev/null 2>&1 )
+assert_eq "$(jq -c '.permissions.allow' "$D/.claude/settings.json")" '["Bash(ls)"]' ".claude/settings.json in keep-local is not merged"
 rm -rf "$D"
 
 echo "== two-tier index + scope cache (token-lean) =="
