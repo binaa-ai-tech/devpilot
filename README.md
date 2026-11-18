@@ -6,7 +6,7 @@
 
 You write what you need in one sentence. DevPilot plans it, writes the code, tests it, reviews it, and merges it.
 
-[![Version](https://img.shields.io/badge/version-6.2.0-blue.svg)](VERSION)
+[![Version](https://img.shields.io/badge/version-6.3.0-blue.svg)](VERSION)
 [![License: MIT](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Runs on](https://img.shields.io/badge/runs%20on-Claude%20Code-7c3aed.svg)](#what-you-need)
 [![Stack](https://img.shields.io/badge/stack-Angular%20%7C%20.NET%20%7C%20Python%20%7C%20SQL%20Server-orange.svg)](#what-you-need)
@@ -84,7 +84,10 @@ Commit the new files, and you're ready:
 git add -A && git commit -m "chore: install devpilot"
 ```
 
-**Update DevPilot later** (your settings are kept): `bash install.sh --update`
+**Update DevPilot later** (your settings are kept): `bash install.sh --update`. Files your team edited
+are kept, not overwritten: `.devpilot/managed.sha` (commit it) records what DevPilot installed, and the
+update lists each file it kept. Take DevPilot's copy of one with `--take <path>`, or all of them with
+`--overwrite-edited`. Paths listed in `.devpilot/keep-local` are never touched.
 
 More detail on every installer question: [docs/setup-guide.md](docs/setup-guide.md).
 
@@ -397,7 +400,8 @@ native Claude Code skills in `.claude/skills/`, so Claude loads each one **only 
 
 The full list is in [.claude/skills/README.md](.claude/skills/README.md). The skills don't appear in the `/` menu:
 you only use the 11 `/dp-*` commands. Your team can edit a skill to match its own conventions; `--update`
-replaces DevPilot's skills with the new version, so keep your own rules in a skill with a different name.
+keeps an edited skill as it is (and so misses DevPilot's changes to it), so rules that should keep
+receiving updates are better kept in a skill with a different name.
 
 ### Elephant-Goldfish spec review
 
@@ -454,6 +458,12 @@ Needs Claude Code 2.1.271 or later. Refresh to a newer EGM release with `bash sc
 ---
 
 ## Upgrading
+
+**From 6.2 or earlier:** run `bash install.sh --update` and commit `.devpilot/managed.sha`. These installs
+have no record of what DevPilot wrote, so this one update keeps every file that matches no DevPilot
+release since 6.0. A file from an older release counts as edited, so check the kept list and take
+DevPilot's copy with `--take <path>` where you have no changes. It also lists the files it added. If
+your team had deleted one of those on purpose, delete it again and add it to `.devpilot/keep-local`.
 
 **From 5.9:** run `bash install.sh --update`. New: `/dp-spec` and the Elephant-Goldfish files in
 `.devpilot/egm` plus `egm-*` reviewer agents. `test-strategy` and `test-case-design` merge into
@@ -516,6 +526,7 @@ the whole repository. Test output is summarized. Simple tasks run on Haiku, hard
 
 **Rolling out to many repositories:** `bash scripts/update-org.sh <github-org> --merge`, or
 `AZDO_PAT=… bash scripts/update-org.sh https://dev.azure.com/<org>[/<project>] --merge`. It opens one update PR per repository, into `develop`.
+Each PR body lists the files kept because the team edited them, and the files added.
 
 **Real-app check:** `tests/real-app.sh` creates a real Angular + .NET + EF Core app, installs DevPilot and runs the generated build and tests.
 It runs weekly in CI (`.github/workflows/real-app.yml`).

@@ -108,23 +108,191 @@ fetch() {
 "
     FETCH_FAIL_COUNT=$((FETCH_FAIL_COUNT + 1))
   fi
+  case "$dst" in /*) ;; *) [ -f "$dst" ] && record "$dst" ;; esac
+  return 0
+}
+
+# ── Edited-file guard ────────────────────────────────────────────────────────
+# .devpilot/managed.sha (committed) records the hash of every managed file the installer wrote.
+# On --update a file is refreshed only when it is still exactly what DevPilot shipped:
+#   · recorded and unchanged                → refreshed
+#   · recorded and changed                  → the team edited it: kept
+#   · recorded but deleted                  → the team removed it: not re-added
+#   · not recorded (installs before 6.3.0)  → refreshed only if it matches a DevPilot release or
+#                                             the incoming copy; anything else is kept
+#   · listed in .devpilot/keep-local        → never touched (paths or globs, one per line)
+# Agent files are hashed without their model: line — model-profiles.sh rewrites it.
+# --overwrite-edited (or DEVPILOT_OVERWRITE_EDITED=1) restores the old overwrite-everything update.
+MANIFEST=".devpilot/managed.sha"
+KEEP_LOCAL=".devpilot/keep-local"
+SKIP_LOG=".devpilot/logs/update-skipped.txt"
+UPDATE_MODE=0
+OVERWRITE_EDITED="${DEVPILOT_OVERWRITE_EDITED:-0}"
+TAKE=""       # --take <path> (repeatable): take DevPilot's copy of this one edited file
+_prev=""
+for _arg in "$@"; do
+  case "$_arg" in
+    --overwrite-edited) OVERWRITE_EDITED=1 ;;
+    --take=*) TAKE="$TAKE ${_arg#--take=}" ;;
+  esac
+  [ "$_prev" = "--take" ] && TAKE="$TAKE $_arg"
+  _prev="$_arg"
+done
+NEW_MANIFEST=$(mktemp "${TMPDIR:-/tmp}/devpilot-manifest.XXXXXX")
+trap 'rm -f "$NEW_MANIFEST" ${KNOWN:+"$KNOWN"}; [ -n "${HIST_DIR:-}" ] && rm -rf "$HIST_DIR"; :' EXIT
+SKIPPED=""
+SKIP_COUNT=0
+KNOWN=""      # file of every DevPilot blob hash (lazy, see load_known)
+HISTORY=0     # 1 when DevPilot's git history was available to build KNOWN
+LEGACY=0      # 1 when updating an install that has no manifest yet (installed before 6.3.0)
+ADDED=""
+ADD_COUNT=0
+
+# dp_hash <file> [logical-path] — git blob hash; agent files without their model: line.
+dp_hash() {
+  case "${2:-$1}" in
+    .claude/agents/*.md) sed '/^model:/d' "$1" | git hash-object --stdin 2>/dev/null ;;
+    *) git hash-object "$1" 2>/dev/null ;;
+  esac
+}
+record() { local h; h=$(dp_hash "$1") && [ -n "$h" ] && printf '%s  %s\n' "$h" "$1" >> "$NEW_MANIFEST"; return 0; }
+manifest_hash() { [ -f "$MANIFEST" ] && awk -v p="$1" '$1 !~ /^#/ && $2 == p { print $1; exit }' "$MANIFEST"; return 0; }
+keep_local() {
+  [ -f "$KEEP_LOCAL" ] || return 1
+  local pat
+  while IFS= read -r pat || [ -n "$pat" ]; do
+    pat="${pat%%#*}"; pat="${pat%"${pat##*[![:space:]]}"}"; pat="${pat#"${pat%%[![:space:]]*}"}"
+    [ -z "$pat" ] && continue
+    case "$pat" in */) pat="${pat}*" ;; esac
+    # shellcheck disable=SC2254  # the entry is a glob on purpose
+    case "$1" in $pat) return 0 ;; esac
+  done < "$KEEP_LOCAL"
+  return 1
+}
+# Every blob DevPilot ever shipped: from the local clone, else a bare clone of the repo.
+load_known() {
+  [ -n "$KNOWN" ] && return 0
+  KNOWN=$(mktemp "${TMPDIR:-/tmp}/devpilot-known.XXXXXX")
+  local h=""
+  if [ -n "$DEVPILOT_LOCAL" ] && git -C "$DEVPILOT_LOCAL" rev-parse --git-dir >/dev/null 2>&1; then
+    h="$DEVPILOT_LOCAL"
+  else
+    HIST_DIR=$(mktemp -d "${TMPDIR:-/tmp}/devpilot-history.XXXXXX")
+    git clone -q --bare "${DEVPILOT_GIT_URL:-https://github.com/binaa-ai-tech/devpilot.git}" "$HIST_DIR/h" >/dev/null 2>&1 && h="$HIST_DIR/h"
+  fi
+  [ -n "$h" ] || return 0
+  HISTORY=1
+  git -C "$h" rev-list --objects --all 2>/dev/null | cut -d' ' -f1 >> "$KNOWN" || true
+  local b
+  git -C "$h" log --all --format= --raw --no-abbrev -- .claude/agents 2>/dev/null | awk '{ print $4 }' | sort -u \
+    | while IFS= read -r b; do
+        git -C "$h" cat-file -p "$b" 2>/dev/null | sed '/^model:/d' | git hash-object --stdin 2>/dev/null
+      done >> "$KNOWN" || true
+  return 0
+}
+is_known() { load_known; [ -n "$1" ] && grep -qxF "$1" "$KNOWN"; }
+# upstream_hash <src> <dst> — hash of the incoming copy (no failure bookkeeping).
+upstream_hash() {
+  local t h=""; t=$(mktemp "${TMPDIR:-/tmp}/devpilot-up.XXXXXX")
+  if { [ -n "$DEVPILOT_LOCAL" ] && [ -f "$DEVPILOT_LOCAL/$1" ] && cp "$DEVPILOT_LOCAL/$1" "$t"; } \
+     || curl -fsSL "$REPO/$1" -o "$t" 2>/dev/null; then h=$(dp_hash "$t" "$2"); fi
+  rm -f "$t"; printf '%s' "$h"
+}
+skipped() {
+  SKIPPED="${SKIPPED}    - $1 ($2)
+"
+  SKIP_COUNT=$((SKIP_COUNT + 1))
+  mkdir -p "$(dirname "$SKIP_LOG")"; printf '%s\t%s\n' "$1" "$2" >> "$SKIP_LOG"
+  local rec; rec=$(manifest_hash "$1"); [ -n "$rec" ] && printf '%s  %s\n' "$rec" "$1" >> "$NEW_MANIFEST"
+  return 0
+}
+# edited_reason <src> <dst> — prints why dst must be kept; prints nothing when it may be refreshed.
+edited_reason() {
+  local src="$1" dst="$2" rec cur
+  [ "$UPDATE_MODE" = 1 ] && [ "$OVERWRITE_EDITED" != 1 ] || return 0
+  case " $TAKE " in *" $dst "*) return 0 ;; esac
+  keep_local "$dst" && { echo "listed in $KEEP_LOCAL"; return 0; }
+  rec=$(manifest_hash "$dst")
+  if [ ! -e "$dst" ]; then
+    [ -n "$rec" ] && echo "deleted by the team — not re-added"
+    return 0
+  fi
+  cur=$(dp_hash "$dst")
+  if [ -n "$rec" ]; then
+    [ "$cur" = "$rec" ] || echo "edited since DevPilot installed it"
+  elif ! is_known "$cur" && [ "$cur" != "$(upstream_hash "$src" "$dst")" ]; then
+    echo "differs from every DevPilot release"
+  fi
+  return 0
+}
+# refresh <src> <dst> — fetch, unless the team changed dst (then keep theirs and report it).
+refresh() {
+  local why new=0; why=$(edited_reason "$1" "$2")
+  if [ -n "$why" ]; then skipped "$2" "$why"; return 0; fi
+  [ -e "$2" ] || new=1
+  fetch "$1" "$2"
+  # Without a manifest a missing file may be new in this release or one the team deleted: list it.
+  if [ "$UPDATE_MODE" = 1 ] && [ "$LEGACY" = 1 ] && [ "$new" = 1 ] && [ -f "$2" ]; then
+    ADDED="${ADDED}    - $2
+"
+    ADD_COUNT=$((ADD_COUNT + 1))
+    mkdir -p "$(dirname "$SKIP_LOG")"; printf '%s\t%s\n' "$2" "added (not present before)" >> "$SKIP_LOG"
+  fi
+  return 0
+}
+# retire <path> — remove a file DevPilot no longer ships, unless the team edited it.
+retire() {
+  local f="$1" cur rec
+  [ -f "$f" ] || return 0
+  if [ "$UPDATE_MODE" = 1 ] && [ "$OVERWRITE_EDITED" != 1 ]; then
+    rec=$(manifest_hash "$f"); cur=$(dp_hash "$f")
+    if keep_local "$f" || { [ -n "$rec" ] && [ "$cur" != "$rec" ]; } || { [ -z "$rec" ] && ! is_known "$cur"; }; then
+      skipped "$f" "retired by DevPilot but edited — kept; delete it when you no longer need it"
+      return 0
+    fi
+  fi
+  rm -f "$f"
+}
+write_manifest() {
+  mkdir -p .devpilot
+  { echo "# DevPilot managed files — the hash the installer wrote. install.sh --update refreshes a file"
+    echo "# only while its hash still matches; edit a file and the update keeps your version."
+    awk '!seen[$2]++' "$NEW_MANIFEST" | sort -k2,2; } > "$MANIFEST"
+  return 0
+}
+skip_summary() {
+  if [ "$ADD_COUNT" -gt 0 ]; then
+    echo ""
+    warn "${ADD_COUNT} file(s) added that this project did not have — new in DevPilot, or removed by your team"
+    warn "before DevPilot recorded its files (installs before 6.3.0). If your team removed one on purpose,"
+    warn "delete it again and add its path to $KEEP_LOCAL — later updates then leave it out:"
+    printf '%s' "$ADDED"
+  fi
+  [ "$SKIP_COUNT" -eq 0 ] && return 0
+  echo ""
+  warn "${SKIP_COUNT} file(s) kept as they are — your team changed them, so the update did not overwrite them:"
+  printf '%s' "$SKIPPED"
+  [ "$HISTORY" = 1 ] || warn "DevPilot's history was unreachable, so older unedited copies may be listed too."
+  echo "    Compare one with DevPilot's copy, then take it:  bash install.sh --update --take <path>"
+  echo "    Take them all:  bash install.sh --update --overwrite-edited   (list: $SKIP_LOG)"
+  echo "    Never touch one again: add its path to $KEEP_LOCAL"
 }
 
 # Native Claude Code skills shipped by DevPilot (.claude/skills/<name>/SKILL.md).
 DEVPILOT_SKILLS="core-rules definition-of-ready spec-review architecture-guard angular-dev angular-testing accessibility dotnet-api efcore-sqlserver dotnet-testing python-api python-testing api-contract test-design ui-e2e-playwright token-lean-testing test-guard verify-change performance review-checklist security-scan definition-of-done auto-merge release-ops self-heal stack-upgrade"
 install_skills() {
   local n
-  for n in $DEVPILOT_SKILLS; do fetch ".claude/skills/$n/SKILL.md" ".claude/skills/$n/SKILL.md"; done
-  fetch ".claude/skills/README.md" ".claude/skills/README.md"
+  for n in $DEVPILOT_SKILLS; do refresh ".claude/skills/$n/SKILL.md" ".claude/skills/$n/SKILL.md"; done
+  refresh ".claude/skills/README.md" ".claude/skills/README.md"
   # v6.0 merged test-strategy + test-case-design → test-design and estimation-and-slicing →
   # definition-of-ready. Remove DevPilot's old copies; a team-edited folder with extra files stays.
   for n in test-strategy test-case-design estimation-and-slicing; do
-    rm -f ".claude/skills/$n/SKILL.md"; rmdir ".claude/skills/$n" 2>/dev/null || true
+    retire ".claude/skills/$n/SKILL.md"; rmdir ".claude/skills/$n" 2>/dev/null || true
   done
   # Before v5.5 skills lived in .devpilot/skills/*.md — remove DevPilot's copies there
   # (code-review.md is now review-checklist), keep anything the team added.
   if [ -d .devpilot/skills ]; then
-    for n in $DEVPILOT_SKILLS code-review README; do rm -f ".devpilot/skills/$n.md"; done
+    for n in $DEVPILOT_SKILLS code-review README; do retire ".devpilot/skills/$n.md"; done
     rmdir .devpilot/skills 2>/dev/null || true
   fi
 }
@@ -196,8 +364,12 @@ ensure_usage_hook() {
 
 run_update() {
   echo ""
-  echo -e "${BOLD}  devpilot — update (config preserved)${RESET}"
+  echo -e "${BOLD}  devpilot — update (config preserved; files your team edited are kept)${RESET}"
   echo ""
+  UPDATE_MODE=1
+  [ -f "$MANIFEST" ] || LEGACY=1
+  rm -f "$SKIP_LOG"
+  [ "$OVERWRITE_EDITED" = 1 ] || load_known
 
   RULE_SNIPPETS="angular.md dotnet.md python.md sqlserver.md"
   PROMPT_TEAM="ba-agent.md lead-plan.md lead-review.md frontend-agent.md dotnet-agent.md python-agent.md qa-agent.md"
@@ -207,29 +379,29 @@ run_update() {
   SCRIPTS="git-flow.sh resolve-model.sh model-profiles.sh checkpoint.sh devpilot-config.sh devpilot-lib.sh tracker.sh jira.sh azdo.sh github.sh git-host.sh version.sh close-delivery.sh open-pr.sh scope.sh scope-guard.sh test-guard.sh run-tests.sh generate-ci.sh protect-branches.sh notify.sh session-start.sh doctor.sh status.sh audit.sh changelog.sh rollback.sh metrics.sh scope-hook.sh install-git-hooks.sh deploy.sh smoke.sh setup-environments.sh db-package.sh usage-hook.sh deploy-init.sh generate-project-index.sh generate-backlog-index.sh md-to-adf.sh sync-egm.sh verify.sh rules-guard.sh reliability.sh commit-gate.sh review-metrics.sh"
 
   info "Refreshing .devpilot/rules..."
-  fetch ".devpilot/rules.md" ".devpilot/rules.md"
-  fetch ".devpilot/process.md" ".devpilot/process.md"
-  fetch "docs/setup-guide.md" "docs/setup-guide.md"
+  refresh ".devpilot/rules.md" ".devpilot/rules.md"
+  refresh ".devpilot/process.md" ".devpilot/process.md"
+  refresh "docs/setup-guide.md" "docs/setup-guide.md"
   # The reliability checklist grows with the project (items whose Origin is one of its PRs):
   # install it once, never overwrite it.
   [ -f .devpilot/reliability-checklist.md ] || fetch ".devpilot/reliability-checklist.md" ".devpilot/reliability-checklist.md"
-  for f in $RULE_SNIPPETS;   do fetch ".devpilot/rules/$f"        ".devpilot/rules/$f";        done
-  for f in $PROMPT_TEAM;     do fetch ".devpilot/prompts/team/$f" ".devpilot/prompts/team/$f"; done
-  rm -f .devpilot/prompts/6-env-diff.md   # v6.0: folded into the self-heal skill
-  for f in $TEMPLATE_TEAM;   do fetch ".devpilot/templates/team/$f" ".devpilot/templates/team/$f"; done
-  fetch ".devpilot/templates/changelog-entry.md" ".devpilot/templates/changelog-entry.md"
+  for f in $RULE_SNIPPETS;   do refresh ".devpilot/rules/$f"        ".devpilot/rules/$f";        done
+  for f in $PROMPT_TEAM;     do refresh ".devpilot/prompts/team/$f" ".devpilot/prompts/team/$f"; done
+  retire .devpilot/prompts/6-env-diff.md   # v6.0: folded into the self-heal skill
+  for f in $TEMPLATE_TEAM;   do refresh ".devpilot/templates/team/$f" ".devpilot/templates/team/$f"; done
+  refresh ".devpilot/templates/changelog-entry.md" ".devpilot/templates/changelog-entry.md"
   mkdir -p .devpilot/templates/deploy
-  for f in appservice.sh iis.sh kubernetes.sh db.sh; do fetch ".devpilot/templates/deploy/$f" ".devpilot/templates/deploy/$f"; done
+  for f in appservice.sh iis.sh kubernetes.sh db.sh; do refresh ".devpilot/templates/deploy/$f" ".devpilot/templates/deploy/$f"; done
   install_skills
   install_egm
-  fetch ".devpilot/config/models.md" ".devpilot/config/models.md"
+  refresh ".devpilot/config/models.md" ".devpilot/config/models.md"
 
   info "Refreshing .claude/..."
-  for f in $CMDS;       do fetch ".claude/commands/$f" ".claude/commands/$f"; done
-  for f in $AGENTS_LIST; do fetch ".claude/agents/$f"  ".claude/agents/$f";  done
+  for f in $CMDS;       do refresh ".claude/commands/$f" ".claude/commands/$f"; done
+  for f in $AGENTS_LIST; do refresh ".claude/agents/$f"  ".claude/agents/$f";  done
 
   info "Refreshing scripts/..."
-  for f in $SCRIPTS; do fetch "scripts/$f" "scripts/$f"; chmod +x "scripts/$f" 2>/dev/null || true; done
+  for f in $SCRIPTS; do refresh "scripts/$f" "scripts/$f"; chmod +x "scripts/$f" 2>/dev/null || true; done
 
   # Retired in the Angular + .NET consolidation — merged into the skills above.
   info "Removing retired skills, rules, and agents..."
@@ -242,23 +414,23 @@ run_update() {
     skills/performance-testing.md skills/debug-method.md skills/documentation.md
     rules/react-vue.md rules/node.md rules/go.md rules/java.md rules/postgres-mysql.md
     prompts/team/backend-agent.md"
-  for f in $RETIRED; do rm -f ".devpilot/$f"; done
-  rm -f .claude/agents/team-backend.md
+  for f in $RETIRED; do retire ".devpilot/$f"; done
+  retire .claude/agents/team-backend.md
   # Retired in the Claude-only move (OpenCode/Antigravity support + renamed commands).
-  for f in ceo.md dp-config.md dp-autofix.md dp-review-fix.md dp-rollback.md; do rm -f ".claude/commands/$f"; done
-  for f in run-command.sh run-mode.sh resolve-engine.sh ceo.sh dp-plan.sh dp-build.sh dp-sprint.sh dp-release.sh dp-status.sh dp-config.sh; do rm -f "scripts/$f"; done
+  for f in ceo.md dp-config.md dp-autofix.md dp-review-fix.md dp-rollback.md; do retire ".claude/commands/$f"; done
+  for f in run-command.sh run-mode.sh resolve-engine.sh ceo.sh dp-plan.sh dp-build.sh dp-sprint.sh dp-release.sh dp-status.sh dp-config.sh; do retire "scripts/$f"; done
   rm -rf .opencode
   # Retired in the multi-tracker move — replaced by tracker.sh + jira.sh / azdo.sh / github.sh.
   for f in track.sh jira-guard.sh jira-sprint.sh create-jira-ticket.sh create-jira-epic.sh update-jira-status.sh \
-           update-jira-description.sh add-jira-comment.sh link-jira-issues.sh jira-describe.sh; do rm -f "scripts/$f"; done
-  rm -f .devpilot/templates/team/jira-brief.md
+           update-jira-description.sh add-jira-comment.sh link-jira-issues.sh jira-describe.sh; do retire "scripts/$f"; done
+  retire .devpilot/templates/team/jira-brief.md
   # Replaced by deploy.sh + smoke.sh and the generated devpilot-cd pipeline.
-  for f in deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh; do rm -f "scripts/$f"; done
+  for f in deploy-dev.sh deploy-sit.sh deploy-uat.sh deploy-prd.sh; do retire "scripts/$f"; done
   # Unused by any command (v5.4.2 cleanup): feature branches come from git-flow.sh; the
   # PR template carries the checklist; test generation lives in team-qa.
-  for f in new-feature.sh preflight-scan.sh run-summary.sh; do rm -f "scripts/$f"; done
+  for f in new-feature.sh preflight-scan.sh run-summary.sh; do retire "scripts/$f"; done
   rm -rf .devpilot/checklists
-  rm -f .devpilot/prompts/6-generate-tests.md .devpilot/templates/ticket.md .github/BRANCH_NAMING.md
+  for f in .devpilot/prompts/6-generate-tests.md .devpilot/templates/ticket.md .github/BRANCH_NAMING.md; do retire "$f"; done
 
   # Refetching the agent files above reset their model: frontmatter to repo
   # defaults — re-sync it from the user's project.config.md so their chosen
@@ -276,6 +448,8 @@ run_update() {
     grep -qxF "$entry" .gitignore || echo "$entry" >> .gitignore
   done
 
+  write_manifest
+  skip_summary
   fetch_summary || true
 
   echo ""
@@ -1185,6 +1359,9 @@ echo "    /dp-setup tracker      — connect Jira / Azure DevOps / GitHub Issues
 echo "    /dp-setup models       — switch Claude model profile (auto | balanced | save)"
 echo "    Edit project.config.md directly"
 echo ""
+
+# Record what was installed, so a later --update can tell the team's edits from DevPilot's files.
+write_manifest
 
 # Surface any skipped files last, so an incomplete install can't slip by unnoticed.
 fetch_summary || true

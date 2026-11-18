@@ -573,6 +573,57 @@ ERR=$( cd "$REPO" && bash ./install.sh --update 2>&1 >/dev/null ); RC=$?
 assert_code "$RC" "1" "install.sh refuses to run inside the DevPilot repo"
 assert_contains "$ERR" "DevPilot repo itself" "the refusal points to the project instead"
 
+echo "== --update keeps the files a team edited =="
+D=$(mktemp -d); git -C "$D" init -q
+( cd "$D" && DEVPILOT_LOCAL="$REPO" bash "$REPO/install.sh" --defaults >/dev/null 2>&1 < /dev/null )
+M="$D/.devpilot/managed.sha"
+[ -s "$M" ] && ok "a fresh install records .devpilot/managed.sha" || no "a fresh install records .devpilot/managed.sha"
+assert_eq "$(awk '$2=="scripts/doctor.sh" {print $1}' "$M")" "$(cd "$D" && git hash-object scripts/doctor.sh)" "the manifest holds the installed file's blob hash"
+( cd "$D" && echo "# team change" >> scripts/doctor.sh && rm .claude/commands/dp-release.md \
+  && printf '# local\nscripts/audit.sh   # our scanner\n.devpilot/rules/\n' > .devpilot/keep-local \
+  && echo "# ours" >> scripts/audit.sh && echo "# ours" >> .devpilot/rules/angular.md \
+  && echo "# stale" >> scripts/status.sh && bash scripts/model-profiles.sh apply save >/dev/null 2>&1 )
+STATUS_HASH=$(cd "$D" && git hash-object scripts/status.sh)
+( cd "$D" && awk -v h="$STATUS_HASH" '$2=="scripts/status.sh" {$1=h} {print}' OFS='  ' .devpilot/managed.sha > m && mv m .devpilot/managed.sha )
+OUT=$( cd "$D" && bash "$REPO/install.sh" --update 2>&1 ); RC=$?
+assert_code "$RC" "0" "--update with edited files still succeeds"
+assert_eq "$(tail -1 "$D/scripts/doctor.sh")" "# team change" "an edited managed file is kept"
+[ -f "$D/.claude/commands/dp-release.md" ] && no "a recorded file the team deleted must not come back" || ok "a recorded file the team deleted is not re-added"
+assert_eq "$(tail -1 "$D/scripts/audit.sh")" "# ours" "a path in .devpilot/keep-local is never touched"
+assert_eq "$(tail -1 "$D/.devpilot/rules/angular.md")" "# ours" "a keep-local directory entry covers its files"
+cmp -s "$D/scripts/status.sh" "$REPO/scripts/status.sh" && ok "an unedited file (hash still recorded) is refreshed" || no "an unedited file (hash still recorded) is refreshed"
+grep -q '^model: claude-haiku' "$D/.claude/agents/team-qa.md" && ok "agents keep the profile's model after the update" || no "agents keep the profile's model after the update"
+[[ "$OUT" == *"team-qa.md"* ]] && no "a model: change alone is not an edit" || ok "a model: change alone is not an edit"
+assert_contains "$OUT" "scripts/doctor.sh (edited since DevPilot installed it)" "the summary names each kept file and why"
+assert_contains "$OUT" "--take <path>" "the summary says how to take DevPilot's copy"
+assert_contains "$(cat "$D/.devpilot/logs/update-skipped.txt")" "scripts/doctor.sh	edited" "kept files are logged for update-org's PR body"
+OUT=$( cd "$D" && bash "$REPO/install.sh" --update 2>&1 )
+assert_eq "$(tail -1 "$D/scripts/doctor.sh")" "# team change" "a second update still keeps the edit (its original hash stays recorded)"
+( cd "$D" && bash "$REPO/install.sh" --update --take scripts/doctor.sh >/dev/null 2>&1 )
+cmp -s "$D/scripts/doctor.sh" "$REPO/scripts/doctor.sh" && ok "--take <path> takes DevPilot's copy of one file" || no "--take <path> takes DevPilot's copy of one file"
+( cd "$D" && echo "# again" >> scripts/doctor.sh && bash "$REPO/install.sh" --update --overwrite-edited >/dev/null 2>&1 )
+cmp -s "$D/scripts/doctor.sh" "$REPO/scripts/doctor.sh" && ok "--overwrite-edited restores the overwrite-everything update" || no "--overwrite-edited restores the overwrite-everything update"
+[ -f "$D/.claude/commands/dp-release.md" ] && ok "--overwrite-edited also re-adds deleted files" || no "--overwrite-edited also re-adds deleted files"
+# An install from before the manifest: a file is refreshed only if it matches a DevPilot release.
+( cd "$D" && rm .devpilot/managed.sha .devpilot/keep-local && echo "# legacy edit" >> scripts/doctor.sh && rm scripts/notify.sh )
+OLD=$(git -C "$REPO" rev-list --max-parents=0 HEAD 2>/dev/null | tail -1)
+OLDCFG=$(git -C "$REPO" show "$OLD:scripts/devpilot-config.sh" 2>/dev/null)
+[ -n "$OLDCFG" ] && printf '%s\n' "$OLDCFG" > "$D/scripts/devpilot-config.sh"
+mkdir -p "$D/.claude/skills/test-strategy"; echo "team-written" > "$D/.claude/skills/test-strategy/SKILL.md"
+OUT=$( cd "$D" && bash "$REPO/install.sh" --update 2>&1 )
+assert_eq "$(tail -1 "$D/scripts/doctor.sh")" "# legacy edit" "no manifest: a file that matches no DevPilot release is kept"
+assert_contains "$OUT" "scripts/doctor.sh (differs from every DevPilot release)" "no manifest: the kept file is named"
+if [ -n "$OLDCFG" ]; then
+  cmp -s "$D/scripts/devpilot-config.sh" "$REPO/scripts/devpilot-config.sh" && ok "no manifest: an older DevPilot release's copy is refreshed" || no "no manifest: an older DevPilot release's copy is refreshed"
+fi
+[ -f "$D/scripts/notify.sh" ] && ok "no manifest: a missing file is added" || no "no manifest: a missing file is added"
+assert_contains "$OUT" "scripts/notify.sh" "no manifest: added files are listed for review"
+assert_eq "$(cat "$D/.claude/skills/test-strategy/SKILL.md" 2>/dev/null)" "team-written" "a retired file the team edited is kept, not deleted"
+[ -s "$D/.devpilot/managed.sha" ] && ok "the update writes the manifest for the next one" || no "the update writes the manifest for the next one"
+[ -n "$(awk '$2=="scripts/doctor.sh"' "$D/.devpilot/managed.sha")" ] && no "a kept file with no recorded hash must stay unrecorded" || ok "a kept file with no recorded hash stays unrecorded"
+assert_contains "$(cat "$REPO/scripts/update-org.sh")" "update-skipped.txt" "update-org.sh puts kept and added files in the PR body"
+rm -rf "$D"
+
 echo "== two-tier index + scope cache (token-lean) =="
 D=$(mktemp -d); git -C "$D" init -q; git -C "$D" config user.email t@t.t; git -C "$D" config user.name t; git -C "$D" config commit.gpgsign false
 mkdir -p "$D/scripts" "$D/src/app/header" "$D/src/orders"

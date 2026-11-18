@@ -51,7 +51,18 @@ curl -fsSL "$RAW/install.sh" -o "$INSTALLER" || { echo "❌ could not download i
 VER=$(curl -fsSL "$RAW/VERSION" 2>/dev/null | tr -d '[:space:]'); VER="${VER:-latest}"
 BR="chore/devpilot-update-$VER"
 TITLE="chore(devpilot): update to v$VER"
-BODY="Automated devpilot refresh via \`scripts/update-org.sh\` — \`install.sh --update\` only touches managed files; \`project.config.md\` and \`.devpilot/config.sh\` are untouched. Integration branch only; feature branches inherit on rebase/merge."
+BODY="Automated devpilot refresh via \`scripts/update-org.sh\` — \`install.sh --update\` only touches managed files; \`project.config.md\` and \`.devpilot/config.sh\` are untouched. Files the team edited are kept, not overwritten (\`.devpilot/managed.sha\` records what DevPilot installed). Integration branch only; feature branches inherit on rebase/merge."
+# pr_body — BODY plus what the update kept and added (install.sh writes .devpilot/logs/update-skipped.txt).
+pr_body() {
+  local log=.devpilot/logs/update-skipped.txt kept added
+  printf '%s\n' "$BODY"
+  [ -s "$log" ] || return 0
+  kept=$(awk -F'\t' '$2 !~ /^added/ { printf "- `%s` — %s\n", $1, $2 }' "$log")
+  added=$(awk -F'\t' '$2 ~ /^added/ { printf "- `%s`\n", $1 }' "$log")
+  [ -n "$kept" ] && printf '\n### Kept as the team has them (not overwritten)\n%s\n\nTake DevPilot'"'"'s copy of one: `bash install.sh --update --take <path>`. Never touch one: list it in `.devpilot/keep-local`.\n' "$kept"
+  [ -n "$added" ] && printf '\n### Added (this project did not have them)\nNew in DevPilot — or removed by the team before DevPilot recorded its files. If one was removed on purpose, delete it in this PR and list it in `.devpilot/keep-local`.\n%s\n' "$added"
+  return 0
+}
 
 # ── repo inventory: "<display>\t<clone-url>\t<default-branch>" ─────────────────
 az_get() { curl -sS --max-time 30 --user ":$AZDO_PAT" -H 'Accept: application/json' "$1"; }
@@ -116,13 +127,13 @@ while IFS=$'\t' read -r NAME URL DEFBR; do
     git push -q -u origin "$BR" || exit 5
 
     if [ "$HOST" = github ]; then
-      gh pr create --base "$BASE" --head "$BR" --title "$TITLE" --body "$BODY" >/dev/null 2>&1 || exit 5
+      gh pr create --base "$BASE" --head "$BR" --title "$TITLE" --body "$(pr_body)" >/dev/null 2>&1 || exit 5
       if [ "$MERGE" = 1 ]; then
         gh pr merge "$BR" --squash --delete-branch >/dev/null 2>&1 && exit 0
         gh pr merge "$BR" --squash --auto --delete-branch >/dev/null 2>&1 && exit 0
       fi
     else
-      PR=$(bash scripts/azdo.sh pr-create "$BASE" "$TITLE" "$BODY" 2>/dev/null) || exit 5
+      PR=$(bash scripts/azdo.sh pr-create "$BASE" "$TITLE" "$(pr_body)" 2>/dev/null) || exit 5
       echo "  $PR"
       [ "$MERGE" = 1 ] && { bash scripts/azdo.sh pr-complete "${PR##*/}" >/dev/null 2>&1; RC=$?; [ "$RC" = 0 ] || [ "$RC" = 3 ] && exit 0; }
     fi

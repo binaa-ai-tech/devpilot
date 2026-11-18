@@ -4,6 +4,25 @@ All notable changes to DevPilot. Versions follow [SemVer](https://semver.org); e
 section becomes the GitHub Release notes when the `vx.y.z` tag is pushed
 (`.github/workflows/release.yml`).
 
+## [6.3.0] — 2026-11-18
+
+### Changed
+- **`install.sh --update` keeps the files a team edited.** Every install and update records the hash
+  of each managed file it wrote in `.devpilot/managed.sha` (commit it). A later update refreshes a file
+  only while its hash still matches. An edited file is kept, a deleted one is not re-added, and a
+  retired file is removed only if unedited. Agent files are compared without their `model:` line,
+  which model profiles rewrite. The update lists what it kept and why. `--take <path>` takes DevPilot's
+  copy of one file, `--overwrite-edited` gives the old behaviour, and paths in `.devpilot/keep-local`
+  (paths, globs or `dir/`) are never touched.
+- **Installs before 6.3.0** have no manifest. Their first update refreshes a file only if it matches a
+  DevPilot release (from git history) or the incoming copy, and keeps the rest. It also lists the
+  files it added, since it cannot tell a new file from one the team deleted.
+- **`update-org.sh` PRs list the kept and added files** in the PR body.
+
+### Fixed
+- An org update no longer silently reverts a project's own fixes to DevPilot files. Before this, it
+  overwrote locally patched scripts and brought back commands a team had removed on purpose.
+
 ## [6.2.0] — 2026-11-18
 
 ### Added
