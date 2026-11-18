@@ -4,6 +4,14 @@ All notable changes to DevPilot. Versions follow [SemVer](https://semver.org); e
 section becomes the GitHub Release notes when the `vx.y.z` tag is pushed
 (`.github/workflows/release.yml`).
 
+## [6.3.1] — 2026-11-19
+
+### Fixed
+- **`--update` no longer loosens a team's permissions.** The `.claude/settings.json` merge added
+  DevPilot's `allow` rules even when the project had put the same rule under `ask` or `deny` (for
+  example `git merge`, `git pull` or `git tag`). It now skips those, and leaves the file alone when it is
+  listed in `.devpilot/keep-local`.
+
 ## [6.3.0] — 2026-11-18
 
 ### Changed
